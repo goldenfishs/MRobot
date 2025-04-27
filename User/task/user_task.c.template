@@ -9,4 +9,4 @@ const osThreadAttr_t attr_init = {
 };
 
 // 用户自定义任务
-{{task_attr_definitions}}
+{{{{task_attr_definitions}}}}

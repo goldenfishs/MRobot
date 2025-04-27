@@ -12,29 +12,29 @@ extern "C" {
 typedef struct {
     /* 各任务，也可以叫做线程 */
     struct {
-{{thread_definitions}}
+{{{{thread_definitions}}}}
     } thread;
 
     struct {
-{{heap_water_mark_definitions}}
+{{{{heap_water_mark_definitions}}}}
     } heap_water_mark; /* heap使用 */
 
     struct {
-{{freq_definitions}}
+{{{{freq_definitions}}}}
     } freq; /* 任务运行频率 */
 
     struct {
-{{last_up_time_definitions}}
+{{{{last_up_time_definitions}}}}
     } last_up_time; /* 任务最近运行时间 */
 } Task_Runtime_t;
 
 // 任务频率和初始化延时
-{{task_frequency_definitions}}
-{{task_init_delay_definitions}}
+{{{{task_frequency_definitions}}}}
+{{{{task_init_delay_definitions}}}}
 
 // 任务句柄
 typedef struct {
-{{task_handle_definitions}}
+{{{{task_handle_definitions}}}}
 } Task_Handles_t;
 
 // 任务运行时结构体
@@ -42,11 +42,11 @@ extern Task_Runtime_t task_runtime;
 
 // 初始化任务句柄
 extern const osThreadAttr_t attr_init;
-{{task_attr_declarations}}
+{{{{task_attr_declarations}}}}
 
 // 任务函数声明
 void Task_Init(void *argument);
-{{task_function_declarations}}
+{{{{task_function_declarations}}}}
 
 #ifdef __cplusplus
 }
