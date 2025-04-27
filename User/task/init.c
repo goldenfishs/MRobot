@@ -4,12 +4,10 @@
 
 /* Includes ----------------------------------------------------------------- */
 #include "task\user_task.h"
-#include "device\can.h"
 /* Private typedef ---------------------------------------------------------- */
 /* Private define ----------------------------------------------------------- */
 /* Private macro ------------------------------------------------------------ */
 /* Private variables -------------------------------------------------------- */
-
 /* Private function --------------------------------------------------------- */
 /* Exported functions ------------------------------------------------------- */
 
@@ -23,16 +21,11 @@ void Task_Init(void *argument) {
 
   osKernelLock(); // 锁定内核，防止任务切换
 
-  // 创建任务，确保任务创建成功
-  task_runtime.thread.disp = osThreadNew(Task_Disp, NULL, &attr_disp);
-  task_runtime.thread.can = osThreadNew(Task_Can, NULL, &attr_can);
-  task_runtime.thread.monitor = osThreadNew(Task_Monitor, NULL, &attr_monitor);
-  task_runtime.thread.pc = osThreadNew(Task_PC, NULL, &attr_pc);
+  task_runtime.thread.user_task = osThreadNew(Task_UserTask, NULL, &attr_user_task);
 
   //创建消息队列
-  task_runtime.msgq.can.feedback.sick = osMessageQueueNew(2u, sizeof(CAN_t), NULL);
-  task_runtime.msgq.pc = osMessageQueueNew(2u, sizeof(CAN_t), NULL);
-  
+  task_runtime.msgq.user_msg= osMessageQueueNew(2u, 10, NULL);
+
   osKernelUnlock(); // 解锁内核
   osThreadTerminate(osThreadGetId()); // 任务完成后结束自身
 }
