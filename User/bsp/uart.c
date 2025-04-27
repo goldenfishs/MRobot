@@ -9,8 +9,12 @@ static void (*UART_Callback[BSP_UART_NUM][BSP_UART_CB_NUM])(void);
 
 /* Private function  -------------------------------------------------------- */
 static BSP_UART_t UART_Get(UART_HandleTypeDef *huart) {
-  if (huart->Instance == USART1)
-    return BSP_UART_SINDT;
+  if (huart->Instance == UART1)
+    return BSP_UART_UART1;
+  else if (huart->Instance == UART2)
+    return BSP_UART_UART2;
+  else if (huart->Instance == UART3)
+    return BSP_UART_UART3;
   else
     return BSP_UART_ERR;
 }
@@ -99,8 +103,12 @@ void BSP_UART_IRQHandler(UART_HandleTypeDef *huart) {
 
 UART_HandleTypeDef *BSP_UART_GetHandle(BSP_UART_t uart) {
   switch (uart) {
-    case BSP_UART_SINDT:
+    case BSP_UART_UART1:
       return &huart1;
+    case BSP_UART_UART2:
+      return &huart2;
+    case BSP_UART_UART3:
+      return &huart3;
     default:
       return NULL;
   }
