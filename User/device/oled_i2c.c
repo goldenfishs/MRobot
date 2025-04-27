@@ -19,8 +19,18 @@ static struct {
 } dirty_rect = {0, 0, 0, 0, 0};
 
 /* Private function prototypes ---------------------------------------------- */
-static void OLED_WriteCommand(uint8_t cmd);
-static void OLED_WriteData(uint8_t *data, uint16_t size);
+static void OLED_WriteCommand(uint8_t cmd) {
+    uint8_t data[2] = {0x00, cmd};
+    HAL_I2C_Master_Transmit(BSP_I2C_GetHandle(BSP_I2C_OLED), OLED_I2C_ADDR, data, 2, HAL_MAX_DELAY);
+}
+
+static void OLED_WriteData(uint8_t *data, uint16_t size) {
+    uint8_t buffer[size + 1];
+    buffer[0] = 0x40;
+    memcpy(&buffer[1], data, size);
+    HAL_I2C_Master_Transmit(BSP_I2C_GetHandle(BSP_I2C_OLED), OLED_I2C_ADDR, buffer, size + 1, HAL_MAX_DELAY);
+}
+
 static void OLED_MarkDirty(uint8_t x, uint8_t y);
 static void OLED_UpdateDirtyScreen(void);
 
@@ -253,16 +263,4 @@ static void OLED_UpdateDirtyScreen(void) {
     }
 
     dirty_rect.dirty = 0;
-}
-
-static void OLED_WriteCommand(uint8_t cmd) {
-    uint8_t data[2] = {0x00, cmd};
-    HAL_I2C_Master_Transmit(BSP_I2C_GetHandle(BSP_I2C_OLED), OLED_I2C_ADDR, data, 2, HAL_MAX_DELAY);
-}
-
-static void OLED_WriteData(uint8_t *data, uint16_t size) {
-    uint8_t buffer[size + 1];
-    buffer[0] = 0x40;
-    memcpy(&buffer[1], data, size);
-    HAL_I2C_Master_Transmit(BSP_I2C_GetHandle(BSP_I2C_OLED), OLED_I2C_ADDR, buffer, size + 1, HAL_MAX_DELAY);
 }
