@@ -2,33 +2,16 @@
 
 Task_Runtime_t task_runtime;
 
-// 定义任务属性
 const osThreadAttr_t attr_init = {
     .name = "Task_Init",
     .priority = osPriorityRealtime,
     .stack_size = 256 * 4,
 };
 
-const osThreadAttr_t attr_can = {
-    .name = "Task_Can",
-    .priority = osPriorityRealtime,
-    .stack_size = 128 * 4,
-};
+//用户自定义任务
 
-const osThreadAttr_t attr_disp = {
-    .name = "Task_Disp",
-    .priority = osPriorityRealtime,
-    .stack_size = 1024 * 4,
-};
-
-const osThreadAttr_t attr_monitor = {
-    .name = "Task_Monitor",
-    .priority = osPriorityRealtime,
-    .stack_size = 128 * 4,
-};
-
-const osThreadAttr_t attr_pc = {
-    .name = "Task_PC",
+const osThreadAttr_t attr_user_task = {
+    .name = "Task_User",
     .priority = osPriorityRealtime,
     .stack_size = 128 * 4,
 };
