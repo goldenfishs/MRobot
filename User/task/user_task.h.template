@@ -16,6 +16,10 @@ typedef struct {
     } thread;
 
     struct {
+        osMessageQueueId_t user_msg; /* 用户自定义任务消息队列 */
+    } msgq;
+
+    struct {
 {{heap_water_mark_definitions}}
     } heap_water_mark; /* heap使用 */
 
@@ -28,8 +32,10 @@ typedef struct {
     } last_up_time; /* 任务最近运行时间 */
 } Task_Runtime_t;
 
-// 任务频率和初始化延时
+// 任务频率
 {{task_frequency_definitions}}
+// 任务初始化延时
+#define TASK_INIT_DELAY (100u)
 {{task_init_delay_definitions}}
 
 // 任务句柄
