@@ -151,6 +151,7 @@ class MRobotApp:
         except Exception as e:
             print(f"创建目录时出错: {e}")
 
+
     # 更新 FreeRTOS 状态标签
     def update_freertos_status(self, label):
         if self.ioc_data:
@@ -199,11 +200,12 @@ class MRobotApp:
         self.header_files_frame = header_files_frame
         self.update_header_files()
 
-        # 任务管理框
-        task_frame = tk.LabelFrame(module_task_frame, text="任务管理", padx=10, pady=10, font=("Arial", 10, "bold"))
-        task_frame.pack(side="left", fill="both", expand=True, padx=5)
-        self.task_frame = task_frame
-        self.update_task_ui()
+
+        if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
+            task_frame = tk.LabelFrame(module_task_frame, text="任务管理", padx=10, pady=10, font=("Arial", 10, "bold"))
+            task_frame.pack(side="left", fill="both", expand=True, padx=5)
+            self.task_frame = task_frame
+            self.update_task_ui()
 
         # 生成按钮和 .gitignore 选项
         button_frame = tk.Frame(main_frame)
@@ -476,17 +478,21 @@ class MRobotApp:
             print(f"生成 init.c 文件时出错: {e}")
 
     # 修改 generate_action 方法
+    
     def generate_action(self):
         def task():
-            # 检查并创建目录
+            # 检查并创建目录（与 FreeRTOS 状态无关的模块始终创建）
             self.create_directories()
     
+            # 复制 .gitignore 文件
             if self.add_gitignore_var.get():
                 self.copy_file_from_repo(".gitignore", ".gitignore")
+    
+            # 如果启用了 FreeRTOS，复制相关文件
             if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
                 self.copy_file_from_repo("src/freertos.c", os.path.join("Core", "Src", "freertos.c"))
     
-            # 定义需要处理的文件夹
+            # 定义需要处理的文件夹（与 FreeRTOS 状态无关）
             folders = ["bsp", "component", "device", "module"]
     
             # 遍历每个文件夹，复制选中的 .h 和 .c 文件
@@ -514,19 +520,22 @@ class MRobotApp:
                         dest_path = os.path.join("User", folder, file_name)
                         self.copy_file_from_repo(src_path, dest_path)
     
-            # 修改 user_task.c 文件
-            self.modify_user_task_file()
+            # 如果启用了 FreeRTOS，执行任务相关的生成逻辑
+            if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
+                # 修改 user_task.c 文件
+                self.modify_user_task_file()
     
-            # 生成 user_task.h 文件
-            self.generate_user_task_header()
+                # 生成 user_task.h 文件
+                self.generate_user_task_header()
     
-            # 生成 init.c 文件
-            self.generate_init_file()
+                # 生成 init.c 文件
+                self.generate_init_file()
     
-            # 生成 task.c 文件
-            self.generate_task_files()
+                # 生成 task.c 文件
+                self.generate_task_files()
     
         threading.Thread(target=task).start()
+
 
     # 程序关闭时清理
     def on_closing(self, root):

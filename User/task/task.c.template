@@ -27,9 +27,6 @@ void {{task_function}}(void *argument) {
 
   uint32_t tick = osKernelGetTickCount(); /* 控制任务运行频率的计时 */
   while (1) {
-    /* 记录任务所使用的的栈空间 */
-    task_runtime.stack_water_mark.{{task_variable}} = osThreadGetStackSpace(osThreadGetId());
-
     tick += delay_tick; /* 计算下一个唤醒时刻 */
     
     /*User code begin*/

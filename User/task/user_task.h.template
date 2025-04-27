@@ -20,10 +20,6 @@ typedef struct {
     } msgq;
 
     struct {
-{{heap_water_mark_definitions}}
-    } heap_water_mark; /* heap使用 */
-
-    struct {
 {{freq_definitions}}
     } freq; /* 任务运行频率 */
 
