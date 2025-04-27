@@ -220,6 +220,18 @@ class MRobotApp:
 
     # 更新任务管理 UI
     def update_task_ui(self):
+        # 检查是否有已存在的任务文件
+        task_dir = os.path.join("User", "task")
+        if os.path.exists(task_dir):
+            for file_name in os.listdir(task_dir):
+                file_base, file_ext = os.path.splitext(file_name)
+                # 忽略 init 和 user_task 文件
+                if file_ext == ".c" and file_base not in ["init", "user_task"] and file_base not in [task_var.get() for task_var in self.task_vars]:
+                    # 自动添加已存在的任务名
+                    new_task_var = tk.StringVar(value=file_base)
+                    self.task_vars.append(new_task_var)
+
+        # 清空任务框架中的所有子组件
         for widget in self.task_frame.winfo_children():
             widget.destroy()
 
@@ -402,7 +414,7 @@ class MRobotApp:
     
             # 定义占位符内容
             thread_definitions = "\n".join([f"        osThreadId_t {task_var.get()};" for task_var in self.task_vars])
-            heap_water_mark_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var in self.task_vars])
+            # heap_water_mark_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var in self.task_vars])
             freq_definitions = "\n".join([f"        float {task_var.get()};" for task_var in self.task_vars])
             last_up_time_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var in self.task_vars])
             task_handle_definitions = "\n".join([f"    osThreadId_t {task_var.get()};" for task_var in self.task_vars])
@@ -424,7 +436,7 @@ class MRobotApp:
     
             # 替换模板中的占位符
             header_content = template_content.replace("{{thread_definitions}}", thread_definitions)
-            header_content = header_content.replace("{{heap_water_mark_definitions}}", heap_water_mark_definitions)
+            # header_content = header_content.replace("{{heap_water_mark_definitions}}", heap_water_mark_definitions)
             header_content = header_content.replace("{{freq_definitions}}", freq_definitions)
             header_content = header_content.replace("{{last_up_time_definitions}}", last_up_time_definitions)
             header_content = header_content.replace("{{task_handle_definitions}}", task_handle_definitions)
@@ -441,6 +453,7 @@ class MRobotApp:
             print(f"生成 user_task.h 文件时出错: {e}")
             import traceback
             traceback.print_exc()
+
 
     def generate_init_file(self):
         try:
