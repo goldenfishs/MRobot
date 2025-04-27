@@ -1,5 +1,5 @@
 /* Includes ----------------------------------------------------------------- */
-#include "device/oled.h"
+#include "device/oled_i2c.h"
 #include "bsp/i2c.h"
 #include <string.h>
 #include <stdint.h>
