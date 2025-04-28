@@ -5,7 +5,7 @@ import shutil
 import re
 from git import Repo
 from collections import defaultdict
-
+import csv
 
 # 配置常量
 REPO_DIR = "MRobot_repo"
@@ -278,12 +278,28 @@ class MRobotApp:
 
     # 更新 .h 文件复选框
     def update_header_files(self):
+        # 清空现有的复选框
         for widget in self.header_files_frame.winfo_children():
             widget.destroy()
 
         # 定义需要处理的文件夹
         folders = ["bsp", "component", "device", "module"]
 
+        # 存储依赖关系
+        dependencies = defaultdict(list)
+
+        # 遍历文件夹，读取 dependencies.csv 文件
+        for folder in folders:
+            folder_dir = os.path.join(REPO_DIR, "User", folder)
+            if os.path.exists(folder_dir):
+                dependencies_file = os.path.join(folder_dir, "dependencies.csv")
+                if os.path.exists(dependencies_file):
+                    with open(dependencies_file, "r", encoding="utf-8") as f:
+                        reader = csv.reader(f)
+                        for row in reader:
+                            if len(row) == 2:
+                                dependencies[row[0]].append(row[1])
+        # 创建复选框
         for folder in folders:
             folder_dir = os.path.join(REPO_DIR, "User", folder)
             if os.path.exists(folder_dir):
@@ -304,14 +320,26 @@ class MRobotApp:
                             module_frame,
                             text=file_base,
                             variable=var,
-                            wraplength=150  # 设置文本换行宽度
+                            wraplength=150,  # 设置文本换行宽度
+                            command=lambda fb=file_base: self.handle_dependencies(fb, dependencies)
                         )
                         checkbox.grid(row=row, column=col, padx=5, pady=5, sticky="w")
                         # 控制列数，达到一定数量后换行
                         col += 1
-                        if col >= 6:  # 每行最多显示 3 个复选框
+                        if col >= 6:  # 每行最多显示 6 个复选框
                             col = 0
                             row += 1
+
+    def handle_dependencies(self, file_base, dependencies):
+        """
+        根据依赖关系自动勾选相关模块
+        """
+        if file_base in self.header_file_vars and self.header_file_vars[file_base].get():
+            # 如果当前模块被选中，自动勾选其依赖项
+            for dependency in dependencies.get(file_base, []):
+                dep_base = os.path.basename(dependency)
+                if dep_base in self.header_file_vars:
+                    self.header_file_vars[dep_base].set(True)
 
     # 在 MRobotApp 类中添加以下方法
     def generate_task_files(self):
