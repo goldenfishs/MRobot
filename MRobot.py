@@ -177,6 +177,9 @@ class MRobotApp:
         root.title("MRobot 自动生成脚本")
         root.geometry("800x600")  # 调整窗口大小以适应布局
 
+        # 在窗口关闭时调用 on_closing 方法
+        root.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(root))
+
         # 初始化 BooleanVar
         self.add_gitignore_var = tk.BooleanVar(value=True)
 
