@@ -142,6 +142,7 @@ static const uint8_t oled_font[95][8] = {
 	{0x00,0x08,0x04,0x04,0x08,0x10,0x10,0x08,}, /* "~", 94 */
 };
 
+
 /* Exported functions ------------------------------------------------------- */
 
 void OLED_Init(void) {
