@@ -1,4 +1,5 @@
 import tkinter as tk
+import sys
 import os
 import threading
 import shutil
@@ -218,7 +219,7 @@ class MRobotApp:
         root.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(root))
         root.mainloop()
 
-    # 更新任务管理 UI
+    # 修改 update_task_ui 方法
     def update_task_ui(self):
         # 检查是否有已存在的任务文件
         task_dir = os.path.join("User", "task")
@@ -226,42 +227,44 @@ class MRobotApp:
             for file_name in os.listdir(task_dir):
                 file_base, file_ext = os.path.splitext(file_name)
                 # 忽略 init 和 user_task 文件
-                if file_ext == ".c" and file_base not in ["init", "user_task"] and file_base not in [task_var.get() for task_var in self.task_vars]:
+                if file_ext == ".c" and file_base not in ["init", "user_task"] and file_base not in [task_var.get() for task_var, _ in self.task_vars]:
                     # 自动添加已存在的任务名
                     new_task_var = tk.StringVar(value=file_base)
-                    self.task_vars.append(new_task_var)
-
+                    self.task_vars.append((new_task_var, tk.IntVar(value=100)))  # 默认频率为 100
+    
         # 清空任务框架中的所有子组件
         for widget in self.task_frame.winfo_children():
             widget.destroy()
-
+    
         # 设置任务管理框的固定宽度
-        self.task_frame.config(width=300)  # 将宽度固定为 300 像素
-
+        self.task_frame.config(width=400)  # 将宽度固定为 400 像素
+    
         # 显示任务列表
-        for i, task_var in enumerate(self.task_vars):
-            task_row = tk.Frame(self.task_frame, width=300)  # 设置任务行的宽度
+        for i, (task_var, freq_var) in enumerate(self.task_vars):
+            task_row = tk.Frame(self.task_frame, width=400)  # 设置任务行的宽度
             task_row.pack(fill="x", pady=5)
-
+    
             # 调整输入框和按钮的宽度
-            tk.Entry(task_row, textvariable=task_var, width=25).pack(side="left", padx=5)  # 输入框宽度
+            tk.Entry(task_row, textvariable=task_var, width=20).pack(side="left", padx=5)  # 输入框宽度
+            tk.Label(task_row, text="频率:").pack(side="left", padx=5)
+            tk.Spinbox(task_row, from_=1, to=1000, textvariable=freq_var, width=5).pack(side="left", padx=5)  # 数字选择框
             tk.Button(task_row, text="删除", command=lambda idx=i: self.remove_task(idx), bg="red", fg="white").pack(side="left", padx=5)
-
+    
         # 添加新任务按钮
         add_task_button = tk.Button(self.task_frame, text="添加任务", command=self.add_task, bg="blue", fg="white")
         add_task_button.pack(pady=10)
-
-    # 添加任务
+    
+    # 修改 add_task 方法
     def add_task(self):
         new_task_var = tk.StringVar(value=f"Task_{len(self.task_vars) + 1}")
-        self.task_vars.append(new_task_var)
+        new_freq_var = tk.IntVar(value=100)  # 默认频率为 100
+        self.task_vars.append((new_task_var, new_freq_var))
         self.update_task_ui()
-
-    # 删除任务
+    
+    # 修改 remove_task 方法
     def remove_task(self, idx):
         del self.task_vars[idx]
         self.update_task_ui()
-
     # 更新文件夹显示
     def update_folder_display(self):
         for widget in self.folder_frame.winfo_children():
@@ -346,35 +349,31 @@ class MRobotApp:
         try:
             template_file_path = os.path.join(REPO_DIR, "User", "task", "task.c.template")
             task_dir = os.path.join("User", "task")
-
-            # 检查模板文件是否存在
+    
             if not os.path.exists(template_file_path):
                 print(f"模板文件 {template_file_path} 不存在，无法生成 task.c 文件！")
                 return
-
-            # 创建目标目录（如果不存在）
+    
             os.makedirs(task_dir, exist_ok=True)
-
-            # 读取模板内容
+    
             with open(template_file_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
-
+    
             # 为每个任务生成对应的 task.c 文件
-            for task_var in self.task_vars:
+            for task_var, _ in self.task_vars:  # 解包元组
                 task_name = task_var.get()
                 task_file_path = os.path.join(task_dir, f"{task_name.lower()}.c")
-
+    
                 # 替换模板中的占位符
                 task_content = template_content.replace("{{task_name}}", task_name)
                 task_content = task_content.replace("{{task_function}}", task_name)
                 task_content = task_content.replace("{{task_frequency}}", f"TASK_FREQ_{task_name.upper()}")
                 task_content = task_content.replace("{{task_delay}}", f"TASK_INIT_DELAY_{task_name.upper()}")
                 task_content = task_content.replace("{{task_variable}}", task_name)
-
-                # 写入生成的内容到文件
+    
                 with open(task_file_path, "w", encoding="utf-8") as f:
                     f.write(task_content)
-
+    
                 print(f"已成功生成 {task_file_path} 文件！")
         except Exception as e:
             print(f"生成 task.c 文件时出错: {e}")
@@ -394,9 +393,6 @@ class MRobotApp:
             with open(template_file_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
     
-            # 打印模板内容
-            # print(f"模板内容: {template_content}")
-    
             # 生成任务属性定义
             task_attr_definitions = "\n".join([
                 f"""const osThreadAttr_t attr_{task_var.get().lower()} = {{
@@ -404,11 +400,8 @@ class MRobotApp:
         .priority = osPriorityNormal,
         .stack_size = 128 * 4,
     }};"""
-                for task_var in self.task_vars
+                for task_var, _ in self.task_vars  # 解包元组
             ])
-    
-            # 打印生成的任务属性定义
-            # print(f"生成的任务属性定义: {task_attr_definitions}")
     
             # 替换模板中的占位符
             task_content = template_content.replace("{{task_attr_definitions}}", task_attr_definitions)
@@ -419,9 +412,7 @@ class MRobotApp:
             print(f"已成功生成 {generated_task_file_path} 文件！")
         except Exception as e:
             print(f"修改 user_task.c 文件时出错: {e}")
-            import traceback
-            traceback.print_exc()
-   
+
     # 生成 user_task.h 文件
     def generate_user_task_header(self):
         try:
@@ -437,34 +428,18 @@ class MRobotApp:
             with open(template_file_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
     
-            # 打印模板内容
-            # print(f"模板内容: {template_content}")
-    
             # 定义占位符内容
-            thread_definitions = "\n".join([f"        osThreadId_t {task_var.get()};" for task_var in self.task_vars])
-            # heap_water_mark_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var in self.task_vars])
-            freq_definitions = "\n".join([f"        float {task_var.get()};" for task_var in self.task_vars])
-            last_up_time_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var in self.task_vars])
-            task_handle_definitions = "\n".join([f"    osThreadId_t {task_var.get()};" for task_var in self.task_vars])
-            task_attr_declarations = "\n".join([f"extern const osThreadAttr_t attr_{task_var.get().lower()};" for task_var in self.task_vars])
-            task_function_declarations = "\n".join([f"void {task_var.get()}(void *argument);" for task_var in self.task_vars])
-            task_frequency_definitions = "\n".join([f"#define TASK_FREQ_{task_var.get().upper()} (100u)" for task_var in self.task_vars])
-            task_init_delay_definitions = "\n".join([f"#define TASK_INIT_DELAY_{task_var.get().upper()} (100u)" for task_var in self.task_vars])
-    
-            # 打印生成的占位符内容
-            # print(f"thread_definitions: {thread_definitions}")
-            # print(f"heap_water_mark_definitions: {heap_water_mark_definitions}")
-            # print(f"freq_definitions: {freq_definitions}")
-            # print(f"last_up_time_definitions: {last_up_time_definitions}")
-            # print(f"task_handle_definitions: {task_handle_definitions}")
-            # print(f"task_attr_declarations: {task_attr_declarations}")
-            # print(f"task_function_declarations: {task_function_declarations}")
-            # print(f"task_frequency_definitions: {task_frequency_definitions}")
-            # print(f"task_init_delay_definitions: {task_init_delay_definitions}")
+            thread_definitions = "\n".join([f"        osThreadId_t {task_var.get()};" for task_var, _ in self.task_vars])
+            freq_definitions = "\n".join([f"        float {task_var.get()};" for task_var, _ in self.task_vars])
+            last_up_time_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var, _ in self.task_vars])
+            task_handle_definitions = "\n".join([f"    osThreadId_t {task_var.get()};" for task_var, _ in self.task_vars])
+            task_attr_declarations = "\n".join([f"extern const osThreadAttr_t attr_{task_var.get().lower()};" for task_var, _ in self.task_vars])
+            task_function_declarations = "\n".join([f"void {task_var.get()}(void *argument);" for task_var, _ in self.task_vars])
+            task_frequency_definitions = "\n".join([f"#define TASK_FREQ_{task_var.get().upper()} (100u)" for task_var, _ in self.task_vars])
+            task_init_delay_definitions = "\n".join([f"#define TASK_INIT_DELAY_{task_var.get().upper()} (0u)" for task_var, _ in self.task_vars])
     
             # 替换模板中的占位符
             header_content = template_content.replace("{{thread_definitions}}", thread_definitions)
-            # header_content = header_content.replace("{{heap_water_mark_definitions}}", heap_water_mark_definitions)
             header_content = header_content.replace("{{freq_definitions}}", freq_definitions)
             header_content = header_content.replace("{{last_up_time_definitions}}", last_up_time_definitions)
             header_content = header_content.replace("{{task_handle_definitions}}", task_handle_definitions)
@@ -479,41 +454,33 @@ class MRobotApp:
             print(f"已成功生成 {header_file_path} 文件！")
         except Exception as e:
             print(f"生成 user_task.h 文件时出错: {e}")
-            import traceback
-            traceback.print_exc()
-
 
     def generate_init_file(self):
         try:
-            # 定义模板文件路径和生成文件路径
             template_file_path = os.path.join(REPO_DIR, "User", "task", "init.c.template")
             generated_file_path = os.path.join("User", "task", "init.c")
-
-            # 检查模板文件是否存在
+    
             if not os.path.exists(template_file_path):
                 print(f"模板文件 {template_file_path} 不存在，无法生成 init.c 文件！")
                 return
-
-            # 创建目标目录（如果不存在）
+    
             os.makedirs(os.path.dirname(generated_file_path), exist_ok=True)
-
-            # 读取模板内容
+    
             with open(template_file_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
-
+    
             # 生成任务创建代码
             thread_creation_code = "\n".join([
                 f"  task_runtime.thread.{task_var.get().lower()} = osThreadNew({task_var.get()}, NULL, &attr_{task_var.get().lower()});"
-                for task_var in self.task_vars
+                for task_var, _ in self.task_vars  # 解包元组
             ])
-
+    
             # 替换模板中的占位符
             init_content = template_content.replace("{{thread_creation_code}}", thread_creation_code)
-
-            # 写入生成的内容到文件
+    
             with open(generated_file_path, "w", encoding="utf-8") as f:
                 f.write(init_content)
-
+    
             print(f"已成功生成 {generated_file_path} 文件！")
         except Exception as e:
             print(f"生成 init.c 文件时出错: {e}")

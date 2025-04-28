@@ -1,3 +1,13 @@
+/*
+    * @file    oled_i2c.c
+    * @brief   OLED I2C驱动程序
+    * @version 1.0
+    * @date    2023-10-01
+    * @note    本文件实现了OLED显示屏的I2C通信和基本绘图功能。
+    */
+*/
+
+
 /* Includes ----------------------------------------------------------------- */
 #include "device/oled_i2c.h"
 #include "bsp/i2c.h"
