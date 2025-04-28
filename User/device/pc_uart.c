@@ -1,5 +1,5 @@
 /* Includes ----------------------------------------------------------------- */
-#include "uart.h"
+#include "pc_uart.h"
 
 #include <string.h>
 
@@ -50,5 +50,5 @@ int8_t UART_StartSend(UART_t *huart)
     {
         return DEVICE_OK
     }
-    return DEVICE_ERROR;
+    return DEVICE_ERR;
 }
