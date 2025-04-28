@@ -1,1 +1,3 @@
 oled_i2c,bsp/i2c
+bmp280_i2c,bsp/i2c
+pc_uart,bsp/uart
