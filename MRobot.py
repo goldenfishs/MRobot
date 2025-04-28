@@ -32,8 +32,8 @@ class MRobotApp:
         try:
             if os.path.exists(REPO_DIR):
                 shutil.rmtree(REPO_DIR)
-            print(f"正在克隆仓库到 {REPO_DIR}...")
-            Repo.clone_from(REPO_URL, REPO_DIR)
+            print(f"正在克隆仓库到 {REPO_DIR}（仅克隆当前文件内容）...")
+            Repo.clone_from(REPO_URL, REPO_DIR, multi_options=["--depth=1"])
             print("仓库克隆成功！")
         except Exception as e:
             print(f"克隆仓库时出错: {e}")
