@@ -10,8 +10,6 @@ extern "C" {
 #define BSP_ERR_INITED (-3)
 #define BSP_ERR_NO_DEV (-4)
 
-#define SIGNAL_BSP_USB_BUF_RECV (1u << 0)
-
 #ifdef __cplusplus
 }
 #endif

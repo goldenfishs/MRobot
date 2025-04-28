@@ -10,7 +10,7 @@ static void (*SPI_Callback[BSP_SPI_NUM][BSP_SPI_CB_NUM])(void);
 /* Private function  -------------------------------------------------------- */
 static BSP_SPI_t SPI_Get(SPI_HandleTypeDef *hspi) {
   if (hspi->Instance == SPI1)
-    return BSP_SPI_OLED;
+    return BSP_SPI_EXAMPLE;
   /*
   else if (hspi->Instance == SPIX)
                   return BSP_SPI_XXX;
@@ -87,7 +87,7 @@ void HAL_SPI_AbortCpltCallback(SPI_HandleTypeDef *hspi) {
 /* Exported functions ------------------------------------------------------- */
 SPI_HandleTypeDef *BSP_SPI_GetHandle(BSP_SPI_t spi) {
   switch (spi) {
-    case BSP_SPI_OLED:
+    case BSP_SPI_EXAMPLE:
       return &hspi1;
     /*
     case BSP_SPI_XXX:

@@ -17,13 +17,13 @@ extern "C" {
 
 /* I2C实体枚举，与设备对应 */
 typedef enum {
-  BSP_I2C_OLED,
+  BSP_I2C_EXAMPLE,
   /* BSP_I2C_XXX,*/
   BSP_I2C_NUM,
   BSP_I2C_ERR,
 } BSP_I2C_t;
 
-/* I2C支持的中断回调函数类型，具体参考HAL中定义 */
+/* I2C支持的中断回调函数类型*/
 typedef enum {
   HAL_I2C_MASTER_TX_CPLT_CB,
   HAL_I2C_MASTER_RX_CPLT_CB,

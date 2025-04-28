@@ -9,10 +9,11 @@ static void (*I2C_Callback[BSP_I2C_NUM][BSP_I2C_CB_NUM])(void);
 
 /* Private function  -------------------------------------------------------- */
 static BSP_I2C_t I2C_Get(I2C_HandleTypeDef *hi2c) {
-  if (hi2c->Instance == I2C1) return BSP_I2C_OLED;
+  if (hi2c->Instance == I2C1) 
+    return BSP_I2C_EXAMPLE;
   /*
   else if (hi2c->Instance == I2CX)
-                  return BSP_I2C_XXX;
+    return BSP_I2C_XXX;
   */
   else
     return BSP_I2C_ERR;
@@ -93,7 +94,7 @@ void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c) {
 /* Exported functions ------------------------------------------------------- */
 I2C_HandleTypeDef *BSP_I2C_GetHandle(BSP_I2C_t i2c) {
   switch (i2c) {
-    case BSP_I2C_OLED:
+    case BSP_I2C_EXAMPLE:
       return &hi2c1;
     /*
     case BSP_I2C_XXX:

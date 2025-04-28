@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "uart.h": "c",
-        "device.h": "c",
-        "pc_uart.h": "c"
-    }
-}

@@ -10,7 +10,7 @@ static void (*UART_Callback[BSP_UART_NUM][BSP_UART_CB_NUM])(void);
 /* Private function  -------------------------------------------------------- */
 static BSP_UART_t UART_Get(UART_HandleTypeDef *huart) {
   if (huart->Instance == USART1)
-    return BSP_UART_PC;
+    return BSP_UART_EXAMPLE;
 
   /*else */
 
@@ -102,7 +102,7 @@ void BSP_UART_IRQHandler(UART_HandleTypeDef *huart) {
 
 UART_HandleTypeDef *BSP_UART_GetHandle(BSP_UART_t uart) {
   switch (uart) {
-    case BSP_UART_PC:
+    case BSP_UART_EXAMPLE:
       return &huart1;
     default:
       return NULL;

@@ -272,40 +272,41 @@ class MRobotApp:
                     file_path = os.path.join(task_dir, file_name)
                     try:
                         with open(file_path, "r", encoding="utf-8") as f:
-                            for line in f:
-                                match = re.search(r"#define\s+TASK_FREQ_\w+\s+\((\d+)\)", line)
-                                if match:
-                                    frequency = int(match.group(1))
-                                    break
+                            content = f.read()
+                            # 调试信息：打印文件内容
+                            print(f"读取任务文件 {file_name} 内容:\n{content}")
+                            match = re.search(r"#define\s+TASK_FREQ_\w+\s*\((\d+)\)", content)
+                            if match:
+                                frequency = int(match.group(1))
+                                print(f"从文件 {file_name} 中读取到频率: {frequency}")
                     except Exception as e:
                         print(f"读取任务文件 {file_name} 时出错: {e}")
-
+    
                     # 自动添加已存在的任务名和频率
                     new_task_var = tk.StringVar(value=file_base)
                     self.task_vars.append((new_task_var, tk.IntVar(value=frequency)))
-
+    
         # 清空任务框架中的所有子组件
         for widget in self.task_frame.winfo_children():
             widget.destroy()
-
+    
         # 设置任务管理框的固定宽度
         self.task_frame.config(width=400)  # 将宽度固定为 400 像素
-
+    
         # 显示任务列表
         for i, (task_var, freq_var) in enumerate(self.task_vars):
             task_row = tk.Frame(self.task_frame, width=400)  # 设置任务行的宽度
             task_row.pack(fill="x", pady=5)
-
+    
             # 调整输入框和按钮的宽度
             tk.Entry(task_row, textvariable=task_var, width=20).pack(side="left", padx=5)  # 输入框宽度
             tk.Label(task_row, text="频率:").pack(side="left", padx=5)
             tk.Spinbox(task_row, from_=1, to=1000, textvariable=freq_var, width=5).pack(side="left", padx=5)  # 数字选择框
             tk.Button(task_row, text="删除", command=lambda idx=i: self.remove_task(idx), bg="red", fg="white").pack(side="left", padx=5)
-
+    
         # 添加新任务按钮
         add_task_button = tk.Button(self.task_frame, text="添加任务", command=self.add_task, bg="blue", fg="white")
         add_task_button.pack(pady=10)
-
     
     # 修改 add_task 方法
     def add_task(self):
