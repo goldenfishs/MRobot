@@ -19,6 +19,14 @@ class MRobotApp:
         self.header_file_vars = {}
         self.task_vars = []  # 用于存储任务的变量
 
+    # 初始化
+    def initialize(self):
+        print("初始化中，正在克隆仓库...")
+        self.clone_repo()
+        self.ioc_data = self.find_and_read_ioc_file()
+        print("初始化完成，启动主窗口...")
+        self.show_main_window()
+
     # 克隆仓库
     def clone_repo(self):
         try:
@@ -161,13 +169,7 @@ class MRobotApp:
             status = "未检测到 .ioc 文件"
         label.config(text=f"FreeRTOS 状态: {status}")
 
-    # 初始化
-    def initialize(self):
-        print("初始化中，正在克隆仓库...")
-        self.clone_repo()
-        self.ioc_data = self.find_and_read_ioc_file()
-        print("初始化完成，启动主窗口...")
-        self.show_main_window()
+
 
     # 显示主窗口
     def show_main_window(self):
@@ -201,25 +203,62 @@ class MRobotApp:
         self.header_files_frame = header_files_frame
         self.update_header_files()
 
-
         if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
             task_frame = tk.LabelFrame(module_task_frame, text="任务管理", padx=10, pady=10, font=("Arial", 10, "bold"))
             task_frame.pack(side="left", fill="both", expand=True, padx=5)
             self.task_frame = task_frame
             self.update_task_ui()
 
-        # 生成按钮和 .gitignore 选项
-        button_frame = tk.Frame(main_frame)
-        button_frame.pack(fill="x", pady=10)
-        generate_button = tk.Button(button_frame, text="一键自动生成MR架构", command=self.generate_action, bg="green", fg="white", font=("Arial", 12, "bold"))
-        generate_button.pack(side="left", padx=10)
-        tk.Checkbutton(button_frame, text="添加 .gitignore", variable=self.add_gitignore_var).pack(side="left", padx=10)
+        # 添加消息框和生成按钮在同一行
+        bottom_frame = tk.Frame(main_frame)
+        bottom_frame.pack(fill="x", pady=10, side="bottom")
 
-        # 在程序关闭时清理
-        root.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(root))
+        # 消息框
+        self.message_box = tk.Text(bottom_frame, wrap="word", state="disabled", height=5, width=60)
+        self.message_box.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+
+        # 生成按钮和 .gitignore 选项
+        button_frame = tk.Frame(bottom_frame)
+        button_frame.pack(side="right", padx=10)
+
+        # 添加 .gitignore 复选框
+        tk.Checkbutton(button_frame, text="添加 .gitignore", variable=self.add_gitignore_var).pack(side="top", pady=5)
+
+        # 添加生成按钮
+        generate_button = tk.Button(button_frame, text="一键生成MRobot代码", command=self.generate_action, bg="green", fg="white", font=("Arial", 12, "bold"))
+        generate_button.pack(side="top", pady=5)
+
+        # 重定向输出到消息框
+        self.redirect_output()
+
+        # 打印欢迎信息
+        print("欢迎使用 MRobot 自动生成脚本！")
+        print("请根据需要选择模块文件和任务。")
+        print("点击“一键生成MRobot代码”按钮开始生成。")
+
+        # 启动 Tkinter 主事件循环
         root.mainloop()
 
-    # 修改 update_task_ui 方法
+    def redirect_output(self):
+        """
+        重定向标准输出到消息框
+        """
+        class TextRedirector:
+            def __init__(self, text_widget):
+                self.text_widget = text_widget
+
+            def write(self, message):
+                self.text_widget.config(state="normal")
+                self.text_widget.insert("end", message)
+                self.text_widget.see("end")
+                self.text_widget.config(state="disabled")
+
+            def flush(self):
+                pass
+
+        sys.stdout = TextRedirector(self.message_box)
+        sys.stderr = TextRedirector(self.message_box)
+
     def update_task_ui(self):
         # 检查是否有已存在的任务文件
         task_dir = os.path.join("User", "task")
@@ -228,31 +267,45 @@ class MRobotApp:
                 file_base, file_ext = os.path.splitext(file_name)
                 # 忽略 init 和 user_task 文件
                 if file_ext == ".c" and file_base not in ["init", "user_task"] and file_base not in [task_var.get() for task_var, _ in self.task_vars]:
-                    # 自动添加已存在的任务名
+                    # 尝试从文件中读取频率信息
+                    frequency = 100  # 默认频率
+                    file_path = os.path.join(task_dir, file_name)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            for line in f:
+                                match = re.search(r"#define\s+TASK_FREQ_\w+\s+\((\d+)\)", line)
+                                if match:
+                                    frequency = int(match.group(1))
+                                    break
+                    except Exception as e:
+                        print(f"读取任务文件 {file_name} 时出错: {e}")
+
+                    # 自动添加已存在的任务名和频率
                     new_task_var = tk.StringVar(value=file_base)
-                    self.task_vars.append((new_task_var, tk.IntVar(value=100)))  # 默认频率为 100
-    
+                    self.task_vars.append((new_task_var, tk.IntVar(value=frequency)))
+
         # 清空任务框架中的所有子组件
         for widget in self.task_frame.winfo_children():
             widget.destroy()
-    
+
         # 设置任务管理框的固定宽度
         self.task_frame.config(width=400)  # 将宽度固定为 400 像素
-    
+
         # 显示任务列表
         for i, (task_var, freq_var) in enumerate(self.task_vars):
             task_row = tk.Frame(self.task_frame, width=400)  # 设置任务行的宽度
             task_row.pack(fill="x", pady=5)
-    
+
             # 调整输入框和按钮的宽度
             tk.Entry(task_row, textvariable=task_var, width=20).pack(side="left", padx=5)  # 输入框宽度
             tk.Label(task_row, text="频率:").pack(side="left", padx=5)
             tk.Spinbox(task_row, from_=1, to=1000, textvariable=freq_var, width=5).pack(side="left", padx=5)  # 数字选择框
             tk.Button(task_row, text="删除", command=lambda idx=i: self.remove_task(idx), bg="red", fg="white").pack(side="left", padx=5)
-    
+
         # 添加新任务按钮
         add_task_button = tk.Button(self.task_frame, text="添加任务", command=self.add_task, bg="blue", fg="white")
         add_task_button.pack(pady=10)
+
     
     # 修改 add_task 方法
     def add_task(self):
@@ -265,6 +318,7 @@ class MRobotApp:
     def remove_task(self, idx):
         del self.task_vars[idx]
         self.update_task_ui()
+    
     # 更新文件夹显示
     def update_folder_display(self):
         for widget in self.folder_frame.winfo_children():
@@ -332,6 +386,7 @@ class MRobotApp:
                         if col >= 6:  # 每行最多显示 6 个复选框
                             col = 0
                             row += 1
+
 
     def handle_dependencies(self, file_base, dependencies):
         """
@@ -435,7 +490,10 @@ class MRobotApp:
             task_handle_definitions = "\n".join([f"    osThreadId_t {task_var.get()};" for task_var, _ in self.task_vars])
             task_attr_declarations = "\n".join([f"extern const osThreadAttr_t attr_{task_var.get().lower()};" for task_var, _ in self.task_vars])
             task_function_declarations = "\n".join([f"void {task_var.get()}(void *argument);" for task_var, _ in self.task_vars])
-            task_frequency_definitions = "\n".join([f"#define TASK_FREQ_{task_var.get().upper()} (100u)" for task_var, _ in self.task_vars])
+            task_frequency_definitions = "\n".join([
+                f"#define TASK_FREQ_{task_var.get().upper()} ({freq_var.get()}u)"
+                for task_var, freq_var in self.task_vars  # 动态获取任务频率
+            ])
             task_init_delay_definitions = "\n".join([f"#define TASK_INIT_DELAY_{task_var.get().upper()} (0u)" for task_var, _ in self.task_vars])
     
             # 替换模板中的占位符
@@ -454,6 +512,7 @@ class MRobotApp:
             print(f"已成功生成 {header_file_path} 文件！")
         except Exception as e:
             print(f"生成 user_task.h 文件时出错: {e}")
+
 
     def generate_init_file(self):
         try:
@@ -549,6 +608,7 @@ class MRobotApp:
     def on_closing(self, root):
         self.delete_repo()
         root.destroy()
+
 
 # 程序入口
 if __name__ == "__main__":

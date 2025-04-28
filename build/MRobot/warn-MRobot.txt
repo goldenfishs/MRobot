@@ -20,7 +20,7 @@ missing module named grp - imported by shutil (delayed, optional), tarfile (opti
 missing module named _posixsubprocess - imported by subprocess (conditional), multiprocessing.util (delayed)
 missing module named fcntl - imported by subprocess (optional), _pyrepl.unix_console (top-level)
 missing module named _manylinux - imported by packaging._manylinux (delayed, optional), setuptools._vendor.packaging._manylinux (delayed, optional), setuptools._vendor.wheel.vendored.packaging._manylinux (delayed, optional)
-missing module named posix - imported by os (conditional, optional), posixpath (optional), shutil (conditional), importlib._bootstrap_external (conditional), _pyrepl.unix_console (delayed, optional)
+missing module named posix - imported by posixpath (optional), shutil (conditional), importlib._bootstrap_external (conditional), os (conditional, optional), _pyrepl.unix_console (delayed, optional)
 missing module named resource - imported by posix (top-level)
 missing module named _frozen_importlib_external - imported by importlib._bootstrap (delayed), importlib (optional), importlib.abc (optional), zipimport (top-level)
 missing module named typing_extensions.TypeAlias - imported by setuptools._vendor.typing_extensions (top-level), setuptools._distutils.compilers.C.base (conditional), setuptools._reqs (conditional), setuptools.warnings (conditional), setuptools._path (conditional), setuptools._distutils.dist (conditional), setuptools.config.setupcfg (conditional), setuptools.config._apply_pyprojecttoml (conditional), setuptools.dist (conditional), pkg_resources (conditional), setuptools.command.bdist_egg (conditional), setuptools.compat.py311 (conditional)
