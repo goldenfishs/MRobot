@@ -11,7 +11,6 @@ import csv
 # 配置常量
 REPO_DIR = "MRobot_repo"
 REPO_URL = "http://gitea.qutrobot.top/robofish/MRobot.git"
-# REPO_URL = "https://github.com/goldenfishs/MRobot.git"  # 使用 HTTPS 协议
 
 class MRobotApp:
     def __init__(self):
@@ -263,6 +262,7 @@ class MRobotApp:
         sys.stdout = TextRedirector(self.message_box)
         sys.stderr = TextRedirector(self.message_box)
 
+    # 修改 update_task_ui 方法
     def update_task_ui(self):
         # 检查是否有已存在的任务文件
         task_dir = os.path.join("User", "task")
@@ -271,20 +271,21 @@ class MRobotApp:
                 file_base, file_ext = os.path.splitext(file_name)
                 # 忽略 init 和 user_task 文件
                 if file_ext == ".c" and file_base not in ["init", "user_task"] and file_base not in [task_var.get() for task_var, _ in self.task_vars]:
-                    # 尝试从文件中读取频率信息
+                    # 尝试从 user_task.h 文件中读取频率信息
                     frequency = 100  # 默认频率
-                    file_path = os.path.join(task_dir, file_name)
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            content = f.read()
-                            # 调试信息：打印文件内容
-                            print(f"读取任务文件 {file_name} 内容:\n{content}")
-                            match = re.search(r"#define\s+TASK_FREQ_\w+\s*\((\d+)\)", content)
-                            if match:
-                                frequency = int(match.group(1))
-                                print(f"从文件 {file_name} 中读取到频率: {frequency}")
-                    except Exception as e:
-                        print(f"读取任务文件 {file_name} 时出错: {e}")
+                    user_task_header_path = os.path.join("User", "task", "user_task.h")
+                    if os.path.exists(user_task_header_path):
+                        try:
+                            with open(user_task_header_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                                # 匹配任务频率的宏定义
+                                pattern = rf"#define\s+TASK_FREQ_{file_base.upper()}\s*\((\d+)[uU]?\)"
+                                match = re.search(pattern, content)
+                                if match:
+                                    frequency = int(match.group(1))
+                                    print(f"从 user_task.h 文件中读取到任务 {file_base} 的频率: {frequency}")
+                        except Exception as e:
+                            print(f"读取 user_task.h 文件时出错: {e}")
     
                     # 自动添加已存在的任务名和频率
                     new_task_var = tk.StringVar(value=file_base)
@@ -311,7 +312,7 @@ class MRobotApp:
         # 添加新任务按钮
         add_task_button = tk.Button(self.task_frame, text="添加任务", command=self.add_task, bg="blue", fg="white")
         add_task_button.pack(pady=10)
-    
+
     # 修改 add_task 方法
     def add_task(self):
         new_task_var = tk.StringVar(value=f"Task_{len(self.task_vars) + 1}")
