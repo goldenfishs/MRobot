@@ -11,6 +11,7 @@ import csv
 # 配置常量
 REPO_DIR = "MRobot_repo"
 REPO_URL = "http://gitea.qutrobot.top/robofish/MRobot.git"
+# REPO_URL = "https://github.com/goldenfishs/MRobot.git"  # 使用 HTTPS 协议
 
 class MRobotApp:
     def __init__(self):
