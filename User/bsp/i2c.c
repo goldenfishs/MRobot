@@ -11,10 +11,8 @@ static void (*I2C_Callback[BSP_I2C_NUM][BSP_I2C_CB_NUM])(void);
 static BSP_I2C_t I2C_Get(I2C_HandleTypeDef *hi2c) {
   if (hi2c->Instance == I2C1) 
     return BSP_I2C_EXAMPLE;
-  /*
-  else if (hi2c->Instance == I2CX)
-    return BSP_I2C_XXX;
-  */
+  // else if (hi2c->Instance == I2CX)
+  //   return BSP_I2C_XXX;
   else
     return BSP_I2C_ERR;
 }
@@ -96,10 +94,8 @@ I2C_HandleTypeDef *BSP_I2C_GetHandle(BSP_I2C_t i2c) {
   switch (i2c) {
     case BSP_I2C_EXAMPLE:
       return &hi2c1;
-    /*
-    case BSP_I2C_XXX:
-            return &hi2cX;
-    */
+    // case BSP_I2C_XXX:
+    //         return &hi2cX;
     default:
       return NULL;
   }

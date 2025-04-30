@@ -469,17 +469,19 @@ class MRobotApp:
 
     # 生成 user_task.h 文件
     # ...existing code...
+    # ...existing code...
+    
     def generate_user_task_header(self):
         try:
             template_file_path = os.path.join(REPO_DIR, "User", "task", "user_task.h.template")
             header_file_path = os.path.join("User", "task", "user_task.h")
-
+    
             if not os.path.exists(template_file_path):
                 print(f"模板文件 {template_file_path} 不存在，无法生成 user_task.h 文件！")
                 return
-
+    
             os.makedirs(os.path.dirname(header_file_path), exist_ok=True)
-
+    
             # 如果 user_task.h 已存在，提取 /* USER MESSAGE BEGIN */ 和 /* USER MESSAGE END */ 区域内容
             existing_msgq_content = ""
             if os.path.exists(header_file_path):
@@ -491,15 +493,15 @@ class MRobotApp:
                         existing_msgq_content = match.group(1).strip()
                         print("已存在的 msgq 区域内容:")
                         print(existing_msgq_content)
-
+    
             with open(template_file_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
-
+    
             # 定义占位符内容
-            thread_definitions = "\n".join([f"        osThreadId_t {task_var.get()};" for task_var, _ in self.task_vars])
+            thread_definitions = "\n".join([f"        osThreadId_t {task_var.get().lower()};" for task_var, _ in self.task_vars])
             msgq_definitions = existing_msgq_content if existing_msgq_content else "        osMessageQueueId_t default_msgq;"
-            freq_definitions = "\n".join([f"        float {task_var.get()};" for task_var, _ in self.task_vars])
-            last_up_time_definitions = "\n".join([f"        uint32_t {task_var.get()};" for task_var, _ in self.task_vars])
+            freq_definitions = "\n".join([f"        float {task_var.get().lower()};" for task_var, _ in self.task_vars])
+            last_up_time_definitions = "\n".join([f"        uint32_t {task_var.get().lower()};" for task_var, _ in self.task_vars])
             task_attr_declarations = "\n".join([f"extern const osThreadAttr_t attr_{task_var.get().lower()};" for task_var, _ in self.task_vars])
             task_function_declarations = "\n".join([f"void {task_var.get()}(void *argument);" for task_var, _ in self.task_vars])
             task_frequency_definitions = "\n".join([
@@ -507,7 +509,8 @@ class MRobotApp:
                 for task_var, freq_var in self.task_vars
             ])
             task_init_delay_definitions = "\n".join([f"#define TASK_INIT_DELAY_{task_var.get().upper()} (0u)" for task_var, _ in self.task_vars])
-
+            task_handle_definitions = "\n".join([f"    osThreadId_t {task_var.get().lower()};" for task_var, _ in self.task_vars])
+    
             # 替换模板中的占位符
             header_content = template_content.replace("{{thread_definitions}}", thread_definitions)
             header_content = header_content.replace("{{msgq_definitions}}", msgq_definitions)
@@ -517,7 +520,8 @@ class MRobotApp:
             header_content = header_content.replace("{{task_function_declarations}}", task_function_declarations)
             header_content = header_content.replace("{{task_frequency_definitions}}", task_frequency_definitions)
             header_content = header_content.replace("{{task_init_delay_definitions}}", task_init_delay_definitions)
-
+            header_content = header_content.replace("{{task_handle_definitions}}", task_handle_definitions)
+    
             # 如果存在 /* USER MESSAGE BEGIN */ 区域内容，则保留
             if existing_msgq_content:
                 header_content = re.sub(
@@ -526,13 +530,15 @@ class MRobotApp:
                     header_content,
                     flags=re.DOTALL
                 )
-
+    
             with open(header_file_path, "w", encoding="utf-8") as f:
                 f.write(header_content)
-
+    
             print(f"已成功生成 {header_file_path} 文件！")
         except Exception as e:
             print(f"生成 user_task.h 文件时出错: {e}")
+    
+    # ...existing code...
 
 
     def generate_init_file(self):
@@ -546,6 +552,18 @@ class MRobotApp:
     
             os.makedirs(os.path.dirname(generated_file_path), exist_ok=True)
     
+            # 如果 init.c 已存在，提取 /* USER MESSAGE BEGIN */ 和 /* USER MESSAGE END */ 区域内容
+            existing_msgq_content = ""
+            if os.path.exists(generated_file_path):
+                with open(generated_file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    # 提取 /* USER MESSAGE BEGIN */ 和 /* USER MESSAGE END */ 区域内容
+                    match = re.search(r"/\* USER MESSAGE BEGIN \*/\s*(.*?)\s*/\* USER MESSAGE END \*/", content, re.DOTALL)
+                    if match:
+                        existing_msgq_content = match.group(1).strip()
+                        print("已存在的消息队列区域内容:")
+                        print(existing_msgq_content)
+    
             with open(template_file_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
     
@@ -558,12 +576,23 @@ class MRobotApp:
             # 替换模板中的占位符
             init_content = template_content.replace("{{thread_creation_code}}", thread_creation_code)
     
+            # 如果存在 /* USER MESSAGE BEGIN */ 区域内容，则保留
+            if existing_msgq_content:
+                init_content = re.sub(
+                    r"/\* USER MESSAGE BEGIN \*/\s*.*?\s*/\* USER MESSAGE END \*/",
+                    f"/* USER MESSAGE BEGIN */\n  {existing_msgq_content}\n  /* USER MESSAGE END */",
+                    init_content,
+                    flags=re.DOTALL
+                )
+    
             with open(generated_file_path, "w", encoding="utf-8") as f:
                 f.write(init_content)
     
             print(f"已成功生成 {generated_file_path} 文件！")
         except Exception as e:
             print(f"生成 init.c 文件时出错: {e}")
+
+
 
     # 修改 generate_action 方法
     
