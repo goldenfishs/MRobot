@@ -25,8 +25,9 @@ void Task_Init(void *argument) {
 {{thread_creation_code}}
 
   // 创建消息队列
+  /* USER MESSAGE BEGIN */
   task_runtime.msgq.user_msg= osMessageQueueNew(2u, 10, NULL);
-
+  /* USER MESSAGE END */
   osKernelUnlock(); // 解锁内核
   osThreadTerminate(osThreadGetId()); // 任务完成后结束自身
 }
