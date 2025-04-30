@@ -15,9 +15,13 @@ typedef struct {
 {{thread_definitions}}
     } thread;
 
+    /* USER MESSAGE BEGIN */
+
     struct {
         osMessageQueueId_t user_msg; /* 用户自定义任务消息队列 */
     } msgq;
+
+    /* USER MESSAGE END */
 
     struct {
 {{freq_definitions}}

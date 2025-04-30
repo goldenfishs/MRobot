@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 import sys
 import os
 import threading
@@ -184,36 +185,36 @@ class MRobotApp:
         self.add_gitignore_var = tk.BooleanVar(value=True)
 
         # 创建主框架
-        main_frame = tk.Frame(root)
+        main_frame = ttk.Frame(root)
         main_frame.pack(fill="both", expand=True)
 
         # 添加标题
-        title_label = tk.Label(main_frame, text="MRobot 自动生成脚本", font=("Arial", 16, "bold"))
+        title_label = ttk.Label(main_frame, text="MRobot 自动生成脚本", font=("Arial", 16, "bold"))
         title_label.pack(pady=10)
 
         # 添加 FreeRTOS 状态标签
-        freertos_status_label = tk.Label(main_frame, text="FreeRTOS 状态: 检测中...", font=("Arial", 12))
+        freertos_status_label = ttk.Label(main_frame, text="FreeRTOS 状态: 检测中...", font=("Arial", 12))
         freertos_status_label.pack(pady=10)
         self.update_freertos_status(freertos_status_label)
 
         # 模块文件选择和任务管理框架
-        module_task_frame = tk.Frame(main_frame)
+        module_task_frame = ttk.Frame(main_frame)
         module_task_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # 模块文件选择框
-        header_files_frame = tk.LabelFrame(module_task_frame, text="模块文件选择", padx=10, pady=10, font=("Arial", 10, "bold"))
+        header_files_frame = ttk.LabelFrame(module_task_frame, text="模块文件选择", padding=(10, 10))
         header_files_frame.pack(side="left", fill="both", expand=True, padx=5)
         self.header_files_frame = header_files_frame
         self.update_header_files()
 
         if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
-            task_frame = tk.LabelFrame(module_task_frame, text="任务管理", padx=10, pady=10, font=("Arial", 10, "bold"))
+            task_frame = ttk.LabelFrame(module_task_frame, text="任务管理", padding=(10, 10))
             task_frame.pack(side="left", fill="both", expand=True, padx=5)
             self.task_frame = task_frame
             self.update_task_ui()
 
         # 添加消息框和生成按钮在同一行
-        bottom_frame = tk.Frame(main_frame)
+        bottom_frame = ttk.Frame(main_frame)
         bottom_frame.pack(fill="x", pady=10, side="bottom")
 
         # 消息框
@@ -221,14 +222,14 @@ class MRobotApp:
         self.message_box.pack(side="left", fill="x", expand=True, padx=5, pady=5)
 
         # 生成按钮和 .gitignore 选项
-        button_frame = tk.Frame(bottom_frame)
+        button_frame = ttk.Frame(bottom_frame)
         button_frame.pack(side="right", padx=10)
 
         # 添加 .gitignore 复选框
-        tk.Checkbutton(button_frame, text="添加 .gitignore", variable=self.add_gitignore_var).pack(side="top", pady=5)
+        ttk.Checkbutton(button_frame, text="添加 .gitignore", variable=self.add_gitignore_var).pack(side="top", pady=5)
 
         # 添加生成按钮
-        generate_button = tk.Button(button_frame, text="一键生成MRobot代码", command=self.generate_action, bg="green", fg="white", font=("Arial", 12, "bold"))
+        generate_button = ttk.Button(button_frame, text="一键生成MRobot代码", command=self.generate_action)
         generate_button.pack(side="top", pady=5)
 
         # 重定向输出到消息框
@@ -241,6 +242,9 @@ class MRobotApp:
 
         # 启动 Tkinter 主事件循环
         root.mainloop()
+
+
+
 
     def redirect_output(self):
         """
@@ -269,16 +273,13 @@ class MRobotApp:
         if os.path.exists(task_dir):
             for file_name in os.listdir(task_dir):
                 file_base, file_ext = os.path.splitext(file_name)
-                # 忽略 init 和 user_task 文件
                 if file_ext == ".c" and file_base not in ["init", "user_task"] and file_base not in [task_var.get() for task_var, _ in self.task_vars]:
-                    # 尝试从 user_task.h 文件中读取频率信息
                     frequency = 100  # 默认频率
                     user_task_header_path = os.path.join("User", "task", "user_task.h")
                     if os.path.exists(user_task_header_path):
                         try:
                             with open(user_task_header_path, "r", encoding="utf-8") as f:
                                 content = f.read()
-                                # 匹配任务频率的宏定义
                                 pattern = rf"#define\s+TASK_FREQ_{file_base.upper()}\s*\((\d+)[uU]?\)"
                                 match = re.search(pattern, content)
                                 if match:
@@ -286,32 +287,32 @@ class MRobotApp:
                                     print(f"从 user_task.h 文件中读取到任务 {file_base} 的频率: {frequency}")
                         except Exception as e:
                             print(f"读取 user_task.h 文件时出错: {e}")
-    
-                    # 自动添加已存在的任务名和频率
+
                     new_task_var = tk.StringVar(value=file_base)
                     self.task_vars.append((new_task_var, tk.IntVar(value=frequency)))
-    
+
         # 清空任务框架中的所有子组件
         for widget in self.task_frame.winfo_children():
             widget.destroy()
-    
+
+
         # 设置任务管理框的固定宽度
-        self.task_frame.config(width=400)  # 将宽度固定为 400 像素
-    
+        self.task_frame.config(width=400)
+
         # 显示任务列表
         for i, (task_var, freq_var) in enumerate(self.task_vars):
-            task_row = tk.Frame(self.task_frame, width=400)  # 设置任务行的宽度
+            task_row = ttk.Frame(self.task_frame, width=400)
             task_row.pack(fill="x", pady=5)
-    
-            # 调整输入框和按钮的宽度
-            tk.Entry(task_row, textvariable=task_var, width=20).pack(side="left", padx=5)  # 输入框宽度
-            tk.Label(task_row, text="频率:").pack(side="left", padx=5)
-            tk.Spinbox(task_row, from_=1, to=1000, textvariable=freq_var, width=5).pack(side="left", padx=5)  # 数字选择框
-            tk.Button(task_row, text="删除", command=lambda idx=i: self.remove_task(idx), bg="red", fg="white").pack(side="left", padx=5)
-    
+
+            ttk.Entry(task_row, textvariable=task_var, width=20).pack(side="left", padx=5)
+            ttk.Label(task_row, text="频率:").pack(side="left", padx=5)
+            ttk.Spinbox(task_row, from_=1, to=1000, textvariable=freq_var, width=5).pack(side="left", padx=5)
+            ttk.Button(task_row, text="删除", command=lambda idx=i: self.remove_task(idx)).pack(side="left", padx=5)
+
         # 添加新任务按钮
-        add_task_button = tk.Button(self.task_frame, text="添加任务", command=self.add_task, bg="blue", fg="white")
+        add_task_button = ttk.Button(self.task_frame, text="添加任务", command=self.add_task)
         add_task_button.pack(pady=10)
+
 
     # 修改 add_task 方法
     def add_task(self):
@@ -341,17 +342,12 @@ class MRobotApp:
 
     # 更新 .h 文件复选框
     def update_header_files(self):
-        # 清空现有的复选框
         for widget in self.header_files_frame.winfo_children():
             widget.destroy()
 
-        # 定义需要处理的文件夹
         folders = ["bsp", "component", "device", "module"]
-
-        # 存储依赖关系
         dependencies = defaultdict(list)
 
-        # 遍历文件夹，读取 dependencies.csv 文件
         for folder in folders:
             folder_dir = os.path.join(REPO_DIR, "User", folder)
             if os.path.exists(folder_dir):
@@ -362,36 +358,33 @@ class MRobotApp:
                         for row in reader:
                             if len(row) == 2:
                                 dependencies[row[0]].append(row[1])
+
         # 创建复选框
         for folder in folders:
             folder_dir = os.path.join(REPO_DIR, "User", folder)
             if os.path.exists(folder_dir):
-                # 创建每个模块的分组框
-                module_frame = tk.LabelFrame(self.header_files_frame, text=folder.capitalize(), padx=10, pady=10, font=("Arial", 10, "bold"))
+                module_frame = ttk.LabelFrame(self.header_files_frame, text=folder.capitalize(), padding=(10, 10))
                 module_frame.pack(fill="x", pady=5)
 
-                # 使用 grid 布局管理器实现自动换行
                 row, col = 0, 0
                 for file in os.listdir(folder_dir):
                     file_base, file_ext = os.path.splitext(file)
-                    if file_ext == ".h" and file_base != folder:  # 过滤掉与文件夹同名的文件
+                    if file_ext == ".h" and file_base != folder:
                         var = tk.BooleanVar(value=False)
                         self.header_file_vars[file_base] = var
 
-                        # 创建复选框并添加到 grid 中
-                        checkbox = tk.Checkbutton(
+                        checkbox = ttk.Checkbutton(
                             module_frame,
                             text=file_base,
                             variable=var,
-                            wraplength=150,  # 设置文本换行宽度
                             command=lambda fb=file_base: self.handle_dependencies(fb, dependencies)
                         )
                         checkbox.grid(row=row, column=col, padx=5, pady=5, sticky="w")
-                        # 控制列数，达到一定数量后换行
                         col += 1
-                        if col >= 6:  # 每行最多显示 6 个复选框
+                        if col >= 6:
                             col = 0
                             row += 1
+
 
 
     def handle_dependencies(self, file_base, dependencies):
