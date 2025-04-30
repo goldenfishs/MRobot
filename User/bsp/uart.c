@@ -11,9 +11,8 @@ static void (*UART_Callback[BSP_UART_NUM][BSP_UART_CB_NUM])(void);
 static BSP_UART_t UART_Get(UART_HandleTypeDef *huart) {
   if (huart->Instance == USART1)
     return BSP_UART_EXAMPLE;
-
-  /*else */
-
+  // else if (huart->Instance == USARTX)
+  //   return BSP_UART_XXX;
   else
     return BSP_UART_ERR;
 }
@@ -104,6 +103,8 @@ UART_HandleTypeDef *BSP_UART_GetHandle(BSP_UART_t uart) {
   switch (uart) {
     case BSP_UART_EXAMPLE:
       return &huart1;
+    // case BSP_UART_XXX:
+    //   return &huartX;
     default:
       return NULL;
   }

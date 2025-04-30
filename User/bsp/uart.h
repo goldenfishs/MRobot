@@ -18,7 +18,7 @@ extern "C" {
 /* UART实体枚举，与设备对应 */
 typedef enum {
   BSP_UART_EXAMPLE,
-  /*BSP_UART_??*/
+  /*BSP_UART_XXX*/
   BSP_UART_NUM,
   BSP_UART_ERR,
 } BSP_UART_t;
