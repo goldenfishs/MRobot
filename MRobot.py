@@ -8,10 +8,14 @@ import re
 from git import Repo
 from collections import defaultdict
 import csv
+import xml.etree.ElementTree as ET
 
 # 配置常量
 REPO_DIR = "MRobot_repo"
 REPO_URL = "http://gitea.qutrobot.top/robofish/MRobot.git"
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+MDK_ARM_DIR = os.path.join(CURRENT_DIR, "MDK-ARM")
+USER_DIR = os.path.join(CURRENT_DIR, "User")
 
 class MRobotApp:
     def __init__(self):
@@ -47,6 +51,123 @@ class MRobotApp:
                 print(f"已删除克隆的仓库目录: {REPO_DIR}")
         except Exception as e:
             print(f"删除仓库目录时出错: {e}")
+
+
+    def auto_configure_environment(self):
+        """自动配置环境"""
+        try:
+            self.add_groups_and_files()
+            self.add_include_path(r"..\User")
+            print("环境配置完成！")
+        except Exception as e:
+            print(f"自动配置环境时出错: {e}")
+
+
+    def log(self, message):
+        """统一日志输出"""
+        print(message)
+
+
+    def find_uvprojx_file(self):
+        """查找 MDK-ARM 文件夹中的 .uvprojx 文件"""
+        if not os.path.exists(MDK_ARM_DIR):
+            self.log(f"未找到 MDK-ARM 文件夹：{MDK_ARM_DIR}")
+            return None
+
+        uvprojx_files = [f for f in os.listdir(MDK_ARM_DIR) if f.endswith(".uvprojx")]
+        if not uvprojx_files:
+            self.log(f"在 {MDK_ARM_DIR} 中未找到任何 .uvprojx 文件！")
+            return None
+
+        project_file = os.path.join(MDK_ARM_DIR, uvprojx_files[0])
+        self.log(f"找到项目文件：{project_file}")
+        return project_file
+
+
+    def add_groups_and_files(self):
+        """添加 User 文件夹中的组和文件到 Keil 项目"""
+        project_file = self.find_uvprojx_file()
+        if not project_file:
+            return
+
+        tree = ET.parse(project_file)
+        root = tree.getroot()
+        groups_node = root.find(".//Groups")
+        if groups_node is None:
+            self.log("未找到 Groups 节点！")
+            return
+
+        existing_groups = {group.find("GroupName").text for group in groups_node.findall("Group")}
+        existing_files = {
+            file.text
+            for group in groups_node.findall("Group")
+            for file in group.findall(".//FileName")
+        }
+
+        for folder_name in os.listdir(USER_DIR):
+            folder_path = os.path.join(USER_DIR, folder_name)
+            if not os.path.isdir(folder_path):
+                continue
+
+            group_name = f"User/{folder_name}"
+            if group_name in existing_groups:
+                self.log(f"组 {group_name} 已存在，跳过...")
+                continue
+
+            group_node = ET.SubElement(groups_node, "Group")
+            ET.SubElement(group_node, "GroupName").text = group_name
+            files_node = ET.SubElement(group_node, "Files")
+
+            for file_name in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file_name)
+                if not os.path.isfile(file_path) or file_name in existing_files:
+                    self.log(f"文件 {file_name} 已存在或无效，跳过...")
+                    continue
+
+                file_node = ET.SubElement(files_node, "File")
+                ET.SubElement(file_node, "FileName").text = file_name
+                ET.SubElement(file_node, "FileType").text = "1"
+                relative_path = os.path.relpath(file_path, os.path.dirname(project_file)).replace("\\", "/")
+                ET.SubElement(file_node, "FilePath").text = relative_path
+
+        tree.write(project_file, encoding="utf-8", xml_declaration=True)
+        self.log("Keil 项目文件已更新！")
+
+    def add_include_path(self, new_path):
+        """添加新的 IncludePath 到 Keil 项目"""
+        project_file = self.find_uvprojx_file()
+        if not project_file:
+            return
+
+        tree = ET.parse(project_file)
+        root = tree.getroot()
+        include_path_nodes = root.findall(".//IncludePath")
+        if not include_path_nodes:
+            self.log("未找到任何 IncludePath 节点，无法添加路径。")
+            return
+
+        updated = False
+        for index, include_path_node in enumerate(include_path_nodes):
+            if index == 0:
+                self.log("跳过第一组 IncludePath 节点，不进行修改。")
+                continue
+
+            include_paths = include_path_node.text.split(";") if include_path_node.text else []
+            if new_path in include_paths:
+                self.log(f"路径 '{new_path}' 已存在于第 {index + 1} 组 IncludePath 节点中，无需重复添加。")
+                continue
+
+            include_paths.append(new_path)
+            include_path_node.text = ";".join(include_paths)
+            updated = True
+            self.log(f"路径 '{new_path}' 已成功添加到第 {index + 1} 组 IncludePath 节点中。")
+
+        if updated:
+            tree.write(project_file, encoding="utf-8", xml_declaration=True)
+            self.log(f"项目文件已更新：{project_file}")
+        else:
+            self.log("未对项目文件进行任何修改。")
+
 
     # 复制文件
     def copy_file_from_repo(self, src_path, dest_path):
@@ -184,7 +305,8 @@ class MRobotApp:
         root.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(root))
 
         # 初始化 BooleanVar
-        self.add_gitignore_var = tk.BooleanVar(value=True)
+        self.add_gitignore_var = tk.BooleanVar(value=False)
+        self.auto_configure_var = tk.BooleanVar(value=False)  # 新增复选框变量
 
         # 创建主框架
         main_frame = ttk.Frame(root)
@@ -223,16 +345,24 @@ class MRobotApp:
         self.message_box = tk.Text(bottom_frame, wrap="word", state="disabled", height=5, width=60)
         self.message_box.pack(side="left", fill="x", expand=True, padx=5, pady=5)
 
-        # 生成按钮和 .gitignore 选项
+        # 生成按钮和复选框选项
         button_frame = ttk.Frame(bottom_frame)
         button_frame.pack(side="right", padx=10)
 
-        # 添加 .gitignore 复选框
-        ttk.Checkbutton(button_frame, text="添加 .gitignore", variable=self.add_gitignore_var).pack(side="top", pady=5)
+        # 添加复选框容器（横向排列复选框）
+        checkbox_frame = ttk.Frame(button_frame)
+        checkbox_frame.pack(side="top", pady=5)
 
-        # 添加生成按钮
+        # 添加 .gitignore 复选框（左侧）
+        ttk.Checkbutton(checkbox_frame, text=".gitignore", variable=self.add_gitignore_var).pack(side="left", padx=5)
+
+        # 添加自动配置环境复选框（右侧）
+        ttk.Checkbutton(checkbox_frame, text="自动环境", variable=self.auto_configure_var).pack(side="left", padx=5)
+
+        # 添加生成按钮（竖向排列在复选框下方）
         generate_button = ttk.Button(button_frame, text="一键生成MRobot代码", command=self.generate_action)
-        generate_button.pack(side="top", pady=5)
+        generate_button.pack(side="top", pady=10)
+        generate_button.config(width=25)  # 设置按钮宽度
 
         # 重定向输出到消息框
         self.redirect_output()
@@ -244,7 +374,6 @@ class MRobotApp:
 
         # 启动 Tkinter 主事件循环
         root.mainloop()
-
 
 
 
@@ -594,29 +723,29 @@ class MRobotApp:
         def task():
             # 检查并创建目录（与 FreeRTOS 状态无关的模块始终创建）
             self.create_directories()
-    
+
             # 复制 .gitignore 文件
             if self.add_gitignore_var.get():
                 self.copy_file_from_repo(".gitignore", ".gitignore")
-    
+
             # 如果启用了 FreeRTOS，复制相关文件
             if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
                 self.copy_file_from_repo("src/freertos.c", os.path.join("Core", "Src", "freertos.c"))
-    
+
             # 定义需要处理的文件夹（与 FreeRTOS 状态无关）
             folders = ["bsp", "component", "device", "module"]
-    
+
             # 遍历每个文件夹，复制选中的 .h 和 .c 文件
             for folder in folders:
                 folder_dir = os.path.join(REPO_DIR, "User", folder)
                 if not os.path.exists(folder_dir):
                     continue  # 如果文件夹不存在，跳过
-    
+
                 for file_name in os.listdir(folder_dir):
                     file_base, file_ext = os.path.splitext(file_name)
                     if file_ext not in [".h", ".c"]:
                         continue  # 只处理 .h 和 .c 文件
-    
+
                     # 强制复制与文件夹同名的文件
                     if file_base == folder:
                         src_path = os.path.join(folder_dir, file_name)
@@ -624,29 +753,34 @@ class MRobotApp:
                         self.copy_file_from_repo(src_path, dest_path)
                         print(f"强制复制与文件夹同名的文件: {file_name}")
                         continue  # 跳过后续检查，直接复制
-    
+
                     # 检查是否选中了对应的文件
                     if file_base in self.header_file_vars and self.header_file_vars[file_base].get():
                         src_path = os.path.join(folder_dir, file_name)
                         dest_path = os.path.join("User", folder, file_name)
                         self.copy_file_from_repo(src_path, dest_path)
-    
+
             # 如果启用了 FreeRTOS，执行任务相关的生成逻辑
             if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
                 # 修改 user_task.c 文件
                 self.modify_user_task_file()
-    
+
                 # 生成 user_task.h 文件
                 self.generate_user_task_header()
-    
+
                 # 生成 init.c 文件
                 self.generate_init_file()
-    
+
                 # 生成 task.c 文件
                 self.generate_task_files()
-    
-        threading.Thread(target=task).start()
+            
+            # 自动配置环境
+            if self.auto_configure_var.get():
+                
+                self.auto_configure_environment()
 
+
+        threading.Thread(target=task).start()
 
     # 程序关闭时清理
     def on_closing(self, root):
