@@ -139,6 +139,8 @@ class MRobotApp:
     
         threading.Thread(target=task).start()
 
+
+
     # 创建必要的目录
     def create_directories(self):
         try:
@@ -415,15 +417,16 @@ class MRobotApp:
     
             # 为每个任务生成对应的 task.c 文件
             for task_var, _ in self.task_vars:  # 解包元组
-                task_name = task_var.get()
-                task_file_path = os.path.join(task_dir, f"{task_name.lower()}.c")
+                task_name = f"Task_{task_var.get()}"  # 添加前缀 Task_
+                task_file_path = os.path.join(task_dir, f"{task_var.get().lower()}.c")  # 文件名保持原始小写
     
                 # 替换模板中的占位符
                 task_content = template_content.replace("{{task_name}}", task_name)
                 task_content = task_content.replace("{{task_function}}", task_name)
-                task_content = task_content.replace("{{task_frequency}}", f"TASK_FREQ_{task_name.upper()}")
-                task_content = task_content.replace("{{task_delay}}", f"TASK_INIT_DELAY_{task_name.upper()}")
-                task_content = task_content.replace("{{task_variable}}", task_name)
+                task_content = task_content.replace(
+                    "{{task_frequency}}", f"TASK_FREQ_{task_var.get().upper()}"
+                )  # 替换为 user_task.h 中的宏定义
+                task_content = task_content.replace("{{task_delay}}", f"TASK_INIT_DELAY_{task_var.get().upper()}")
     
                 with open(task_file_path, "w", encoding="utf-8") as f:
                     f.write(task_content)
@@ -431,7 +434,6 @@ class MRobotApp:
                 print(f"已成功生成 {task_file_path} 文件！")
         except Exception as e:
             print(f"生成 task.c 文件时出错: {e}")
-
     # 修改 user_task.c 文件
     def modify_user_task_file(self):
         try:
@@ -466,9 +468,6 @@ class MRobotApp:
             print(f"已成功生成 {generated_task_file_path} 文件！")
         except Exception as e:
             print(f"修改 user_task.c 文件时出错: {e}")
-
-    # 生成 user_task.h 文件
-    # ...existing code...
     # ...existing code...
     
     def generate_user_task_header(self):
@@ -503,7 +502,7 @@ class MRobotApp:
             freq_definitions = "\n".join([f"        float {task_var.get().lower()};" for task_var, _ in self.task_vars])
             last_up_time_definitions = "\n".join([f"        uint32_t {task_var.get().lower()};" for task_var, _ in self.task_vars])
             task_attr_declarations = "\n".join([f"extern const osThreadAttr_t attr_{task_var.get().lower()};" for task_var, _ in self.task_vars])
-            task_function_declarations = "\n".join([f"void {task_var.get()}(void *argument);" for task_var, _ in self.task_vars])
+            task_function_declarations = "\n".join([f"void Task_{task_var.get()}(void *argument);" for task_var, _ in self.task_vars])
             task_frequency_definitions = "\n".join([
                 f"#define TASK_FREQ_{task_var.get().upper()} ({freq_var.get()}u)"
                 for task_var, freq_var in self.task_vars
@@ -537,9 +536,6 @@ class MRobotApp:
             print(f"已成功生成 {header_file_path} 文件！")
         except Exception as e:
             print(f"生成 user_task.h 文件时出错: {e}")
-    
-    # ...existing code...
-
 
     def generate_init_file(self):
         try:
@@ -569,7 +565,7 @@ class MRobotApp:
     
             # 生成任务创建代码
             thread_creation_code = "\n".join([
-                f"  task_runtime.thread.{task_var.get().lower()} = osThreadNew({task_var.get()}, NULL, &attr_{task_var.get().lower()});"
+                f"  task_runtime.thread.{task_var.get().lower()} = osThreadNew(Task_{task_var.get()}, NULL, &attr_{task_var.get().lower()});"
                 for task_var, _ in self.task_vars  # 解包元组
             ])
     
@@ -591,8 +587,6 @@ class MRobotApp:
             print(f"已成功生成 {generated_file_path} 文件！")
         except Exception as e:
             print(f"生成 init.c 文件时出错: {e}")
-
-
 
     # 修改 generate_action 方法
     
