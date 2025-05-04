@@ -3,7 +3,7 @@
 更加高效快捷的 STM32 开发架构，诞生于 Robocon 和 Robomaster，但绝不仅限于此。
 
 <div align="center">
-  <img src="./image/MRobot.jpeg" height="100" alt="MRobot Logo">
+  <img src="./img/MRobot.png" height="100" alt="MRobot Logo">
   <p>是时候使用更简洁的方式开发单片机了</p>
   <p>
     <!-- <img src="https://img.shields.io/github/license/xrobot-org/XRobot.svg" alt="License">

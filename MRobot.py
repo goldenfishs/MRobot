@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from PIL import Image, ImageTk
 import sys
 import os
 import threading
@@ -13,7 +14,11 @@ import xml.etree.ElementTree as ET
 # 配置常量
 REPO_DIR = "MRobot_repo"
 REPO_URL = "http://gitea.qutrobot.top/robofish/MRobot.git"
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):  # 检查是否为打包后的环境
+    CURRENT_DIR = os.path.dirname(sys.executable)  # 使用可执行文件所在目录
+else:
+    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))  # 使用脚本所在目录
+
 MDK_ARM_DIR = os.path.join(CURRENT_DIR, "MDK-ARM")
 USER_DIR = os.path.join(CURRENT_DIR, "User")
 
@@ -83,55 +88,60 @@ class MRobotApp:
         self.log(f"找到项目文件：{project_file}")
         return project_file
 
-
     def add_groups_and_files(self):
-        """添加 User 文件夹中的组和文件到 Keil 项目"""
+        """添加 User 文件夹中的组和 .c 文件到 Keil 项目"""
         project_file = self.find_uvprojx_file()
         if not project_file:
             return
-
+    
         tree = ET.parse(project_file)
         root = tree.getroot()
         groups_node = root.find(".//Groups")
         if groups_node is None:
             self.log("未找到 Groups 节点！")
             return
-
-        existing_groups = {group.find("GroupName").text for group in groups_node.findall("Group")}
-        existing_files = {
-            file.text
-            for group in groups_node.findall("Group")
-            for file in group.findall(".//FileName")
-        }
-
+    
+        # 获取现有组和文件信息
+        existing_groups = {group.find("GroupName").text: group for group in groups_node.findall("Group")}
+    
         for folder_name in os.listdir(USER_DIR):
             folder_path = os.path.join(USER_DIR, folder_name)
             if not os.path.isdir(folder_path):
                 continue
-
+    
             group_name = f"User/{folder_name}"
             if group_name in existing_groups:
-                self.log(f"组 {group_name} 已存在，跳过...")
-                continue
-
-            group_node = ET.SubElement(groups_node, "Group")
-            ET.SubElement(group_node, "GroupName").text = group_name
-            files_node = ET.SubElement(group_node, "Files")
-
+                group_node = existing_groups[group_name]
+                self.log(f"组 {group_name} 已存在，检查文件...")
+            else:
+                group_node = ET.SubElement(groups_node, "Group")
+                ET.SubElement(group_node, "GroupName").text = group_name
+                ET.SubElement(group_node, "Files")
+                self.log(f"创建新组: {group_name}")
+    
+            files_node = group_node.find("Files")
+            existing_files_in_group = {file.find("FileName").text for file in files_node.findall("File")}
+    
             for file_name in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, file_name)
-                if not os.path.isfile(file_path) or file_name in existing_files:
-                    self.log(f"文件 {file_name} 已存在或无效，跳过...")
+                if not os.path.isfile(file_path) or not file_name.lower().endswith(".c"):
+                    self.log(f"文件 {file_name} 无效，跳过...")
                     continue
-
+    
+                if file_name in existing_files_in_group:
+                    self.log(f"文件 {file_name} 已存在于组 {group_name}，跳过...")
+                    continue
+    
                 file_node = ET.SubElement(files_node, "File")
                 ET.SubElement(file_node, "FileName").text = file_name
                 ET.SubElement(file_node, "FileType").text = "1"
                 relative_path = os.path.relpath(file_path, os.path.dirname(project_file)).replace("\\", "/")
                 ET.SubElement(file_node, "FilePath").text = relative_path
-
+                self.log(f"已添加文件: {file_name} 到组 {group_name}")
+    
         tree.write(project_file, encoding="utf-8", xml_declaration=True)
-        self.log("Keil 项目文件已更新！")
+        self.log("Keil 项目文件已更新，仅添加 .c 文件！")
+
 
     def add_include_path(self, new_path):
         """添加新的 IncludePath 到 Keil 项目"""
@@ -300,6 +310,7 @@ class MRobotApp:
         root = tk.Tk()
         root.title("MRobot 自动生成脚本")
         root.geometry("800x600")  # 调整窗口大小以适应布局
+
 
         # 在窗口关闭时调用 on_closing 方法
         root.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(root))
