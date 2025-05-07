@@ -1,3 +1,5 @@
 oled_i2c,bsp/i2c
 bmp280_i2c,bsp/i2c
 pc_uart,bsp/uart
+key_gpio,bsp/gpio_exti
+servo,bsp/servo_pwm
