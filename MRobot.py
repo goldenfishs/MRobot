@@ -58,127 +58,6 @@ class MRobotApp:
             print(f"删除仓库目录时出错: {e}")
 
 
-    def auto_configure_environment(self):
-        """自动配置环境"""
-        try:
-            self.add_groups_and_files()
-            self.add_include_path(r"..\User")
-            print("环境配置完成！")
-        except Exception as e:
-            print(f"自动配置环境时出错: {e}")
-
-
-    def log(self, message):
-        """统一日志输出"""
-        print(message)
-
-
-    def find_uvprojx_file(self):
-        """查找 MDK-ARM 文件夹中的 .uvprojx 文件"""
-        if not os.path.exists(MDK_ARM_DIR):
-            self.log(f"未找到 MDK-ARM 文件夹：{MDK_ARM_DIR}")
-            return None
-
-        uvprojx_files = [f for f in os.listdir(MDK_ARM_DIR) if f.endswith(".uvprojx")]
-        if not uvprojx_files:
-            self.log(f"在 {MDK_ARM_DIR} 中未找到任何 .uvprojx 文件！")
-            return None
-
-        project_file = os.path.join(MDK_ARM_DIR, uvprojx_files[0])
-        self.log(f"找到项目文件：{project_file}")
-        return project_file
-
-    def add_groups_and_files(self):
-        """添加 User 文件夹中的组和 .c 文件到 Keil 项目"""
-        project_file = self.find_uvprojx_file()
-        if not project_file:
-            return
-    
-        tree = ET.parse(project_file)
-        root = tree.getroot()
-        groups_node = root.find(".//Groups")
-        if groups_node is None:
-            self.log("未找到 Groups 节点！")
-            return
-    
-        # 获取现有组和文件信息
-        existing_groups = {group.find("GroupName").text: group for group in groups_node.findall("Group")}
-    
-        for folder_name in os.listdir(USER_DIR):
-            folder_path = os.path.join(USER_DIR, folder_name)
-            if not os.path.isdir(folder_path):
-                continue
-    
-            group_name = f"User/{folder_name}"
-            if group_name in existing_groups:
-                group_node = existing_groups[group_name]
-                self.log(f"组 {group_name} 已存在，检查文件...")
-            else:
-                group_node = ET.SubElement(groups_node, "Group")
-                ET.SubElement(group_node, "GroupName").text = group_name
-                ET.SubElement(group_node, "Files")
-                self.log(f"创建新组: {group_name}")
-    
-            files_node = group_node.find("Files")
-            existing_files_in_group = {file.find("FileName").text for file in files_node.findall("File")}
-    
-            for file_name in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, file_name)
-                if not os.path.isfile(file_path) or not file_name.lower().endswith(".c"):
-                    self.log(f"文件 {file_name} 无效，跳过...")
-                    continue
-    
-                if file_name in existing_files_in_group:
-                    self.log(f"文件 {file_name} 已存在于组 {group_name}，跳过...")
-                    continue
-    
-                file_node = ET.SubElement(files_node, "File")
-                ET.SubElement(file_node, "FileName").text = file_name
-                ET.SubElement(file_node, "FileType").text = "1"
-                relative_path = os.path.relpath(file_path, os.path.dirname(project_file)).replace("\\", "/")
-                ET.SubElement(file_node, "FilePath").text = relative_path
-                self.log(f"已添加文件: {file_name} 到组 {group_name}")
-    
-        tree.write(project_file, encoding="utf-8", xml_declaration=True)
-        self.log("Keil 项目文件已更新，仅添加 .c 文件！")
-
-
-    def add_include_path(self, new_path):
-        """添加新的 IncludePath 到 Keil 项目"""
-        project_file = self.find_uvprojx_file()
-        if not project_file:
-            return
-
-        tree = ET.parse(project_file)
-        root = tree.getroot()
-        include_path_nodes = root.findall(".//IncludePath")
-        if not include_path_nodes:
-            self.log("未找到任何 IncludePath 节点，无法添加路径。")
-            return
-
-        updated = False
-        for index, include_path_node in enumerate(include_path_nodes):
-            if index == 0:
-                self.log("跳过第一组 IncludePath 节点，不进行修改。")
-                continue
-
-            include_paths = include_path_node.text.split(";") if include_path_node.text else []
-            if new_path in include_paths:
-                self.log(f"路径 '{new_path}' 已存在于第 {index + 1} 组 IncludePath 节点中，无需重复添加。")
-                continue
-
-            include_paths.append(new_path)
-            include_path_node.text = ";".join(include_paths)
-            updated = True
-            self.log(f"路径 '{new_path}' 已成功添加到第 {index + 1} 组 IncludePath 节点中。")
-
-        if updated:
-            tree.write(project_file, encoding="utf-8", xml_declaration=True)
-            self.log(f"项目文件已更新：{project_file}")
-        else:
-            self.log("未对项目文件进行任何修改。")
-
-
     # 复制文件
     def copy_file_from_repo(self, src_path, dest_path):
         try:
@@ -306,87 +185,122 @@ class MRobotApp:
 
 
     # 显示主窗口
+    # ...existing code...
+    # ...existing code...
+    
+    # 显示主窗口
     def show_main_window(self):
         root = tk.Tk()
         root.title("MRobot 自动生成脚本")
-        root.geometry("800x600")  # 调整窗口大小以适应布局
-
-
+        root.geometry("1000x650")  # 调整窗口大小以适应布局
+    
         # 在窗口关闭时调用 on_closing 方法
         root.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(root))
-
+    
         # 初始化 BooleanVar
         self.add_gitignore_var = tk.BooleanVar(value=False)
         self.auto_configure_var = tk.BooleanVar(value=False)  # 新增复选框变量
-
+    
         # 创建主框架
         main_frame = ttk.Frame(root)
         main_frame.pack(fill="both", expand=True)
-
+    
         # 添加标题
         title_label = ttk.Label(main_frame, text="MRobot 自动生成脚本", font=("Arial", 16, "bold"))
         title_label.pack(pady=10)
-
+    
         # 添加 FreeRTOS 状态标签
         freertos_status_label = ttk.Label(main_frame, text="FreeRTOS 状态: 检测中...", font=("Arial", 12))
         freertos_status_label.pack(pady=10)
         self.update_freertos_status(freertos_status_label)
-
-        # 模块文件选择和任务管理框架
+    
+        # 模块文件选择和任务管理框架（添加滚动功能）
         module_task_frame = ttk.Frame(main_frame)
         module_task_frame.pack(fill="both", expand=True, padx=10, pady=10)
-
+    
+        # 创建 Canvas 和 Scrollbar
+        canvas = tk.Canvas(module_task_frame)
+        scrollbar = ttk.Scrollbar(module_task_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+    
+        # 配置滚动区域
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+    
+        # 绑定鼠标滚轮事件
+        def on_mouse_wheel(event):
+            canvas.yview_scroll(-1 * int(event.delta / 120), "units")
+    
+        canvas.bind_all("<MouseWheel>", on_mouse_wheel)
+    
+        # 布局 Canvas 和 Scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+    
+        # 左右布局：模块文件选择框和任务管理框
+        left_frame = ttk.Frame(scrollable_frame)
+        left_frame.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+    
+        right_frame = ttk.Frame(scrollable_frame)
+        right_frame.pack(side="right", fill="both", expand=True, padx=5, pady=5)
+    
         # 模块文件选择框
-        header_files_frame = ttk.LabelFrame(module_task_frame, text="模块文件选择", padding=(10, 10))
-        header_files_frame.pack(side="left", fill="both", expand=True, padx=5)
+        header_files_frame = ttk.LabelFrame(left_frame, text="模块文件选择", padding=(10, 10))
+        header_files_frame.pack(fill="both", expand=True, padx=5)
         self.header_files_frame = header_files_frame
         self.update_header_files()
-
+    
+        # 任务管理框
         if self.ioc_data and self.check_freertos_enabled(self.ioc_data):
-            task_frame = ttk.LabelFrame(module_task_frame, text="任务管理", padding=(10, 10))
-            task_frame.pack(side="left", fill="both", expand=True, padx=5)
+            task_frame = ttk.LabelFrame(right_frame, text="任务管理", padding=(10, 10))
+            task_frame.pack(fill="both", expand=True, padx=5)
             self.task_frame = task_frame
             self.update_task_ui()
-
+    
         # 添加消息框和生成按钮在同一行
         bottom_frame = ttk.Frame(main_frame)
         bottom_frame.pack(fill="x", pady=10, side="bottom")
-
+    
         # 消息框
         self.message_box = tk.Text(bottom_frame, wrap="word", state="disabled", height=5, width=60)
         self.message_box.pack(side="left", fill="x", expand=True, padx=5, pady=5)
-
+    
         # 生成按钮和复选框选项
         button_frame = ttk.Frame(bottom_frame)
         button_frame.pack(side="right", padx=10)
-
+    
         # 添加复选框容器（横向排列复选框）
         checkbox_frame = ttk.Frame(button_frame)
         checkbox_frame.pack(side="top", pady=5)
-
+    
         # 添加 .gitignore 复选框（左侧）
         ttk.Checkbutton(checkbox_frame, text=".gitignore", variable=self.add_gitignore_var).pack(side="left", padx=5)
-
+    
         # 添加自动配置环境复选框（右侧）
         ttk.Checkbutton(checkbox_frame, text="自动环境", variable=self.auto_configure_var).pack(side="left", padx=5)
-
+    
         # 添加生成按钮（竖向排列在复选框下方）
         generate_button = ttk.Button(button_frame, text="一键生成MRobot代码", command=self.generate_action)
         generate_button.pack(side="top", pady=10)
         generate_button.config(width=25)  # 设置按钮宽度
-
+    
         # 重定向输出到消息框
         self.redirect_output()
-
+    
         # 打印欢迎信息
         print("欢迎使用 MRobot 自动生成脚本！")
         print("请根据需要选择模块文件和任务。")
         print("点击“一键生成MRobot代码”按钮开始生成。")
-
+    
         # 启动 Tkinter 主事件循环
         root.mainloop()
-
-
+    
+    # ...existing code...
+    # ...existing code...
 
     def redirect_output(self):
         """
@@ -785,10 +699,10 @@ class MRobotApp:
                 # 生成 task.c 文件
                 self.generate_task_files()
             
-            # 自动配置环境
-            if self.auto_configure_var.get():
+            # # 自动配置环境
+            # if self.auto_configure_var.get():
                 
-                self.auto_configure_environment()
+            #     self.auto_configure_environment()
 
 
         threading.Thread(target=task).start()
