@@ -11,7 +11,7 @@ extern "C" {
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>
-
+#include <stdint.h>
 #define M_DEG2RAD_MULT (0.01745329251f)
 #define M_RAD2DEG_MULT (57.2957795131f)
 
@@ -128,11 +128,3 @@ void CircleReverse(float *origin);
  */
 #define VERIFY(expr) ((void)(expr))
 #endif
-
-/**
- * @brief 断言失败处理
- *
- * @param file 文件名
- * @param line 行号
- */
-void VerifyFailed(const char *file, uint32_t line);

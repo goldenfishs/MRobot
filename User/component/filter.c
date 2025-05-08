@@ -3,6 +3,7 @@
 */
 
 #include "filter.h"
+#include <stddef.h>
 
 #include "user_math.h"
 

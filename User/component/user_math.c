@@ -5,7 +5,7 @@
 #include "user_math.h"
 
 #include <string.h>
-
+#include <stdint.h>
 inline float InvSqrt(float x) {
 //#if 0
   /* Fast inverse square-root */
@@ -86,17 +86,3 @@ inline void CircleAdd(float *origin, float delta, float range) {
  * @param origin 被操作的值
  */
 inline void CircleReverse(float *origin) { *origin = -(*origin) + M_2PI; }
-
-/**
- * @brief 断言失败处理
- *
- * @param file 文件名
- * @param line 行号
- */
-void VerifyFailed(const char *file, uint32_t line) {
-  UNUSED(file);
-  UNUSED(line);
-  while (1) {
-    __NOP();
-  }
-}

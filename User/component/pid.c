@@ -13,6 +13,7 @@
 
 #include "pid.h"
 
+#include <stddef.h>
 #include "user_math.h"
 
 #define SIGMA 0.000001f
