@@ -29,6 +29,6 @@ Examples/
 !*.bin
 !*.hex
 
-/build
-/dist
+build/
+dist/
 *.spec

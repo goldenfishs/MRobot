@@ -1,16 +1,4 @@
 import sys
-import numpy as np
-import pandas as pd
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QLabel, QPushButton, QTextEdit, QVBoxLayout,
-    QHBoxLayout, QStackedWidget, QSizePolicy, QFrame, QGraphicsDropShadowEffect,
-    QSpinBox, QTableWidget, QTableWidgetItem, QFileDialog, QComboBox, QMessageBox, QHeaderView
-)
-from PyQt5.QtGui import QPixmap, QFont, QIcon
-from PyQt5.QtCore import Qt
-import matplotlib
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
 import os
 import numpy as np
 import pandas as pd
@@ -18,10 +6,18 @@ import requests
 import webbrowser
 import serial
 import serial.tools.list_ports
-from PyQt5.QtWidgets import QGroupBox, QGridLayout, QLineEdit, QTextBrowser
-from PyQt5.QtCore import QTimer, pyqtSlot
-from PyQt5.QtWidgets import QCheckBox
-from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QLabel, QPushButton, QTextEdit, QVBoxLayout,
+    QHBoxLayout, QStackedWidget, QSizePolicy, QFrame, QGraphicsDropShadowEffect,
+    QSpinBox, QTableWidget, QTableWidgetItem, QFileDialog, QComboBox, QMessageBox, QHeaderView,
+    QGroupBox, QGridLayout, QLineEdit, QTextBrowser, QCheckBox
+)
+from PyQt5.QtGui import QPixmap, QFont, QIcon, QPainter, QPen, QColor
+from PyQt5.QtCore import Qt, QTimer, QPointF, pyqtSlot
+import matplotlib
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 def resource_path(relative_path):
     """兼容PyInstaller打包后资源路径"""
@@ -94,7 +90,6 @@ class HomePage(QWidget):
         footer.setStyleSheet("color: #b2bec3; margin-top: 18px;")
         footer.setFixedHeight(100)  # 修改为固定高度
         layout.addWidget(footer)
-
 
 # --------- 功能一：多项式拟合工具页面 ---------
 class PolyFitApp(QWidget):
@@ -591,8 +586,10 @@ class DownloadPage(QWidget):
         # desc.setStyleSheet("color: #34495e; margin-bottom: 18px;")
         # main_layout.addWidget(desc)
 
-        # 两大类布局
-        from PyQt5.QtWidgets import QGridLayout, QGroupBox
+        spacer = QFrame()
+        spacer.setFixedHeight(4)  # 可根据需要调整间隔高度
+        spacer.setStyleSheet("background: transparent; border: none;")
+        main_layout.addWidget(spacer)
 
         # 小工具类
         tools_tools = [
@@ -661,6 +658,10 @@ class DownloadPage(QWidget):
             tools_layout.addWidget(btn, row, col)
         tools_group.setLayout(tools_layout)
         main_layout.addWidget(tools_group)
+        spacer = QFrame()
+        spacer.setFixedHeight(4)  # 可根据需要调整间隔高度
+        spacer.setStyleSheet("background: transparent; border: none;")
+        main_layout.addWidget(spacer)
 
         # 开发/设计软件类
         dev_tools = [
@@ -753,25 +754,25 @@ class SerialAssistant(QWidget):
         self.data_type = "float"
         self.data_count = 2
         self.sample_idx = 0
-
+    
         # 新增：HEX模式复选框
         self.hex_send_chk = QCheckBox("HEX发送")
         self.hex_recv_chk = QCheckBox("HEX接收")
-        self.hex_send_chk.setFont(QFont("微软雅黑", 10))
-        self.hex_recv_chk.setFont(QFont("微软雅黑", 10))
+        self.hex_send_chk.setFont(QFont("微软雅黑", 12))
+        self.hex_recv_chk.setFont(QFont("微软雅黑", 12))
         self.hex_send_chk.setChecked(False)
         self.hex_recv_chk.setChecked(False)
-
+    
         # 主体布局
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(32, 32, 32, 32)
         main_layout.setSpacing(28)
-
+    
         # 左侧面板
         left_panel = QVBoxLayout()
         left_panel.setSpacing(20)
         left_panel.setContentsMargins(0, 0, 0, 0)
-
+    
         # 串口配置区
         config_group = QGroupBox("串口配置")
         config_group.setFont(QFont("微软雅黑", 14, QFont.Bold))
@@ -816,30 +817,34 @@ class SerialAssistant(QWidget):
         config_layout.addWidget(self.open_btn, 2, 1)
         config_group.setLayout(config_layout)
         left_panel.addWidget(config_group)
-
+    
         # 数据协议配置区
         proto_group = QGroupBox("数据协议配置")
         proto_group.setFont(QFont("微软雅黑", 14, QFont.Bold))
         proto_group.setStyleSheet(config_group.styleSheet())
-        proto_layout = QGridLayout()
-        proto_layout.setSpacing(12)
+        proto_layout = QHBoxLayout()
+        proto_layout.setSpacing(18)
         proto_layout.setContentsMargins(16, 16, 16, 16)
-        proto_layout.addWidget(QLabel("数据数量:"), 0, 0)
+        proto_layout.addWidget(QLabel("数据数量:"))
         self.data_count_spin = QSpinBox()
         self.data_count_spin.setRange(1, 16)
         self.data_count_spin.setValue(self.data_count)
+        self.data_count_spin.setFixedWidth(80)
         self.data_count_spin.valueChanged.connect(self.apply_proto_config)
-        proto_layout.addWidget(self.data_count_spin, 0, 1)
-        proto_layout.addWidget(QLabel("数据类型:"), 1, 0)
+        proto_layout.addWidget(self.data_count_spin)
+        proto_layout.addSpacing(18)
+        proto_layout.addWidget(QLabel("数据类型:"))
         self.data_type_box = QComboBox()
         self.data_type_box.addItems(self.data_types)
         self.data_type_box.setCurrentText(self.data_type)
+        self.data_type_box.setFixedWidth(100)
         self.data_type_box.currentTextChanged.connect(self.apply_proto_config)
-        proto_layout.addWidget(self.data_type_box, 1, 1)
+        proto_layout.addWidget(self.data_type_box)
+        # proto_layout.addStretch(1)
         proto_group.setLayout(proto_layout)
         left_panel.addWidget(proto_group)
-
-        # 发送数据区
+    
+        # 发送数据区美化
         send_group = QGroupBox("发送数据")
         send_group.setFont(QFont("微软雅黑", 14, QFont.Bold))
         send_group.setStyleSheet("""
@@ -860,77 +865,109 @@ class SerialAssistant(QWidget):
             }
         """)
         send_layout = QVBoxLayout()
-        send_layout.setSpacing(14)
-        send_layout.setContentsMargins(12, 12, 12, 12)
-
-        # 输入框（更大更高字体）
-        self.send_edit = QLineEdit()
-        self.send_edit.setFont(QFont("Consolas", 22))
-        self.send_edit.setPlaceholderText("输入要发送的数据...")
-        self.send_edit.setMinimumHeight(54)
-        self.send_edit.setMinimumWidth(360)
+        send_layout.setSpacing(16)
+        send_layout.setContentsMargins(18, 18, 18, 18)
+    
+        # 输入框（多行）
+        self.send_edit = QTextEdit()
+        self.send_edit.setFont(QFont("Consolas", 18))
+        self.send_edit.setPlaceholderText("输入要发送的数据，可多行（支持HEX/文本）...")
+        self.send_edit.setMinimumHeight(140)
+        self.send_edit.setMaximumHeight(220)
         self.send_edit.setStyleSheet("""
-            QLineEdit {
+            QTextEdit {
                 background: #f8fbfd;
-                border-radius: 10px;
-                border: 1.5px solid #d6eaf8;
-                font-size: 22px;
-                padding: 12px 18px;
+                border-radius: 12px;
+                border: 2px solid #d6eaf8;
+                font-size: 18px;
+                padding: 14px 20px;
             }
         """)
         send_layout.addWidget(self.send_edit)
-
-        # HEX复选框行（字体更小）
-        hex_chk_row = QHBoxLayout()
-        self.hex_send_chk.setFont(QFont("微软雅黑", 10))
-        self.hex_recv_chk.setFont(QFont("微软雅黑", 10))
-        for chk in [self.hex_send_chk, self.hex_recv_chk]:
-            chk.setStyleSheet("""
-                QCheckBox {
-                    color: #2471a3;
-                    spacing: 12px;
-                }
-                QCheckBox::indicator {
-                    width: 18px;
-                    height: 18px;
-                }
-                QCheckBox::indicator:checked {
-                    background-color: #2980b9;
-                    border: 1.5px solid #2980b9;
-                }
-                QCheckBox::indicator:unchecked {
-                    background-color: #fff;
-                    border: 1.5px solid #b5d0ea;
-                }
-            """)
-        self.hex_send_chk.setChecked(False)
-        self.hex_recv_chk.setChecked(False)
-        hex_chk_row.addWidget(self.hex_send_chk)
-        hex_chk_row.addWidget(self.hex_recv_chk)
-        hex_chk_row.addStretch(1)
-        send_layout.addLayout(hex_chk_row)
-
-        # 发送按钮
-        send_btn_row = QHBoxLayout()
+    
+        # HEX复选框和按钮行
+        row1 = QHBoxLayout()
+        row1.setSpacing(24)
+        self.hex_send_chk.setStyleSheet("""
+            QCheckBox {
+                color: #2471a3;
+                font-size: 15px;
+            }
+            QCheckBox::indicator {
+                width: 22px;
+                height: 22px;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #2980b9;
+                border: 1.5px solid #2980b9;
+            }
+            QCheckBox::indicator:unchecked {
+                background-color: #fff;
+                border: 1.5px solid #b5d0ea;
+            }
+        """)
+        self.hex_recv_chk.setStyleSheet(self.hex_send_chk.styleSheet())
+        row1.addWidget(self.hex_send_chk)
+        row1.addWidget(self.hex_recv_chk)
+        row1.addStretch(1)
+        send_layout.addLayout(row1)
+    
+        # 发送和持续发送按钮+频率（优化为“每秒发送次数”）
+        row2 = QHBoxLayout()
+        row2.setSpacing(18)
         self.send_btn = QPushButton("发送")
         self.send_btn.clicked.connect(self.send_data)
         self.send_btn.setFont(QFont("微软雅黑", 16, QFont.Bold))
+        self.send_btn.setFixedHeight(44)
+        self.send_btn.setFixedWidth(120)
         self.send_btn.setStyleSheet(self._btn_style("#2980b9"))
-        send_btn_row.addWidget(self.send_btn)
-        send_layout.addLayout(send_btn_row)
-
+        row2.addWidget(self.send_btn)
+    
+        self.cont_send_btn = QPushButton("持续发送")
+        self.cont_send_btn.setCheckable(True)
+        self.cont_send_btn.setFont(QFont("微软雅黑", 15))
+        self.cont_send_btn.setFixedHeight(44)
+        self.cont_send_btn.setFixedWidth(120)
+        self.cont_send_btn.setStyleSheet(self._btn_style("#f1c40f"))
+        self.cont_send_btn.clicked.connect(self.toggle_cont_send)
+        row2.addWidget(self.cont_send_btn)
+    
+        freq_label = QLabel("   每秒发送次数:")
+        freq_label.setFont(QFont("微软雅黑", 8))
+        freq_label.setFixedWidth(180)
+        #文本居中
+        # freq_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        row2.addWidget(freq_label)
+    
+        self.freq_input = QSpinBox()
+        self.freq_input.setRange(1, 1000)
+        self.freq_input.setValue(5)
+        self.freq_input.setFont(QFont("Consolas", 14))
+        self.freq_input.setFixedWidth(100)
+        self.freq_input.setStyleSheet("""
+            QSpinBox {
+                background: #f8fbfd;
+                border-radius: 8px;
+                border: 1px solid #d6eaf8;
+                font-size: 15px;
+                padding: 2px 8px;
+            }
+        """)
+        row2.addWidget(self.freq_input)
+    
+        # freq_unit = QLabel("次/秒")
+        # freq_unit.setFont(QFont("微软雅黑", 13))
+        # freq_unit.setFixedWidth(40)
+        # row2.addWidget(freq_unit)
+        row2.addStretch(1)
+        send_layout.addLayout(row2)
+    
+        self.cont_send_timer = QTimer(self)
+        self.cont_send_timer.timeout.connect(self.send_data)
+    
         send_group.setLayout(send_layout)
         left_panel.addWidget(send_group, stretch=1)  # 让发送区弹性填充
-
-        # 清空按钮
-        self.clear_btn = QPushButton("清空接收和曲线")
-        self.clear_btn.clicked.connect(self.clear_all)
-        self.clear_btn.setStyleSheet(self._btn_style("#e74c3c"))
-        left_panel.addWidget(self.clear_btn)
-
-        # 弹性空隙（动态扩展填满）
-        left_panel.addStretch(1)
-
+    
         # 使用说明始终在最下方
         usage_group = QGroupBox("使用说明")
         usage_group.setFont(QFont("微软雅黑", 13, QFont.Bold))
@@ -953,27 +990,31 @@ class SerialAssistant(QWidget):
         """)
         usage_layout = QVBoxLayout()
         usage_label = QLabel(
-            "1. 选择串口号和波特率，点击“打开串口”。\n"
-            "2. 在“数据协议配置”中选择数据数量和数据类型。\n"
-            "3. 下位机发送格式：\n"
+            "1. 在“数据协议配置”中选择数据数量和数据类型。\n"
+            "2. 下位机发送格式：\n"
             "   0x55 + 数据数量(1字节) + 数据 + 校验和(1字节)\n"
             "   校验和为包头到最后一个数据字节的累加和的低8位。\n"
-            "4. 每包数据自动绘制曲线，X轴为采样点（或时间），Y轴为各通道数据。\n"
-            "5. 支持float/int16/uint16/int8/uint8类型，最多16通道。\n"
-            "6. 可点击“测试绘图”按钮模拟数据包接收效果。"
+            "3. 每包数据自动绘制曲线，X轴为采样点（或时间），Y轴为各通道数据。\n"
         )
         usage_label.setWordWrap(True)
         usage_label.setFont(QFont("微软雅黑", 9))
         usage_layout.addWidget(usage_label)
         usage_group.setLayout(usage_layout)
         left_panel.addWidget(usage_group)
-
+    
+        # 清空按钮紧贴使用说明
+        self.clear_btn = QPushButton("清空接收和曲线")
+        self.clear_btn.clicked.connect(self.clear_all)
+        self.clear_btn.setStyleSheet(self._btn_style("#e74c3c"))
+        self.clear_btn.setFixedHeight(38)
+        left_panel.addWidget(self.clear_btn)
+    
         main_layout.addLayout(left_panel, 0)
-
+    
         # 右侧面板
         right_panel = QVBoxLayout()
         right_panel.setSpacing(20)
-
+    
         # 接收区
         recv_group = QGroupBox("串口接收区")
         recv_group.setFont(QFont("微软雅黑", 14, QFont.Bold))
@@ -996,7 +1037,7 @@ class SerialAssistant(QWidget):
         recv_layout.addWidget(self.recv_box)
         recv_group.setLayout(recv_layout)
         right_panel.addWidget(recv_group)
-
+    
         # 曲线绘图区
         plot_frame = QFrame()
         plot_frame.setStyleSheet("""
@@ -1017,20 +1058,69 @@ class SerialAssistant(QWidget):
         self.canvas = FigureCanvas(self.figure)
         plot_layout2.addWidget(self.canvas)
         right_panel.addWidget(plot_frame, 2)
-
+    
         main_layout.addLayout(right_panel, 1)
-
+    
         # 定时器接收
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.read_serial)
-
+    
         # 新增：正弦波测试定时器
         self.sine_timer = QTimer(self)
         self.sine_timer.timeout.connect(self.send_sine_data)
         self.sine_phase = 0
         # 默认配置
         self.apply_proto_config()
+    
+    def parse_hex_string(self, s):
+        """支持 0x11 0x22 33 44 格式转bytes"""
+        s = s.strip().replace(',', ' ').replace(';', ' ')
+        parts = s.split()
+        result = []
+        for part in parts:
+            if part.startswith('0x') or part.startswith('0X'):
+                try:
+                    result.append(int(part, 16))
+                except Exception:
+                    pass
+            else:
+                try:
+                    result.append(int(part, 16))
+                except Exception:
+                    pass
+        return bytes(result)
 
+    def send_data(self):
+        if self.ser and self.ser.is_open:
+            data = self.send_edit.text()
+            try:
+                if self.hex_send_chk.isChecked():
+                    # 支持 0x11 0x22 33 44 格式
+                    data_bytes = self.parse_hex_string(data)
+                    if not data_bytes:
+                        self.recv_box.append("HEX格式错误，未发送。")
+                        return
+                    self.ser.write(data_bytes)
+                    self.recv_box.append(f"发送(HEX): {' '.join(['%02X'%b for b in data_bytes])}")
+                else:
+                    self.ser.write(data.encode('utf-8'))
+                    self.recv_box.append(f"发送: {data}")
+            except Exception as e:
+                self.recv_box.append(f"发送失败: {e}")
+        else:
+            self.recv_box.append("串口未打开，无法发送。")
+
+    def toggle_cont_send(self):
+        if self.cont_send_btn.isChecked():
+            try:
+                interval = int(self.freq_box.currentText())
+            except Exception:
+                interval = 200
+            self.cont_send_timer.start(interval)
+            self.cont_send_btn.setText("停止发送")
+        else:
+            self.cont_send_timer.stop()
+            self.cont_send_btn.setText("持续发送")
 
     def simulate_data(self):
         """模拟一包数据并自动解析绘图"""
@@ -1127,23 +1217,6 @@ class SerialAssistant(QWidget):
             self.recv_box.append("串口已关闭")
             self.timer.stop()
 
-    def send_data(self):
-        if self.ser and self.ser.is_open:
-            data = self.send_edit.text()
-            try:
-                if self.hex_send_chk.isChecked():
-                    # HEX模式发送
-                    data_bytes = bytes.fromhex(data.replace(' ', ''))
-                    self.ser.write(data_bytes)
-                    self.recv_box.append(f"发送(HEX): {data_bytes.hex(' ').upper()}")
-                else:
-                    self.ser.write(data.encode('utf-8'))
-                    self.recv_box.append(f"发送: {data}")
-            except Exception as e:
-                self.recv_box.append(f"发送失败: {e}")
-        else:
-            self.recv_box.append("串口未打开，无法发送。")
-
     def send_multi_data(self):
         if self.ser and self.ser.is_open:
             text = self.send_edit.text()
@@ -1152,9 +1225,9 @@ class SerialAssistant(QWidget):
                 if line.strip():
                     try:
                         if self.hex_send_chk.isChecked():
-                            data_bytes = bytes.fromhex(line.strip().replace(' ', ''))
+                            data_bytes = self.parse_hex_string(line.strip())
                             self.ser.write(data_bytes)
-                            self.recv_box.append(f"发送(HEX): {data_bytes.hex(' ').upper()}")
+                            self.recv_box.append(f"发送(HEX): {' '.join(['%02X'%b for b in data_bytes])}")
                         else:
                             self.ser.write(line.strip().encode('utf-8'))
                             self.recv_box.append(f"发送: {line.strip()}")
@@ -1295,8 +1368,8 @@ class SerialAssistant(QWidget):
     def update_plot(self):
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-        ax.set_xlabel("采样点", fontsize=14)
-        ax.set_ylabel("数据值", fontsize=14)
+        ax.set_xlabel("Sample", fontsize=14)
+        ax.set_ylabel("Value", fontsize=14)
         has_curve = False
         for idx in range(self.data_count):
             color = self.curve_colors[idx % len(self.curve_colors)]
@@ -1317,6 +1390,8 @@ class SerialAssistant(QWidget):
 
 # --------- 功能四：MRobot架构生成 ---------
 class GenerateMRobotCode(QWidget):
+    repo_ready_signal = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.setFont(QFont("微软雅黑", 15))
@@ -1327,20 +1402,523 @@ class GenerateMRobotCode(QWidget):
                 padding: 20px;
             }
         """)
+        # 变量初始化
+        self.repo_dir = "MRobot_repo"
+        self.repo_url = "http://gitea.qutrobot.top/robofish/MRobot.git"
+        self.header_file_vars = {}
+        self.task_vars = []
+        self.ioc_data = None
+        self.add_gitignore = False
+        self.auto_configure = False
+        self.repo_ready = False  # 标志：仓库是否已准备好
         self.init_ui()
+        self.repo_ready_signal.connect(self.on_repo_ready)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self.repo_ready:
+            self.log("首次进入，正在克隆MRobot仓库...")
+            self.clone_repo_and_refresh()
+
+    def clone_repo_and_refresh(self):
+        import threading
+        def do_clone():
+            self.clone_repo()
+            self.repo_ready = True
+            self.ioc_data = self.find_and_read_ioc_file()
+            self.repo_ready_signal.emit()
+        threading.Thread(target=do_clone).start()
+
+    @pyqtSlot()
+    def on_repo_ready(self):
+        self.update_freertos_status()
+        self.update_header_files()
+        self.update_task_ui()
+        self.log("仓库准备完成！")
 
     def init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(32, 32, 32, 32)
+        self.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #eaf6fb, stop:1 #d6eaf8);
+                border-radius: 16px;
+            }
+        """)
 
-        # 功能说明
-        desc_label = QLabel("MRobot架构生成工具，帮助您快速生成MRobot项目代码。")
-        desc_label.setFont(QFont("微软雅黑", 14))
-        desc_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(desc_label)
+        # 顶部标题区
+        title = QLabel("MRobot 架构生成工具")
+        title.setFont(QFont("微软雅黑", 22, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("color: #2980b9; letter-spacing: 2px; margin-bottom: 2px;")
+        main_layout.addWidget(title)
 
-        # 其他UI元素...
+        desc = QLabel("快速生成 MRobot 项目代码，自动管理模块、任务与环境配置。")
+        desc.setFont(QFont("微软雅黑", 13))
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setStyleSheet("color: #34495e; margin-bottom: 8px;")
+        main_layout.addWidget(desc)
+
+        # 状态与选项区
+        status_opt_row = QHBoxLayout()
+        status_opt_row.setSpacing(24)
+
+        # 状态区
+        status_col = QVBoxLayout()
+        self.freertos_status_label = QLabel("FreeRTOS 状态: 检测中...")
+        self.freertos_status_label.setFont(QFont("微软雅黑", 12))
+        self.freertos_status_label.setStyleSheet("color: #2471a3;")
+        status_col.addWidget(self.freertos_status_label)
+        status_col.addStretch(1)
+        status_opt_row.addLayout(status_col, 1)
+
+        # 选项区
+        option_col = QVBoxLayout()
+        self.gitignore_chk = QCheckBox("生成 .gitignore")
+        self.gitignore_chk.setFont(QFont("微软雅黑", 12))
+        self.gitignore_chk.stateChanged.connect(lambda x: setattr(self, "add_gitignore", x == Qt.Checked))
+        option_col.addWidget(self.gitignore_chk)
+        self.auto_env_chk = QCheckBox("自动环境配置")
+        self.auto_env_chk.setFont(QFont("微软雅黑", 12))
+        self.auto_env_chk.stateChanged.connect(lambda x: setattr(self, "auto_configure", x == Qt.Checked))
+        option_col.addWidget(self.auto_env_chk)
+        option_col.addStretch(1)
+        status_opt_row.addLayout(option_col, 1)
+
+        status_opt_row.addStretch(2)
+        main_layout.addLayout(status_opt_row)
+
+        # 主体分区：左侧模块选择，右侧任务管理
+        body_layout = QHBoxLayout()
+        body_layout.setSpacing(24)
+
+        # 左侧：模块文件选择
+        left_col = QVBoxLayout()
+        self.header_group = QGroupBox("模块文件选择")
+        self.header_group.setFont(QFont("微软雅黑", 15, QFont.Bold))
+        self.header_group.setStyleSheet("""
+            QGroupBox {
+                border: 2px solid #b5d0ea;
+                border-radius: 12px;
+                margin-top: 8px;
+                background: #f8fbfd;
+                color: #2471a3;
+                padding: 10px 0 0 0;
+            }
+            QGroupBox:title {
+                subcontrol-origin: margin;
+                left: 18px;
+                top: -10px;
+                background: transparent;
+                padding: 0 8px;
+            }
+        """)
+        self.header_layout = QVBoxLayout(self.header_group)
+        self.header_layout.setSpacing(8)
+        left_col.addWidget(self.header_group)
+        left_col.addStretch(1)
+        body_layout.addLayout(left_col, 2)
+
+        # 右侧：任务管理
+        right_col = QVBoxLayout()
+        self.task_group = QGroupBox("任务管理 (FreeRTOS)")
+        self.task_group.setFont(QFont("微软雅黑", 15, QFont.Bold))
+        self.task_group.setStyleSheet(self.header_group.styleSheet())
+        self.task_layout = QVBoxLayout(self.task_group)
+        self.task_layout.setSpacing(8)
+        right_col.addWidget(self.task_group)
+        right_col.addStretch(1)
+        body_layout.addLayout(right_col, 2)
+
+        main_layout.addLayout(body_layout)
+
+        # 生成按钮区
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        self.generate_btn = QPushButton("一键生成 MRobot 代码")
+        self.generate_btn.setFont(QFont("微软雅黑", 18, QFont.Bold))
+        self.generate_btn.setMinimumHeight(48)
+        self.generate_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #eaf6fb, stop:1 #d6eaf8);
+                color: #2980b9;
+                border-radius: 20px;
+                font-size: 20px;
+                font-weight: 600;
+                padding: 12px 0;
+                border: 1px solid #d6eaf8;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #f8fffe, stop:1 #cfe7fa);
+                color: #1a6fae;
+                border: 1.5px solid #b5d0ea;
+            }
+            QPushButton:pressed {
+                background: #e3f0fa;
+                color: #2471a3;
+                border: 1.5px solid #a4cbe3;
+            }
+        """)
+        self.generate_btn.clicked.connect(self.generate_action)
+        btn_row.addWidget(self.generate_btn)
+        btn_row.addStretch(1)
+        main_layout.addLayout(btn_row)
+
+        # 日志输出区
+        self.msg_box = QTextEdit()
+        self.msg_box.setReadOnly(True)
+        self.msg_box.setFont(QFont("Consolas", 13))
+        self.msg_box.setMaximumHeight(100)
+        self.msg_box.setStyleSheet("""
+            QTextEdit {
+                background: #f4f6f7;
+                border-radius: 8px;
+                border: 1px solid #d6eaf8;
+                font-size: 15px;
+                color: #2c3e50;
+                padding: 8px;
+            }
+        """)
+        main_layout.addWidget(self.msg_box)
+
+        # 页脚
+        footer = QLabel("如遇问题请反馈至 QUT 机器人战队")
+        footer.setFont(QFont("微软雅黑", 11))
+        footer.setAlignment(Qt.AlignCenter)
+        footer.setStyleSheet("color: #b2bec3; margin-top: 6px;")
+        main_layout.addWidget(footer)
+
+        # 初始化内容
+        self.update_header_files()
+        self.update_task_ui()
+
+        # ...其余方法保持不变...
+
+    def log(self, msg):
+        self.msg_box.append(msg)
+
+    def clone_repo(self):
+        import shutil
+        from git import Repo
+        if os.path.exists(self.repo_dir):
+            shutil.rmtree(self.repo_dir)
+        try:
+            self.log("正在克隆仓库...")
+            Repo.clone_from(self.repo_url, self.repo_dir, multi_options=["--depth=1"])
+            self.log("仓库克隆成功！")
+        except Exception as e:
+            self.log(f"克隆仓库失败: {e}")
+
+    def find_and_read_ioc_file(self):
+        for file in os.listdir("."):
+            if file.endswith(".ioc"):
+                with open(file, "r", encoding="utf-8") as f:
+                    return f.read()
+        self.log("未找到 .ioc 文件！")
+        return None
+
+    def check_freertos_enabled(self):
+        import re
+        if not self.ioc_data:
+            return False
+        return bool(re.search(r"Mcu\.IP\d+=FREERTOS", self.ioc_data))
+
+    def update_freertos_status(self):
+        if self.ioc_data:
+            status = "已启用" if self.check_freertos_enabled() else "未启用"
+        else:
+            status = "未检测到 .ioc 文件"
+        self.freertos_status_label.setText(f"FreeRTOS 状态: {status}")
+
+    def update_header_files(self):
+        for i in reversed(range(self.header_layout.count())):
+            widget = self.header_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        if not self.repo_ready or not os.path.exists(self.repo_dir):
+            return
+        from collections import defaultdict
+        import csv
+        folders = ["bsp", "component", "device", "module"]
+        dependencies = defaultdict(list)
+        for folder in folders:
+            folder_dir = os.path.join(self.repo_dir, "User", folder)
+            dep_file = os.path.join(folder_dir, "dependencies.csv")
+            if os.path.exists(dep_file):
+                with open(dep_file, "r", encoding="utf-8") as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        if len(row) == 2:
+                            dependencies[row[0]].append(row[1])
+        for folder in folders:
+            folder_dir = os.path.join(self.repo_dir, "User", folder)
+            if os.path.exists(folder_dir):
+                group = QGroupBox(folder)
+                g_layout = QHBoxLayout(group)
+                for file in os.listdir(folder_dir):
+                    file_base, file_ext = os.path.splitext(file)
+                    if file_ext == ".h" and file_base != folder:
+                        var = QCheckBox(file_base)
+                        var.stateChanged.connect(lambda x, fb=file_base: self.handle_dependencies(fb, dependencies))
+                        self.header_file_vars[file_base] = var
+                        g_layout.addWidget(var)
+                self.header_layout.addWidget(group)
+
+    def handle_dependencies(self, file_base, dependencies):
+        if file_base in self.header_file_vars and self.header_file_vars[file_base].isChecked():
+            for dep in dependencies.get(file_base, []):
+                dep_base = os.path.basename(dep)
+                if dep_base in self.header_file_vars:
+                    self.header_file_vars[dep_base].setChecked(True)
+
+    def update_task_ui(self):
+        for i in reversed(range(self.task_layout.count())):
+            widget = self.task_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        if not self.repo_ready or not self.check_freertos_enabled():
+            self.task_group.setVisible(False)
+            return
+        self.task_group.setVisible(True)
+        for i, (task_var, freq_var) in enumerate(self.task_vars):
+            row = QHBoxLayout()
+            name_edit = QLineEdit(task_var)
+            freq_spin = QSpinBox()
+            freq_spin.setRange(1, 1000)
+            freq_spin.setValue(freq_var)
+            del_btn = QPushButton("删除")
+            del_btn.clicked.connect(lambda _, idx=i: self.remove_task(idx))
+            row.addWidget(name_edit)
+            row.addWidget(QLabel("频率:"))
+            row.addWidget(freq_spin)
+            row.addWidget(del_btn)
+            container = QWidget()
+            container.setLayout(row)
+            self.task_layout.addWidget(container)
+        add_btn = QPushButton("添加任务")
+        add_btn.clicked.connect(self.add_task)
+        self.task_layout.addWidget(add_btn)
+
+    def add_task(self):
+        self.task_vars.append([f"Task_{len(self.task_vars)+1}", 100])
+        self.update_task_ui()
+
+    def remove_task(self, idx):
+        if 0 <= idx < len(self.task_vars):
+            self.task_vars.pop(idx)
+            self.update_task_ui()
+
+    def copy_file_from_repo(self, src_path, dest_path):
+        import shutil
+        if src_path.startswith(self.repo_dir):
+            full_src_path = src_path
+        else:
+            full_src_path = os.path.join(self.repo_dir, src_path.lstrip(os.sep))
+        if not os.path.exists(full_src_path):
+            self.log(f"文件 {full_src_path} 不存在！")
+            return
+        dest_dir = os.path.dirname(dest_path)
+        if dest_dir and not os.path.exists(dest_dir):
+            os.makedirs(dest_dir, exist_ok=True)
+        shutil.copy(full_src_path, dest_path)
+        self.log(f"已复制 {full_src_path} 到 {dest_path}")
+
+    def generate_action(self):
+        import threading
+        def task():
+            self.create_directories()
+            if self.add_gitignore:
+                self.copy_file_from_repo(".gitignore", ".gitignore")
+            if self.ioc_data and self.check_freertos_enabled():
+                self.copy_file_from_repo("src/freertos.c", os.path.join("Core", "Src", "freertos.c"))
+            folders = ["bsp", "component", "device", "module"]
+            for folder in folders:
+                folder_dir = os.path.join(self.repo_dir, "User", folder)
+                if not os.path.exists(folder_dir):
+                    continue
+                for file_name in os.listdir(folder_dir):
+                    file_base, file_ext = os.path.splitext(file_name)
+                    if file_ext not in [".h", ".c"]:
+                        continue
+                    if file_base == folder:
+                        src_path = os.path.join(folder_dir, file_name)
+                        dest_path = os.path.join("User", folder, file_name)
+                        self.copy_file_from_repo(src_path, dest_path)
+                        continue
+                    if file_base in self.header_file_vars and self.header_file_vars[file_base].isChecked():
+                        src_path = os.path.join(folder_dir, file_name)
+                        dest_path = os.path.join("User", folder, file_name)
+                        self.copy_file_from_repo(src_path, dest_path)
+            if self.ioc_data and self.check_freertos_enabled():
+                self.modify_user_task_file()
+                self.generate_user_task_header()
+                self.generate_init_file()
+                self.generate_task_files()
+            self.log("生成完成！")
+        threading.Thread(target=task).start()
+
+    def create_directories(self):
+        dirs = [
+            "User/bsp",
+            "User/component",
+            "User/device",
+            "User/module",
+        ]
+        if self.ioc_data and self.check_freertos_enabled():
+            dirs.append("User/task")
+        for d in dirs:
+            if not os.path.exists(d):
+                os.makedirs(d, exist_ok=True)
+                self.log(f"已创建目录: {d}")
+
+    def generate_task_files(self):
+        try:
+            import re
+            template_file_path = os.path.join(self.repo_dir, "User", "task", "task.c.template")
+            task_dir = os.path.join("User", "task")
+            if not os.path.exists(template_file_path):
+                self.log(f"模板文件 {template_file_path} 不存在，无法生成 task.c 文件！")
+                return
+            os.makedirs(task_dir, exist_ok=True)
+            with open(template_file_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+            for task in self.task_vars:
+                if isinstance(task, (list, tuple)):
+                    task_name = str(task[0])
+                else:
+                    task_name = str(task)
+                task_file_path = os.path.join(task_dir, f"{task_name.lower()}.c")
+                task_content = template_content.replace("{{task_name}}", task_name)
+                task_content = task_content.replace("{{task_function}}", task_name)
+                task_content = task_content.replace(
+                    "{{task_frequency}}", f"TASK_FREQ_{task_name.upper()}"
+                )
+                task_content = task_content.replace("{{task_delay}}", f"TASK_INIT_DELAY_{task_name.upper()}")
+                with open(task_file_path, "w", encoding="utf-8") as f2:
+                    f2.write(task_content)
+                self.log(f"已成功生成 {task_file_path} 文件！")
+        except Exception as e:
+            self.log(f"生成 task.c 文件时出错: {e}")
+
+    def modify_user_task_file(self):
+        try:
+            import re
+            template_file_path = os.path.join(self.repo_dir, "User", "task", "user_task.c.template")
+            generated_task_file_path = os.path.join("User", "task", "user_task.c")
+            if not os.path.exists(template_file_path):
+                self.log(f"模板文件 {template_file_path} 不存在，无法生成 user_task.c 文件！")
+                return
+            os.makedirs(os.path.dirname(generated_task_file_path), exist_ok=True)
+            with open(template_file_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+            task_attr_definitions = "\n".join([
+                f"""const osThreadAttr_t attr_{str(task[0]).lower()} = {{
+    .name = "{str(task[0])}",
+    .priority = osPriorityNormal,
+    .stack_size = 128 * 4,
+}};"""
+                for task in self.task_vars
+            ])
+            task_content = template_content.replace("{{task_attr_definitions}}", task_attr_definitions)
+            with open(generated_task_file_path, "w", encoding="utf-8") as f2:
+                f2.write(task_content)
+            self.log(f"已成功生成 {generated_task_file_path} 文件！")
+        except Exception as e:
+            self.log(f"修改 user_task.c 文件时出错: {e}")
+
+    def generate_user_task_header(self):
+        try:
+            import re
+            template_file_path = os.path.join(self.repo_dir, "User", "task", "user_task.h.template")
+            header_file_path = os.path.join("User", "task", "user_task.h")
+            if not os.path.exists(template_file_path):
+                self.log(f"模板文件 {template_file_path} 不存在，无法生成 user_task.h 文件！")
+                return
+            os.makedirs(os.path.dirname(header_file_path), exist_ok=True)
+            existing_msgq_content = ""
+            if os.path.exists(header_file_path):
+                with open(header_file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    match = re.search(r"/\* USER MESSAGE BEGIN \*/\s*(.*?)\s*/\* USER MESSAGE END \*/", content, re.DOTALL)
+                    if match:
+                        existing_msgq_content = match.group(1).strip()
+                        self.log("已存在的 msgq 区域内容已保留")
+            with open(template_file_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+            thread_definitions = "\n".join([f"        osThreadId_t {str(task[0]).lower()};" for task in self.task_vars])
+            msgq_definitions = existing_msgq_content if existing_msgq_content else "        osMessageQueueId_t default_msgq;"
+            freq_definitions = "\n".join([f"        float {str(task[0]).lower()};" for task in self.task_vars])
+            last_up_time_definitions = "\n".join([f"        uint32_t {str(task[0]).lower()};" for task in self.task_vars])
+            task_attr_declarations = "\n".join([f"extern const osThreadAttr_t attr_{str(task[0]).lower()};" for task in self.task_vars])
+            task_function_declarations = "\n".join([f"void {str(task[0])}(void *argument);" for task in self.task_vars])
+            task_frequency_definitions = "\n".join([
+                f"#define TASK_FREQ_{str(task[0]).upper()} ({int(task[1])}u)"
+                for task in self.task_vars
+            ])
+            task_init_delay_definitions = "\n".join([f"#define TASK_INIT_DELAY_{str(task[0]).upper()} (0u)" for task in self.task_vars])
+            task_handle_definitions = "\n".join([f"    osThreadId_t {str(task[0]).lower()};" for task in self.task_vars])
+            header_content = template_content.replace("{{thread_definitions}}", thread_definitions)
+            header_content = header_content.replace("{{msgq_definitions}}", msgq_definitions)
+            header_content = header_content.replace("{{freq_definitions}}", freq_definitions)
+            header_content = header_content.replace("{{last_up_time_definitions}}", last_up_time_definitions)
+            header_content = header_content.replace("{{task_attr_declarations}}", task_attr_declarations)
+            header_content = header_content.replace("{{task_function_declarations}}", task_function_declarations)
+            header_content = header_content.replace("{{task_frequency_definitions}}", task_frequency_definitions)
+            header_content = header_content.replace("{{task_init_delay_definitions}}", task_init_delay_definitions)
+            header_content = header_content.replace("{{task_handle_definitions}}", task_handle_definitions)
+            if existing_msgq_content:
+                header_content = re.sub(
+                    r"/\* USER MESSAGE BEGIN \*/\s*.*?\s*/\* USER MESSAGE END \*/",
+                    f"/* USER MESSAGE BEGIN */\n\n    {existing_msgq_content}\n\n    /* USER MESSAGE END */",
+                    header_content,
+                    flags=re.DOTALL
+                )
+            with open(header_file_path, "w", encoding="utf-8") as f2:
+                f2.write(header_content)
+            self.log(f"已成功生成 {header_file_path} 文件！")
+        except Exception as e:
+            self.log(f"生成 user_task.h 文件时出错: {e}")
+
+    def generate_init_file(self):
+        try:
+            import re
+            template_file_path = os.path.join(self.repo_dir, "User", "task", "init.c.template")
+            generated_file_path = os.path.join("User", "task", "init.c")
+            if not os.path.exists(template_file_path):
+                self.log(f"模板文件 {template_file_path} 不存在，无法生成 init.c 文件！")
+                return
+            os.makedirs(os.path.dirname(generated_file_path), exist_ok=True)
+            existing_msgq_content = ""
+            if os.path.exists(generated_file_path):
+                with open(generated_file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    match = re.search(r"/\* USER MESSAGE BEGIN \*/\s*(.*?)\s*/\* USER MESSAGE END \*/", content, re.DOTALL)
+                    if match:
+                        existing_msgq_content = match.group(1).strip()
+                        self.log("已存在的消息队列区域内容已保留")
+            with open(template_file_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+            thread_creation_code = "\n".join([
+                f"  task_runtime.thread.{str(task[0]).lower()} = osThreadNew({str(task[0])}, NULL, &attr_{str(task[0]).lower()});"
+                for task in self.task_vars
+            ])
+            init_content = template_content.replace("{{thread_creation_code}}", thread_creation_code)
+            if existing_msgq_content:
+                init_content = re.sub(
+                    r"/\* USER MESSAGE BEGIN \*/\s*.*?\s*/\* USER MESSAGE END \*/",
+                    f"/* USER MESSAGE BEGIN */\n  {existing_msgq_content}\n  /* USER MESSAGE END */",
+                    init_content,
+                    flags=re.DOTALL
+                )
+            with open(generated_file_path, "w", encoding="utf-8") as f2:
+                f2.write(init_content)
+            self.log(f"已成功生成 {generated_file_path} 文件！")
+        except Exception as e:
+            self.log(f"生成 init.c 文件时出错: {e}")
 
 # --------- 主工具箱UI ---------
 class ToolboxUI(QWidget):
@@ -1399,7 +1977,7 @@ class ToolboxUI(QWidget):
         left_layout.addWidget(logo_label)
 
         # 按钮区
-        self.button_names = ["主页", "曲线拟合", "Mini串口助手", "MR架构配置","软件指南"]
+        self.button_names = ["主页", "曲线拟合", "Mini串口助手(BUG)", "MR架构配置(开发中)","软件指南"]
         self.buttons = []
         for idx, name in enumerate(self.button_names):
             btn = QPushButton(name)
@@ -1479,6 +2057,8 @@ class ToolboxUI(QWidget):
         main_layout.addWidget(self.stack)
 
         self.output_box.append("欢迎使用 MRobot 工具箱！请选择左侧功能。")
+
+
 
     def placeholder_page(self, text):
         page = QWidget()
