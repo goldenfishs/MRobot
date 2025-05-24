@@ -28,3 +28,7 @@ Examples/
 !*.axf
 !*.bin
 !*.hex
+
+/build
+/dist
+*.spec

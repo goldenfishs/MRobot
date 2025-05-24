@@ -1,205 +1,216 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import sys
 import numpy as np
 import pandas as pd
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSpinBox,
+    QLabel, QTableWidget, QTableWidgetItem, QFileDialog, QTextEdit,
+    QComboBox, QMessageBox, QHeaderView
+)
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
+import matplotlib
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-class PolyFitApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("多项式拟合工具")
+class PolyFitApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("MRobot 多项式拟合工具")
+        self.resize(1440, 1280)
+        self.setFont(QFont("微软雅黑", 11))
+        self.center()
+
         self.data_x = []
         self.data_y = []
         self.last_coeffs = None
+        self.last_xmin = None
+        self.last_xmax = None
 
-        # ===== 主布局 =====
-        main_frame = ttk.Frame(root, padding=8)
-        main_frame.pack(fill="both", expand=True)
-        main_frame.columnconfigure(0, weight=0)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(0, weight=1)
+        # 主布局
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(12)
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(12)
+        main_layout.addLayout(left_layout, 0)
+        main_layout.addLayout(right_layout, 1)
 
-        # ===== 左侧区 =====
-        left_frame = ttk.Frame(main_frame, width=320, height=580)  # 设置固定宽度
-        left_frame.grid(row=0, column=0, sticky="nsw")  # 只贴左侧
-        left_frame.columnconfigure(0, weight=1)
-        left_frame.grid_propagate(False)  # 防止自动缩放
+        # 数据输入区
+        self.table = QTableWidget(0, 2)
+        self.table.setFont(QFont("Consolas", 11))
+        self.table.setHorizontalHeaderLabels(["x", "y"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        left_layout.addWidget(self.table)
 
-        # --- 数据输入区 ---
-        input_frame = ttk.LabelFrame(left_frame, text="数据输入", padding=6)
-        input_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        input_frame.columnconfigure(0, weight=1)
+        btn_row = QHBoxLayout()
+        self.add_row_btn = QPushButton("添加数据")
+        self.add_row_btn.setStyleSheet("color: #333;")
+        self.add_row_btn.clicked.connect(self.add_point_row)
+        btn_row.addWidget(self.add_row_btn)
 
-        self.excel_btn = ttk.Button(input_frame, text="导入excel文件", command=self.load_excel)
-        self.excel_btn.grid(row=0, column=0, sticky="ew", padx=2, pady=2)
+        self.del_row_btn = QPushButton("删除选中行")
+        self.del_row_btn.setStyleSheet("color: #333;")
+        self.del_row_btn.clicked.connect(self.delete_selected_rows)
+        btn_row.addWidget(self.del_row_btn)
+        left_layout.addLayout(btn_row)
 
-        # 滚动区域
-        self.scroll_canvas = tk.Canvas(input_frame, height=200)
-        self.scroll_canvas.grid(row=1, column=0, sticky="ew", pady=4)
-        self.scrollbar = ttk.Scrollbar(input_frame, orient="vertical", command=self.scroll_canvas.yview)
-        self.scrollbar.grid(row=1, column=1, sticky="ns")
-        self.scroll_canvas.configure(yscrollcommand=self.scrollbar.set)
+        # 导入导出按钮区
+        file_btn_row = QHBoxLayout()
+        self.import_btn = QPushButton("导入Excel文件")
+        self.import_btn.setStyleSheet("font-weight: bold; color: #333;")
+        self.import_btn.clicked.connect(self.load_excel)
+        file_btn_row.addWidget(self.import_btn)
 
-        self.manual_frame = ttk.Frame(self.scroll_canvas)
-        self.manual_frame.bind("<Configure>", lambda e: self.scroll_canvas.configure(scrollregion=self.scroll_canvas.bbox("all")))
-        self.scroll_canvas.create_window((0, 0), window=self.manual_frame, anchor="nw")
+        self.export_btn = QPushButton("导出Excel文件")
+        self.export_btn.setStyleSheet("font-weight: bold; color: #333;")
+        self.export_btn.clicked.connect(self.export_excel_and_plot)
+        file_btn_row.addWidget(self.export_btn)
+        left_layout.addLayout(file_btn_row)
 
-        self.point_rows = []
-        self.add_row_btn = ttk.Button(input_frame, text="添加数据", command=self.add_point_row)
-        self.add_row_btn.grid(row=2, column=0, sticky="ew", padx=2, pady=2)
+        # 拟合参数区
+        param_layout = QHBoxLayout()
+        param_layout.addWidget(QLabel("多项式阶数:"))
+        self.order_spin = QSpinBox()
+        self.order_spin.setRange(1, 10)
+        self.order_spin.setValue(2)
+        param_layout.addWidget(self.order_spin)
+        left_layout.addLayout(param_layout)
 
-        # --- 参数区 ---
-        param_frame = ttk.LabelFrame(left_frame, text="拟合参数", padding=6)
-        param_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
-        ttk.Label(param_frame, text="选择多项式阶数:").grid(row=0, column=0, padx=2, pady=2, sticky="e")
-        self.order_spin = ttk.Spinbox(param_frame, from_=1, to=10, width=5)
-        self.order_spin.set(2)
-        self.order_spin.grid(row=0, column=1, padx=2, pady=2, sticky="w")
-        # 优化复选框和拟合按钮同一行
-        self.fit_btn = ttk.Button(param_frame, text="拟合并显示", command=self.fit_and_plot)
-        self.fit_btn.grid(row=1, column=0, padx=2, pady=4, sticky="ew")
-        self.optimize_var = tk.BooleanVar(value=True)
-        self.optimize_check = ttk.Checkbutton(param_frame, text="优化曲线（防止突起）", variable=self.optimize_var)
-        self.optimize_check.grid(row=1, column=1, padx=2, pady=4, sticky="w")
+        self.fit_btn = QPushButton("拟合并显示")
+        self.fit_btn.setStyleSheet("font-weight: bold; color: #333;")
+        self.fit_btn.clicked.connect(self.fit_and_plot)
+        left_layout.addWidget(self.fit_btn)
 
-        # --- 输出区 ---
-        output_frame = ttk.LabelFrame(left_frame, text="表达式与代码", padding=6)
-        output_frame.grid(row=2, column=0, sticky="ew")
-        self.output = tk.Text(output_frame, height=6, width=40, font=("Consolas", 10))
-        self.output.grid(row=0, column=0, columnspan=3, padx=2, pady=2)
-        ttk.Label(output_frame, text="输出代码格式:").grid(row=1, column=0, padx=2, pady=2, sticky="e")
-        self.code_type = ttk.Combobox(output_frame, values=["C", "C++", "Python"], width=8)
-        self.code_type.set("C")
-        self.code_type.grid(row=1, column=1, padx=2, pady=2, sticky="w")
-        self.gen_code_btn = ttk.Button(output_frame, text="生成函数代码", command=self.generate_code)
-        self.gen_code_btn.grid(row=1, column=2, padx=2, pady=2, sticky="ew")
+        # 输出区
+        self.output = QTextEdit()
+        self.output.setReadOnly(False)
+        self.output.setFont(QFont("Consolas", 10))
+        self.output.setMaximumHeight(150)
+        left_layout.addWidget(self.output)
 
-        # ===== 右侧区 =====
-        right_frame = ttk.Frame(main_frame)
-        # right_frame.grid(row=0, column=1, sticky="nsew")  # 填满剩余空间
-        right_frame.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
-        right_frame.rowconfigure(0, weight=1)
-        right_frame.columnconfigure(0, weight=1)
+        code_layout = QHBoxLayout()
+        code_layout.addWidget(QLabel("输出代码格式:"))
+        self.code_type = QComboBox()
+        self.code_type.addItems(["C", "C++", "Python"])
+        code_layout.addWidget(self.code_type)
+        self.gen_code_btn = QPushButton("生成函数代码")
+        self.gen_code_btn.setStyleSheet("color: #333;")
+        self.gen_code_btn.clicked.connect(self.generate_code)
+        code_layout.addWidget(self.gen_code_btn)
+        left_layout.addLayout(code_layout)
 
-        plot_frame = ttk.LabelFrame(right_frame, text="拟合曲线", padding=6)
-        plot_frame.grid(row=0, column=0, sticky="nsew")
-        plot_frame.rowconfigure(0, weight=1)
-        plot_frame.columnconfigure(0, weight=1)
+        # 拟合曲线区
         self.figure = Figure(figsize=(5, 4))
-        self.canvas = FigureCanvasTkAgg(self.figure, master=plot_frame)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True)
-        self.scroll_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas = FigureCanvas(self.figure)
+        right_layout.addWidget(self.canvas)
 
-
-    def _on_mousewheel(self, event):
-        # Windows下event.delta为120的倍数，负值向下
-        self.scroll_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    def center(self):
+        qr = self.frameGeometry()
+        cp = QApplication.desktop().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def add_point_row(self, x_val="", y_val=""):
-        row = {}
-        idx = len(self.point_rows)
-        row['x'] = ttk.Entry(self.manual_frame, width=10)
-        row['x'].insert(0, str(x_val))
-        row['y'] = ttk.Entry(self.manual_frame, width=10)
-        row['y'].insert(0, str(y_val))
-        row['del'] = ttk.Button(self.manual_frame, text="删除", width=5, command=lambda r=idx: self.delete_point_row(r))
-        row['x'].grid(row=idx, column=0, padx=1, pady=1)
-        row['y'].grid(row=idx, column=1, padx=1, pady=1)
-        row['del'].grid(row=idx, column=2, padx=1, pady=1)
-        self.point_rows.append(row)
-        self.refresh_point_rows()
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        self.table.setItem(row, 0, QTableWidgetItem(str(x_val)))
+        self.table.setItem(row, 1, QTableWidgetItem(str(y_val)))
 
-    def delete_point_row(self, idx):
-        for widget in self.point_rows[idx].values():
-            widget.grid_forget()
-            widget.destroy()
-        self.point_rows.pop(idx)
-        self.refresh_point_rows()
-
-    def refresh_point_rows(self):
-        for i, row in enumerate(self.point_rows):
-            row['x'].grid(row=i, column=0, padx=1, pady=1)
-            row['y'].grid(row=i, column=1, padx=1, pady=1)
-            row['del'].config(command=lambda r=i: self.delete_point_row(r))
-            row['del'].grid(row=i, column=2, padx=1, pady=1)
+    def delete_selected_rows(self):
+        selected = self.table.selectionModel().selectedRows()
+        for idx in sorted(selected, reverse=True):
+            self.table.removeRow(idx.row())
 
     def load_excel(self):
-        file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
+        file, _ = QFileDialog.getOpenFileName(self, "选择Excel文件", "", "Excel Files (*.xlsx *.xls)")
         if file:
             try:
                 data = pd.read_excel(file, usecols=[0, 1])
                 new_x = data.iloc[:, 0].values.tolist()
                 new_y = data.iloc[:, 1].values.tolist()
-                messagebox.showinfo("成功", "数据导入成功！")
                 for x, y in zip(new_x, new_y):
                     self.add_point_row(x, y)
+                QMessageBox.information(self, "成功", "数据导入成功！")
             except Exception as e:
-                messagebox.showerror("错误", f"读取Excel失败: {e}")
+                QMessageBox.critical(self, "错误", f"读取Excel失败: {e}")
+
+    def export_excel_and_plot(self):
+        file, _ = QFileDialog.getSaveFileName(self, "导出Excel文件", "", "Excel Files (*.xlsx *.xls)")
+        if file:
+            x_list, y_list = [], []
+            for row in range(self.table.rowCount()):
+                try:
+                    x = float(self.table.item(row, 0).text())
+                    y = float(self.table.item(row, 1).text())
+                    x_list.append(x)
+                    y_list.append(y)
+                except Exception:
+                    continue
+            if not x_list or not y_list:
+                QMessageBox.warning(self, "导出失败", "没有可导出的数据！")
+                return
+            df = pd.DataFrame({'x': x_list, 'y': y_list})
+            try:
+                df.to_excel(file, index=False)
+                # 导出同名png图像
+                png_file = file
+                if png_file.lower().endswith('.xlsx') or png_file.lower().endswith('.xls'):
+                    png_file = png_file.rsplit('.', 1)[0] + '.png'
+                else:
+                    png_file = png_file + '.png'
+                self.figure.savefig(png_file, dpi=150, bbox_inches='tight')
+                QMessageBox.information(self, "导出成功", f"数据已成功导出到Excel文件！\n图像已导出为：{png_file}")
+            except Exception as e:
+                QMessageBox.critical(self, "导出错误", f"导出Excel或图像失败: {e}")
 
     def get_manual_points(self):
         x_list, y_list = [], []
-        for row in self.point_rows:
+        for row in range(self.table.rowCount()):
             try:
-                x = float(row['x'].get())
-                y = float(row['y'].get())
+                x = float(self.table.item(row, 0).text())
+                y = float(self.table.item(row, 1).text())
                 x_list.append(x)
                 y_list.append(y)
-            except ValueError:
+            except Exception:
                 continue
         return x_list, y_list
 
-
     def fit_and_plot(self):
-        # 始终以手动输入区为准
+        matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei']
+        matplotlib.rcParams['axes.unicode_minus'] = False
+        matplotlib.rcParams['font.size'] = 14
         self.data_x, self.data_y = self.get_manual_points()
         try:
-            order = int(self.order_spin.get())
+            order = int(self.order_spin.value())
         except ValueError:
-            messagebox.showwarning("输入错误", "阶数必须为整数！")
+            QMessageBox.warning(self, "输入错误", "阶数必须为整数！")
             return
         n_points = len(self.data_x)
         if n_points < order + 1:
-            messagebox.showwarning("数据不足", "数据点数量不足以拟合该阶多项式！")
+            QMessageBox.warning(self, "数据不足", "数据点数量不足以拟合该阶多项式！")
             return
-
-        # 阶数过高判断，只提示不强制修改
-        max_order = max(2, min(6, n_points // 3))
-        if order > max_order:
-            messagebox.showwarning("阶数过高", f"当前数据点数为{n_points}，建议阶数不超过{max_order}，否则容易出现异常突起！")
-
         x = np.array(self.data_x, dtype=np.float64)
         y = np.array(self.data_y, dtype=np.float64)
-
-        # ----------- 新增归一化 -----------
         x_min, x_max = x.min(), x.max()
         if x_max - x_min == 0:
-            messagebox.showwarning("数据错误", "所有x值都相同，无法拟合！")
+            QMessageBox.warning(self, "数据错误", "所有x值都相同，无法拟合！")
             return
-        x_norm = (x - x_min) / (x_max - x_min)
-        # ---------------------------------
-
         try:
-            if self.optimize_var.get():
-                # 优化：加大rcond，减少高阶影响
-                coeffs = np.polyfit(x_norm, y, order, rcond=1e-3)
-            else:
-                coeffs = np.polyfit(x_norm, y, order)
+            coeffs = np.polyfit(x, y, order)
         except Exception as e:
-            messagebox.showerror("拟合错误", f"多项式拟合失败：{e}")
+            QMessageBox.critical(self, "拟合错误", f"多项式拟合失败：{e}")
             return
         poly = np.poly1d(coeffs)
-        expr = "y = " + " + ".join([f"{c:.6g}*x_norm^{order-i}" for i, c in enumerate(coeffs)])
-        self.output.delete(1.0, tk.END)
-        self.output.insert(tk.END, f"归一化x: x_norm=(x-{x_min:.6g})/({x_max:.6g}-{x_min:.6g})\n")
-        self.output.insert(tk.END, expr + "\n")
-        # 绘图
+        expr = "y = " + " + ".join([f"{c:.6g}*x^{order-i}" for i, c in enumerate(coeffs)])
+        self.output.setPlainText(f"{expr}\n")
         self.figure.clear()
         ax = self.figure.add_subplot(111)
         ax.scatter(x, y, color='red', label='数据点')
         x_fit = np.linspace(x_min, x_max, 200)
-        x_fit_norm = (x_fit - x_min) / (x_max - x_min)
-        y_fit = poly(x_fit_norm)
+        y_fit = poly(x_fit)
         ax.plot(x_fit, y_fit, label='拟合曲线')
         ax.legend()
         self.canvas.draw()
@@ -209,19 +220,17 @@ class PolyFitApp:
 
     def generate_code(self):
         if self.last_coeffs is None:
-            messagebox.showwarning("未拟合", "请先拟合数据！")
+            QMessageBox.warning(self, "未拟合", "请先拟合数据！")
             return
         coeffs = self.last_coeffs
-        order = len(coeffs) - 1
-        code_type = self.code_type.get()
+        code_type = self.code_type.currentText()
         if code_type == "C":
             code = self.create_c_function(coeffs)
         elif code_type == "C++":
             code = self.create_cpp_function(coeffs)
         else:
             code = self.create_py_function(coeffs)
-        self.output.delete(1.0, tk.END)
-        self.output.insert(tk.END, code)
+        self.output.setPlainText(code)
 
     def create_c_function(self, coeffs):
         lines = ["#include <math.h>", "double polynomial(double x) {", "    return "]
@@ -271,6 +280,7 @@ class PolyFitApp:
         return "\n".join(lines)
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = PolyFitApp(root)
-    root.mainloop()
+    app = QApplication(sys.argv)
+    win = PolyFitApp()
+    win.show()
+    sys.exit(app.exec_())
