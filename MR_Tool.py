@@ -1101,7 +1101,7 @@ class SerialAssistant(QWidget):
 
     def send_data(self):
         if self.ser and self.ser.is_open:
-            data = self.send_edit.text()
+            data = self.send_edit.toPlainText()
             try:
                 if self.hex_send_chk.isChecked():
                     # 支持 0x11 0x22 33 44 格式
@@ -2159,7 +2159,7 @@ class ToolboxUI(QWidget):
         left_layout.addWidget(logo_label)
 
         # 按钮区
-        self.button_names = ["主页", "曲线拟合", "Mini串口助手(BUG)", "MR架构配置(开发中)", "零件库", "软件指南"]
+        self.button_names = ["主页", "曲线拟合", "Mini串口助手", "MR架构配置", "零件库", "软件指南"]
         self.buttons = []
         for idx, name in enumerate(self.button_names):
             btn = QPushButton(name)

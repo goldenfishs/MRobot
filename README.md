@@ -89,3 +89,5 @@
 ```bash
 pyinstaller --onefile --windowed 
 pyinstaller MR_Toolbox.py --onefile --noconsole --icon=img\M.ico --add-data "mr_tool_img\MRobot.png;mr_tool_img"
+
+pyinstaller MR_Tool.py --onefile --noconsole --icon=img\M.ico --add-data "mr_tool_img\MRobot.png;mr_tool_img" --add-data "src;src" --add-data "User;User"
