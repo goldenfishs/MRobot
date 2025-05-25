@@ -26,6 +26,9 @@ from PyQt5.QtWidgets import QFileDialog
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
+from PyQt5.QtWidgets import QSplashScreen
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QPixmap
 
 
 def resource_path(relative_path):
@@ -2260,7 +2263,77 @@ class ToolboxUI(QWidget):
         self.output_box.append(f"已切换到功能：{self.button_names[idx]}")
 
 if __name__ == "__main__":
+
+    from PyQt5.QtWidgets import QSplashScreen, QGraphicsDropShadowEffect
+    from PyQt5.QtCore import Qt, QTimer, QRect
+    from PyQt5.QtGui import QPixmap, QPainter, QColor, QFont, QLinearGradient, QBrush
+
+    class CustomSplash(QSplashScreen):
+        def __init__(self, pixmap):
+            super().__init__(QPixmap(640, 400))
+            self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+            self.setAttribute(Qt.WA_TranslucentBackground)
+            self.logo = pixmap.scaled(360, 240, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.title = "MRobot 工具箱"
+            self.subtitle = "欢迎使用 MRobot，正在启动中..."
+            self.title_color = QColor("#2471a3")
+            self.subtitle_color = QColor("#2980b9")
+            self.bg_gradient = QLinearGradient(0, 0, 0, 400)
+            self.bg_gradient.setColorAt(0, QColor("#f8fbfd"))
+            self.bg_gradient.setColorAt(1, QColor("#eaf6fb"))
+            self.border_color = QColor("#2980b9")
+            self.setFixedSize(640, 400)
+            # 阴影
+            effect = QGraphicsDropShadowEffect(self)
+            effect.setBlurRadius(36)
+            effect.setOffset(0, 10)
+            effect.setColor(QColor(80, 120, 180, 80))
+            self.setGraphicsEffect(effect)
+
+        def paintEvent(self, event):
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            # 渐变背景
+            painter.setBrush(QBrush(self.bg_gradient))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(0, 0, self.width(), self.height(), 44, 44)
+            # 边框
+            pen = painter.pen()
+            pen.setColor(self.border_color)
+            pen.setWidth(3)
+            painter.setPen(pen)
+            painter.drawRoundedRect(2, 2, self.width()-4, self.height()-4, 44, 44)
+            # LOGO
+            logo_x = (self.width() - self.logo.width()) // 2
+            logo_y = 80
+            painter.drawPixmap(logo_x, logo_y, self.logo)
+            # 主标题
+            # painter.setFont(QFont("微软雅黑", 24, QFont.Bold))
+            # painter.setPen(self.title_color)
+            # painter.drawText(QRect(0, 200, self.width(), 48), Qt.AlignCenter, self.title)
+            # 副标题
+            painter.setFont(QFont("微软雅黑", 12))
+            painter.setPen(self.subtitle_color)
+            painter.drawText(QRect(0, 250, self.width(), 36), Qt.AlignCenter, self.subtitle)
+            # 版权
+            painter.setFont(QFont("微软雅黑", 10))
+            painter.setPen(QColor("#b2bec3"))
+            painter.drawText(QRect(0, 360, self.width(), 30), Qt.AlignCenter, "© 2025 MRobot. All rights reserved.")
+
     app = QApplication(sys.argv)
-    win = ToolboxUI()
-    win.show()
+
+    # 立即显示Splash
+    logo_pix = QPixmap(resource_path("mr_tool_img/MRobot.png"))
+    splash = CustomSplash(logo_pix)
+    splash.show()
+    app.processEvents()  # 强制立即刷新Splash
+
+    # 异步加载主窗口
+    def load_main():
+        win = ToolboxUI()
+        splash.finish(win)
+        win.show()
+
+    QTimer.singleShot(100, load_main)
+
     sys.exit(app.exec_())
