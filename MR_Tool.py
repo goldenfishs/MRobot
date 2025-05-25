@@ -18,6 +18,15 @@ import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtWebEngineWidgets import QWebEngineView  # 新增
+from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QThread
+from PyQt5.QtWebEngineWidgets import QWebEngineProfile
+from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWebEngineWidgets import QWebEngineView
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEngineProfile, QWebEnginePage
+from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
+
 
 def resource_path(relative_path):
     """兼容PyInstaller打包后资源路径"""
@@ -1920,6 +1929,179 @@ class GenerateMRobotCode(QWidget):
         except Exception as e:
             self.log(f"生成 init.c 文件时出错: {e}")
 
+# --------- 功能五：零件库 ---------
+
+class CustomWebView(QWebEngineView):
+    def __init__(self, parent=None, popup_list=None):
+        super().__init__(parent)
+        self.popup_list = popup_list
+        self._progress_dialog = None
+        self.page().profile().downloadRequested.connect(self.handle_download)
+        self.setStyleSheet("""
+            QWebEngineView {
+                border-radius: 12px;
+                background: #f8fbfd;
+                border: 1px solid #d6eaf8;
+            }
+        """)
+
+    def handle_download(self, download_item):
+        from PyQt5.QtWidgets import QFileDialog, QProgressDialog
+
+        # 防止重复弹窗
+        if hasattr(download_item, "_handled") and download_item._handled:
+            return
+        download_item._handled = True
+
+        suggested = download_item.suggestedFileName()
+        path, _ = QFileDialog.getSaveFileName(self, "保存文件", suggested)
+        if not path:
+            download_item.cancel()
+            return
+
+        download_item.setPath(path)
+        download_item.accept()
+
+        # 创建进度对话框
+        self._progress_dialog = QProgressDialog(f"正在下载: {suggested}", "取消", 0, 100, self)
+        self._progress_dialog.setWindowTitle("下载进度")
+        self._progress_dialog.setWindowModality(Qt.WindowModal)
+        self._progress_dialog.setMinimumDuration(0)
+        self._progress_dialog.setValue(0)
+        self._progress_dialog.canceled.connect(download_item.cancel)
+        self._progress_dialog.show()
+
+        def on_progress(received, total):
+            if total > 0:
+                percent = int(received * 100 / total)
+                self._progress_dialog.setValue(percent)
+            else:
+                self._progress_dialog.setValue(0)
+
+        download_item.downloadProgress.connect(on_progress)
+
+        def on_finished():
+            self._progress_dialog.setValue(100)
+            self._progress_dialog.close()
+            if self.parent() and isinstance(self.parent(), CustomWebView):
+                self.parent().close()
+            elif self.popup_list and self in self.popup_list:
+                self.close()
+                self.popup_list.remove(self)
+
+        download_item.finished.connect(on_finished)
+
+    def createWindow(self, _type):
+        popup = CustomWebView(popup_list=self.popup_list)
+        popup.setAttribute(Qt.WA_DeleteOnClose)
+        popup.setWindowTitle("下载")
+        popup.resize(900, 600)
+        popup.show()
+        if self.popup_list is not None:
+            self.popup_list.append(popup)
+        return popup
+
+class MachineryLibrary(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.popup_windows = []
+        self.setFont(QFont("微软雅黑", 15))
+        self.setStyleSheet("""
+            QWidget {
+                background: #f8fbfd;
+                border-radius: 16px;
+                padding: 20px;
+            }
+        """)
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(32, 32, 32, 32)
+
+        # 标题区
+        title = QLabel("MRobot 零件库")
+        title.setFont(QFont("微软雅黑", 22, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("color: #2980b9; letter-spacing: 2px; margin-bottom: 2px;")
+        main_layout.addWidget(title)
+
+        desc = QLabel("零件库账号：Engineer（无密码）")
+        desc.setFont(QFont("微软雅黑", 13))
+        desc.setAlignment(Qt.AlignCenter)
+        desc.setStyleSheet("color: #34495e; margin-bottom: 8px;")
+        main_layout.addWidget(desc)
+
+        # 加载提示
+        self.loading_label = QLabel("正在加载零件库网页，请稍候...")
+        self.loading_label.setAlignment(Qt.AlignCenter)
+        self.loading_label.setFont(QFont("微软雅黑", 14))
+        self.loading_label.setStyleSheet("color: #888; margin-bottom: 8px;")
+        main_layout.addWidget(self.loading_label)
+
+        # 网页视图
+        self.webview = CustomWebView(parent=self, popup_list=self.popup_windows)
+        self.webview.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.webview.setMinimumHeight(480)
+        self.webview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.webview.loadFinished.connect(self.on_webview_loaded)
+        main_layout.addWidget(self.webview, stretch=10)
+
+        # 刷新按钮
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        self.refresh_btn = QPushButton("刷新零件库")
+        self.refresh_btn.setFont(QFont("微软雅黑", 13, QFont.Bold))
+        self.refresh_btn.setFixedWidth(140)
+        self.refresh_btn.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #eaf6fb, stop:1 #d6eaf8);
+                color: #2980b9;
+                border-radius: 14px;
+                font-size: 15px;
+                font-weight: 600;
+                padding: 8px 0;
+                border: 1.5px solid #d6eaf8;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #f8fffe, stop:1 #cfe7fa);
+                color: #1a6fae;
+                border: 2px solid #b5d0ea;
+            }
+            QPushButton:pressed {
+                background: #e3f0fa;
+                color: #2471a3;
+                border: 2px solid #a4cbe3;
+            }
+        """)
+        self.refresh_btn.clicked.connect(self.reload_webview)
+        btn_row.addWidget(self.refresh_btn)
+        btn_row.addStretch(1)
+        main_layout.addLayout(btn_row)
+
+        # 自动加载网页
+        QTimer.singleShot(200, lambda: self.webview.setUrl(QUrl("http://alist.qutrobot.top")))
+        self.webview.show()
+
+        # 定时刷新（可选，防止页面假死）
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.setInterval(100)
+        self.refresh_timer.timeout.connect(self.webview.update)
+        self.refresh_timer.start()
+
+    def reload_webview(self):
+        self.loading_label.show()
+        self.webview.setUrl(QUrl("http://alist.qutrobot.top"))
+
+    def on_webview_loaded(self):
+        self.loading_label.hide()
+
+    def closeEvent(self, event):
+        self.refresh_timer.stop()
+        super().closeEvent(event)
 # --------- 主工具箱UI ---------
 class ToolboxUI(QWidget):
     def __init__(self):
@@ -1977,7 +2159,7 @@ class ToolboxUI(QWidget):
         left_layout.addWidget(logo_label)
 
         # 按钮区
-        self.button_names = ["主页", "曲线拟合", "Mini串口助手(BUG)", "MR架构配置(开发中)","软件指南"]
+        self.button_names = ["主页", "曲线拟合", "Mini串口助手(BUG)", "MR架构配置(开发中)", "零件库", "软件指南"]
         self.buttons = []
         for idx, name in enumerate(self.button_names):
             btn = QPushButton(name)
@@ -2050,7 +2232,8 @@ class ToolboxUI(QWidget):
             1: PolyFitApp(),  # 多项式拟合
             2: SerialAssistant(),  # 串口助手
             3: GenerateMRobotCode(),  # MRobot架构生成
-            4: DownloadPage(),  # 下载页面
+            4: MachineryLibrary(),  # 零件库
+            5: DownloadPage(),  # 下载页面
         }
         for i in range(len(self.button_names)):
             self.stack.addWidget(self.page_widgets[i])
