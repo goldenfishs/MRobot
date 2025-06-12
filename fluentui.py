@@ -29,45 +29,77 @@ class HomeInterface(BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
-        # 欢迎图标
+        # 顶部Logo
         iconLabel = QLabel(self)
         iconPixmap = QPixmap('img/MRobot.png').scaled(
-            300, 300, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            180, 180, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
         )
         iconLabel.setPixmap(iconPixmap)
         iconLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # 欢迎语
-        welcomeLabel = SubtitleLabel("高效、智能的R代码助手", self)
-        setFont(welcomeLabel, 18)
-        welcomeLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # 标题
+        titleLabel = QLabel("MRobot 智能R助手", self)
+        titleLabel.setFont(QFont("微软雅黑", 28, QFont.Bold))
+        titleLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        titleLabel.setStyleSheet("color: #1976d2; margin-top: 12px;")
 
-        # 操作按钮
-        btnGen = PushButton('生成代码', self, FIF.LIBRARY)
-        btnGen.setFixedWidth(160)
+        # 副标题
+        subtitle = QLabel("高效 · 智能 · 便捷\n让R语言开发更简单", self)
+        subtitle.setFont(QFont("微软雅黑", 16))
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet("color: #555; margin-bottom: 18px;")
+
+        # 三个主按钮
+        btnGen = PushButton('代码生成', self, FIF.LIBRARY)
+        btnGen.setFixedSize(180, 48)
+        btnGen.setFont(QFont("微软雅黑", 15))
         btnGen.clicked.connect(self.showInfoBar)
 
         btnHelp = PushButton('帮助文档', self, FIF.HELP)
-        btnHelp.setFixedWidth(160)
+        btnHelp.setFixedSize(180, 48)
+        btnHelp.setFont(QFont("微软雅黑", 15))
         btnHelp.clicked.connect(self.showHelp)
 
         btnAbout = PushButton('关于我们', self, FIF.INFO)
-        btnAbout.setFixedWidth(160)
+        btnAbout.setFixedSize(180, 48)
+        btnAbout.setFont(QFont("微软雅黑", 15))
         btnAbout.clicked.connect(self.showAbout)
 
-        # 按钮布局
-        btnLayout = QVBoxLayout()
-        btnLayout.setSpacing(16)
+        btnLayout = QHBoxLayout()
+        btnLayout.setSpacing(36)
+        btnLayout.addStretch(1)
         btnLayout.addWidget(btnGen)
         btnLayout.addWidget(btnHelp)
         btnLayout.addWidget(btnAbout)
-        btnWidget = QWidget(self)
-        btnWidget.setLayout(btnLayout)
+        btnLayout.addStretch(1)
+
+        # 卡片式欢迎信息
+        card = QFrame(self)
+        card.setStyleSheet("""
+            QFrame {
+                background: #f8fbfd;
+                border-radius: 18px;
+                border: 1.5px solid #d6eaf8;
+                padding: 24px 32px 18px 32px;
+            }
+        """)
+        cardLayout = QVBoxLayout(card)
+        cardLayout.setSpacing(10)
+        cardLayout.addWidget(titleLabel)
+        cardLayout.addWidget(subtitle)
+        cardLayout.addLayout(btnLayout)
 
         # 主布局
-        self._mainLayout.insertWidget(0, iconLabel, 0, Qt.AlignmentFlag.AlignCenter)
-        self._mainLayout.insertWidget(1, welcomeLabel, 0, Qt.AlignmentFlag.AlignCenter)
-        self._mainLayout.insertWidget(2, btnWidget, 0, Qt.AlignmentFlag.AlignCenter)
+        layout = QVBoxLayout()
+        layout.setSpacing(24)
+        layout.setContentsMargins(0, 32, 0, 0)
+        layout.addWidget(iconLabel, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addWidget(card, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addStretch(1)
+
+        # 清空原有内容并设置新布局
+        QWidget().setLayout(self._mainLayout)
+        self.setLayout(layout)
 
     def showInfoBar(self):
         InfoBar.success(
@@ -79,11 +111,10 @@ class HomeInterface(BaseInterface):
         )
 
     def showHelp(self):
-        webbrowser.open("https://github.com/lvzucheng/MRobot")  # 示例
+        webbrowser.open("https://github.com/lvzucheng/MRobot")
 
     def showAbout(self):
         MessageBox("关于我们", "MRobot 由 lvzucheng 开发，致力于高效智能的R代码辅助。", self).exec()
-
 # ===================== 代码生成页面 =====================
 class DataInterface(BaseInterface):
     def __init__(self, parent=None):
