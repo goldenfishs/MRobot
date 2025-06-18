@@ -1,9 +1,10 @@
 /*
-  初始化任务
+    Init Task
+    任务初始化，创建各个线程任务和消息队列
 */
 
 /* Includes ----------------------------------------------------------------- */
-#include "task\user_task.h"
+#include "task/user_task.h"
 
 /* USER INCLUDE BEGIN */
 
@@ -23,16 +24,19 @@
  */
 void Task_Init(void *argument) {
   (void)argument; /* 未使用argument，消除警告 */
+    /* USER CODE BEGIN Task_Init */
 
-  osKernelLock(); // 锁定内核，防止任务切换
-
-  // 创建线程
+    /* USER CODE END Task_Init */
+  osKernelLock(); /* 锁定内核，防止任务切换 */
+  
+  /* 创建任务线程 */
 {{thread_creation_code}}
 
   // 创建消息队列
   /* USER MESSAGE BEGIN */
   task_runtime.msgq.user_msg= osMessageQueueNew(2u, 10, NULL);
   /* USER MESSAGE END */
+
   osKernelUnlock(); // 解锁内核
   osThreadTerminate(osThreadGetId()); // 任务完成后结束自身
 }
