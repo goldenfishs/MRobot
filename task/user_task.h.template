@@ -47,15 +47,15 @@ typedef struct {
 
     /* USER CONFIG END */
 
-    /* 各任务运行频率 */
-    struct {
-{{freq_definitions}}
-    } freq;
-
     /* 各任务的stack使用 */
     struct {
 {{stack_definitions}}
     } stack_water_mark;
+
+    /* 各任务运行频率 */
+    struct {
+{{freq_definitions}}
+    } freq;
 
     /* 任务最近运行时间 */
     struct {
@@ -64,19 +64,12 @@ typedef struct {
 
 } Task_Runtime_t;
 
-
-/* 任务句柄 */
-typedef struct {
-{{task_handle_definitions}}
-} Task_Handles_t;
-
 /* 任务运行时结构体 */
 extern Task_Runtime_t task_runtime;
 
 /* 初始化任务句柄 */
 extern const osThreadAttr_t attr_init;
 {{task_attr_declarations}}
-
 
 /* 任务函数声明 */
 void Task_Init(void *argument);
