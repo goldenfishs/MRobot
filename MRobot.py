@@ -1,28 +1,36 @@
 import sys
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
+import os
 import serial
 import serial.tools.list_ports
+
+from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QTextCursor
-from PyQt5.QtCore import QThread, pyqtSignal
-from PyQt5.QtWidgets import QHBoxLayout, QComboBox, QPushButton, QTextEdit, QLineEdit, QLabel
-from PyQt5.QtWidgets import QGroupBox, QGridLayout, QSizePolicy
-from qfluentwidgets import Theme, setTheme
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QGroupBox,
+    QComboBox, QPushButton, QTextEdit, QLineEdit, QLabel, QSizePolicy,
+    QFileDialog, QMessageBox, QStackedLayout
+)
+
 from qfluentwidgets import (
-    NavigationItemPosition, Theme, FluentWindow, NavigationAvatarWidget,
-    PushButton, FluentIcon
+    Theme, setTheme, FluentIcon, SwitchButton, BodyLabel, SubtitleLabel,
+    StrongBodyLabel, HorizontalSeparator, InfoBar, MessageDialog, Dialog,
+    AvatarWidget, NavigationItemPosition, FluentWindow, NavigationAvatarWidget,
+    PushButton, TextEdit, LineEdit, ComboBox, ImageLabel
 )
 from qfluentwidgets import FluentIcon as FIF
-from qfluentwidgets import Theme, setTheme, FluentIcon, SwitchButton
-from qfluentwidgets import BodyLabel
-from qfluentwidgets import BodyLabel, TextEdit, LineEdit, ComboBox, PushButton, SwitchButton
-from qfluentwidgets import BodyLabel, SubtitleLabel, StrongBodyLabel, HorizontalSeparator, InfoBar
-from qfluentwidgets import MessageDialog
-from qfluentwidgets import Dialog, StrongBodyLabel, BodyLabel, SubtitleLabel, AvatarWidget
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget
-from qfluentwidgets import Dialog
-from qfluentwidgets import StrongBodyLabel, SubtitleLabel, BodyLabel, PushButton, AvatarWidget, HorizontalSeparator
-from qfluentwidgets import ImageLabel
+import requests
+import shutil
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QTreeWidget, QTreeWidgetItem, QAbstractItemView, QHeaderView
+
+from qfluentwidgets import (
+    TreeWidget, InfoBar, InfoBarPosition, MessageDialog, TreeItemDelegate
+)
+from qfluentwidgets import CheckBox
+from qfluentwidgets import TreeWidget
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import QFileDialog
+from qfluentwidgets import ProgressBar
 
 # ===================== 页面基类 =====================
 class BaseInterface(QWidget):
@@ -30,10 +38,6 @@ class BaseInterface(QWidget):
         super().__init__(parent=parent)
 
 # ===================== 首页界面 =====================
-# ...existing code...
-
-# ...existing code...
-
 class HomeInterface(BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -72,32 +76,83 @@ class HomeInterface(BaseInterface):
                                   "让机器人开发变得更轻松、更智能。"))
         layout.addWidget(BodyLabel("适用于 RM、RC、各类嵌入式机器人项目。"))
 
-        # # 开源与版本信息
-        # layout.addWidget(HorizontalSeparator())
-        # layout.addWidget(SubtitleLabel("项目信息"))
-        # layout.addWidget(BodyLabel("开源地址: https://github.com/QUT-MOVE/MRobot-Toolbox"))
-        # layout.addWidget(BodyLabel("当前版本: v1.0.0"))
-        # layout.addWidget(BodyLabel("反馈邮箱: move@qut.edu.cn"))
-
-        # # 致谢
-        # layout.addWidget(HorizontalSeparator())
-        # layout.addWidget(SubtitleLabel("致谢"))
-        # layout.addWidget(BodyLabel("感谢所有开源社区贡献者，特别感谢 RM/RC 机器人开发者的持续支持。"))
-
-        layout.addStretch()
-
-# ...existing code...
-
-# ...existing code...
-
+        # layout.addStretch()
 
 # ===================== 代码生成页面 =====================
 class DataInterface(BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setObjectName("dataInterface")
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        self.stacked_layout = QStackedLayout()
+        self.setLayout(self.stacked_layout)
+
+        # --- 页面1：工程路径选择 ---
+        self.select_widget = QWidget()
+        select_layout = QVBoxLayout(self.select_widget)
+        select_layout.addSpacing(40)
+        select_layout.addWidget(SubtitleLabel("MRobot 代码生成"))
+        select_layout.addWidget(HorizontalSeparator())
+        select_layout.addSpacing(10)
+        select_layout.addWidget(BodyLabel("请选择包含 .ioc 文件的工程文件夹，点击下方按钮进行选择。"))
+        select_layout.addSpacing(20)
+        self.choose_btn = PushButton("选择工程路径")
+        self.choose_btn.clicked.connect(self.choose_project_folder)
+        select_layout.addWidget(self.choose_btn)
+        select_layout.addStretch()
+        self.stacked_layout.addWidget(self.select_widget)
+
+        # --- 页面2：代码配置 ---
+        self.config_widget = QWidget()
+        self.config_layout = QVBoxLayout(self.config_widget)
+        # 左上角小返回按钮
+        top_bar = QHBoxLayout()
+        self.back_btn = PushButton('返回', icon=FluentIcon.SKIP_BACK)
+        # self.back_btn.setFixedSize(32, 32)
+        self.back_btn.clicked.connect(self.back_to_select)
+        self.back_btn.setToolTip("返回")
+        top_bar.addWidget(self.back_btn, alignment=Qt.AlignmentFlag.AlignLeft)
+        top_bar.addStretch()
+        self.config_layout.addLayout(top_bar)
+        self.config_layout.addWidget(SubtitleLabel("工程配置信息"))
+        self.config_layout.addWidget(HorizontalSeparator())
+        self.project_info_labels = []
+        self.config_layout.addStretch()
+        self.stacked_layout.addWidget(self.config_widget)
+
+        # 默认显示选择页面
+        self.stacked_layout.setCurrentWidget(self.select_widget)
+
+    def choose_project_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "请选择代码项目文件夹")
+        if not folder:
+            return
+        ioc_files = [f for f in os.listdir(folder) if f.endswith('.ioc')]
+        if not ioc_files:
+            QMessageBox.warning(self, "提示", "未找到.ioc文件，请确认项目文件夹。")
+            return
+        self.project_path = folder
+        self.project_name = os.path.basename(folder)
+        self.ioc_file = os.path.join(folder, ioc_files[0])
+        self.show_config_page()
+
+    def show_config_page(self):
+        # 清理旧内容
+        for label in self.project_info_labels:
+            self.config_layout.removeWidget(label)
+            label.deleteLater()
+        self.project_info_labels.clear()
+        # 显示项目信息
+        l1 = BodyLabel(f"项目名称: {self.project_name}")
+        l2 = BodyLabel(f"项目路径: {self.project_path}")
+        l3 = BodyLabel(f"IOC 文件: {self.ioc_file}")
+        self.config_layout.insertWidget(2, l1)
+        self.config_layout.insertWidget(3, l2)
+        self.config_layout.insertWidget(4, l3)
+        self.project_info_labels.extend([l1, l2, l3])
+        self.stacked_layout.setCurrentWidget(self.config_widget)
+
+    def back_to_select(self):
+        self.stacked_layout.setCurrentWidget(self.select_widget)
 
 # ===================== 串口终端界面 =====================
 class SerialReadThread(QThread):
@@ -129,11 +184,11 @@ class SerialTerminalInterface(BaseInterface):
 
         # 串口选择和连接
         hbox = QHBoxLayout()
-        self.port_combo = ComboBox()  # 替换QComboBox为ComboBox
+        self.port_combo = ComboBox()
         self.refresh_ports()
-        self.baud_combo = ComboBox()  # 替换QComboBox为ComboBox
+        self.baud_combo = ComboBox()
         self.baud_combo.addItems(['9600', '115200', '57600', '38400', '19200', '4800'])
-        self.connect_btn = PushButton("连接")  # 替换QPushButton为PushButton
+        self.connect_btn = PushButton("连接")
         self.connect_btn.clicked.connect(self.toggle_connection)
         hbox.addWidget(BodyLabel("串口:"))
         hbox.addWidget(self.port_combo)
@@ -142,8 +197,22 @@ class SerialTerminalInterface(BaseInterface):
         hbox.addWidget(self.connect_btn)
         layout.addLayout(hbox)
 
-        # 预设命令区
-        preset_group = QGroupBox("预设命令")
+        # 自动回车复选框
+        self.auto_enter_checkbox = CheckBox("自动回车")
+        self.auto_enter_checkbox.setChecked(True)
+        layout.addWidget(self.auto_enter_checkbox)
+
+        # 预设命令区（不使用QGroupBox，直接用布局和分隔线）
+        layout.addWidget(HorizontalSeparator())
+        preset_label = BodyLabel("预设命令")
+        layout.addWidget(preset_label)
+        # ...existing code...
+
+
+        # 预设命令区（不使用QGroupBox，直接用布局和分隔线）
+        layout.addWidget(HorizontalSeparator())
+        preset_label = BodyLabel("预设命令")
+        layout.addWidget(preset_label)
         preset_layout = QGridLayout()
         self.preset_commands = [
             ("线程监视器", "RESET"),
@@ -154,15 +223,16 @@ class SerialTerminalInterface(BaseInterface):
             ("查询id", "STATUS"),
         ]
         for i, (label, cmd) in enumerate(self.preset_commands):
-            btn = PushButton(label)  # 替换QPushButton为PushButton
+            btn = PushButton(label)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             btn.clicked.connect(lambda _, c=cmd: self.send_preset_command(c))
             preset_layout.addWidget(btn, i // 3, i % 3)
-        preset_group.setLayout(preset_layout)
-        layout.addWidget(preset_group)
+        layout.addLayout(preset_layout)
+        layout.addWidget(HorizontalSeparator())
+
 
         # 显示区
-        self.text_edit = TextEdit()  # 替换QTextEdit为TextEdit
+        self.text_edit = TextEdit()
         self.text_edit.setReadOnly(True)
         layout.addWidget(self.text_edit)
 
@@ -179,6 +249,7 @@ class SerialTerminalInterface(BaseInterface):
 
         self.ser = None
         self.read_thread = None
+
 
     def send_preset_command(self, cmd):
         self.input_line.setText(cmd)
@@ -233,10 +304,220 @@ class SerialTerminalInterface(BaseInterface):
                 else:
                     for char in text:
                         self.ser.write(char.encode())
-                    self.ser.write('\n'.encode())
+                    # 判断是否自动回车
+                    if self.auto_enter_checkbox.isChecked():
+                        self.ser.write('\n'.encode())
             except Exception as e:
                 self.text_edit.append(f"发送失败: {e}")
             self.input_line.clear()
+
+# ===================== 零件库页面 =====================
+
+class DownloadThread(QThread):
+    progressChanged = pyqtSignal(int)
+    finished = pyqtSignal(list, list)  # success, fail
+
+    def __init__(self, files, server_url, secret_key, local_dir, parent=None):
+        super().__init__(parent)
+        self.files = files
+        self.server_url = server_url
+        self.secret_key = secret_key
+        self.local_dir = local_dir
+
+    def run(self):
+        import requests, shutil, os
+        success, fail = [], []
+        total = len(self.files)
+        for idx, rel_path in enumerate(self.files):
+            try:
+                url = f"{self.server_url}/download/{rel_path}"
+                params = {"key": self.secret_key}
+                resp = requests.get(url, params=params, stream=True, timeout=10)
+                if resp.status_code == 200:
+                    local_path = os.path.join(self.local_dir, rel_path)
+                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                    with open(local_path, "wb") as f:
+                        shutil.copyfileobj(resp.raw, f)
+                    success.append(rel_path)
+                else:
+                    fail.append(rel_path)
+            except Exception:
+                fail.append(rel_path)
+            self.progressChanged.emit(int((idx + 1) / total * 100))
+        self.finished.emit(success, fail)
+
+class PartLibraryInterface(BaseInterface):
+    SERVER_URL = "http://154.37.215.220:5000"
+    SECRET_KEY = "MRobot_Download"
+    LOCAL_LIB_DIR = "mech_lib"
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.setObjectName("partLibraryInterface")
+        layout = QVBoxLayout(self)
+        layout.setSpacing(16)
+
+        layout.addWidget(SubtitleLabel("零件库（在线bate版）"))
+        layout.addWidget(HorizontalSeparator())
+        layout.addWidget(BodyLabel("可浏览服务器零件库，选择需要的文件下载到本地。"))
+
+        btn_layout = QHBoxLayout()
+        refresh_btn = PushButton(FluentIcon.SYNC, "刷新列表")
+        refresh_btn.clicked.connect(self.refresh_list)
+        btn_layout.addWidget(refresh_btn)
+
+        # 新增：打开本地零件库按钮
+        open_local_btn = PushButton(FluentIcon.FOLDER, "打开本地零件库")
+        open_local_btn.clicked.connect(self.open_local_lib)
+        btn_layout.addWidget(open_local_btn)
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        self.tree = TreeWidget(self)
+
+        self.tree.setHeaderLabels(["名称", "类型"])
+        self.tree.setSelectionMode(self.tree.ExtendedSelection)
+        self.tree.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tree.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tree.setCheckedColor("#0078d4", "#2d7d9a")
+        self.tree.setBorderRadius(8)
+        self.tree.setBorderVisible(True)
+        layout.addWidget(self.tree, stretch=1)
+
+        download_btn = PushButton(FluentIcon.DOWNLOAD, "下载选中文件")
+        download_btn.clicked.connect(self.download_selected_files)
+        layout.addWidget(download_btn)
+
+        self.refresh_list(first=True)
+
+    def refresh_list(self, first=False):
+        self.tree.clear()
+        try:
+            resp = requests.get(
+                f"{self.SERVER_URL}/list",
+                params={"key": self.SECRET_KEY},
+                timeout=5
+            )
+            resp.raise_for_status()
+            tree = resp.json()
+            self.populate_tree(self.tree, tree, "")
+            if not first:
+                InfoBar.success(
+                    title="刷新成功",
+                    content="零件库已经是最新的！",
+                    parent=self,
+                    position=InfoBarPosition.TOP,
+                    duration=2000
+                )
+        except Exception as e:
+            InfoBar.error(
+                title="刷新失败",
+                content=f"获取零件库失败: {e}",
+                parent=self,
+                position=InfoBarPosition.TOP,
+                duration=3000
+            )
+
+    def populate_tree(self, parent, node, path_prefix):
+        from PyQt5.QtWidgets import QTreeWidgetItem
+        for dname, dnode in node.get("dirs", {}).items():
+            item = QTreeWidgetItem([dname, "文件夹"])
+            if isinstance(parent, TreeWidget):
+                parent.addTopLevelItem(item)
+            else:
+                parent.addChild(item)
+            self.populate_tree(item, dnode, os.path.join(path_prefix, dname))
+        for fname in node.get("files", []):
+            item = QTreeWidgetItem([fname, "文件"])
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(0, Qt.Unchecked)
+            item.setData(0, Qt.UserRole, os.path.join(path_prefix, fname))
+            if isinstance(parent, TreeWidget):
+                parent.addTopLevelItem(item)
+            else:
+                parent.addChild(item)
+
+    def get_checked_files(self):
+        files = []
+        def _traverse(item):
+            for i in range(item.childCount()):
+                child = item.child(i)
+                if child.text(1) == "文件" and child.checkState(0) == Qt.Checked:
+                    files.append(child.data(0, Qt.UserRole))
+                _traverse(child)
+        root = self.tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            _traverse(root.child(i))
+        return files
+
+    def download_selected_files(self):
+        files = self.get_checked_files()
+        if not files:
+            InfoBar.info(
+                title="提示",
+                content="请先勾选要下载的文件。",
+                parent=self,
+                position=InfoBarPosition.TOP,
+                duration=2000
+            )
+            return
+
+        # 进度条对话框
+        self.progress_dialog = Dialog(
+            title="正在下载",
+            content="正在下载选中文件，请稍候...",
+            parent=self
+        )
+        self.progress_bar = ProgressBar()
+        self.progress_bar.setValue(0)
+        # 插入进度条到内容布局
+        self.progress_dialog.textLayout.addWidget(self.progress_bar)
+        self.progress_dialog.show()
+
+        # 启动下载线程
+        self.download_thread = DownloadThread(
+            files, self.SERVER_URL, self.SECRET_KEY, self.LOCAL_LIB_DIR
+        )
+        self.download_thread.progressChanged.connect(self.progress_bar.setValue)
+        self.download_thread.finished.connect(self.on_download_finished)
+        self.download_thread.finished.connect(self.download_thread.deleteLater)
+        self.download_thread.start()
+
+    def on_download_finished(self, success, fail):
+        self.progress_dialog.close()
+        msg = f"成功下载: {len(success)} 个文件\n失败: {len(fail)} 个文件"
+        dialog = Dialog(
+            title="下载结果",
+            content=msg,
+            parent=self
+        )
+        # 添加“打开文件夹”按钮
+        open_btn = PushButton("打开文件夹")
+        def open_folder():
+            folder = os.path.abspath(self.LOCAL_LIB_DIR)
+            # 打开文件夹（macOS用open，Windows用explorer，Linux用xdg-open）
+            import platform, subprocess
+            if platform.system() == "Darwin":
+                subprocess.call(["open", folder])
+            elif platform.system() == "Windows":
+                subprocess.call(["explorer", folder])
+            else:
+                subprocess.call(["xdg-open", folder])
+            dialog.close()
+        open_btn.clicked.connect(open_folder)
+        # 添加按钮到Dialog布局
+        dialog.textLayout.addWidget(open_btn)
+        dialog.exec()
+
+    def open_local_lib(self):
+        folder = os.path.abspath(self.LOCAL_LIB_DIR)
+        import platform, subprocess
+        if platform.system() == "Darwin":
+            subprocess.call(["open", folder])
+        elif platform.system() == "Windows":
+            subprocess.call(["explorer", folder])
+        else:
+            subprocess.call(["xdg-open", folder])
 
 # ===================== 设置界面 =====================
 class SettingInterface(BaseInterface):
@@ -292,6 +573,7 @@ class SettingInterface(BaseInterface):
 
     def on_theme_switch(self, checked):
         self.themeSwitchRequested.emit()
+
 # ===================== 帮助与关于界面 =====================
 class HelpInterface(BaseInterface):
     def __init__(self, parent=None):
@@ -328,6 +610,7 @@ class MainWindow(FluentWindow):
             (HomeInterface(self), FIF.HOME, "首页", NavigationItemPosition.TOP),
             (DataInterface(self), FIF.LIBRARY, "MRobot代码生成", NavigationItemPosition.SCROLL),
             (SerialTerminalInterface(self), FIF.COMMAND_PROMPT, "Mini_Shell", NavigationItemPosition.SCROLL),
+            (PartLibraryInterface(self), FIF.DOWNLOAD, "零件库", NavigationItemPosition.SCROLL),  # ← 加上这一行
             (self.setting_page, FIF.SETTING, "设置", NavigationItemPosition.BOTTOM),
             (HelpInterface(self), FIF.HELP, "帮助", NavigationItemPosition.BOTTOM),
             (AboutInterface(self), FIF.INFO, "关于", NavigationItemPosition.BOTTOM),
