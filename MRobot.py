@@ -180,76 +180,80 @@ class SerialTerminalInterface(BaseInterface):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setObjectName("serialTerminalInterface")
-        layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(12)
 
-        # 串口选择和连接
-        hbox = QHBoxLayout()
+        # 顶部：串口设置区
+        top_hbox = QHBoxLayout()
+        top_hbox.addWidget(BodyLabel("串口:"))
         self.port_combo = ComboBox()
         self.refresh_ports()
+        top_hbox.addWidget(self.port_combo)
+        top_hbox.addWidget(BodyLabel("波特率:"))
         self.baud_combo = ComboBox()
         self.baud_combo.addItems(['9600', '115200', '57600', '38400', '19200', '4800'])
+        top_hbox.addWidget(self.baud_combo)
         self.connect_btn = PushButton("连接")
         self.connect_btn.clicked.connect(self.toggle_connection)
-        hbox.addWidget(BodyLabel("串口:"))
-        hbox.addWidget(self.port_combo)
-        hbox.addWidget(BodyLabel("波特率:"))
-        hbox.addWidget(self.baud_combo)
-        hbox.addWidget(self.connect_btn)
-        layout.addLayout(hbox)
+        top_hbox.addWidget(self.connect_btn)
+        self.refresh_btn = PushButton(FluentIcon.SYNC, "刷新")
+        self.refresh_btn.clicked.connect(self.refresh_ports)
+        top_hbox.addWidget(self.refresh_btn)
+        top_hbox.addStretch()
+        main_layout.addLayout(top_hbox)
 
-        # 自动回车复选框
-        self.auto_enter_checkbox = CheckBox("自动回车")
-        self.auto_enter_checkbox.setChecked(True)
-        layout.addWidget(self.auto_enter_checkbox)
+        main_layout.addWidget(HorizontalSeparator())
 
-        # 预设命令区（不使用QGroupBox，直接用布局和分隔线）
-        layout.addWidget(HorizontalSeparator())
-        preset_label = BodyLabel("预设命令")
-        layout.addWidget(preset_label)
-        # ...existing code...
-
-
-        # 预设命令区（不使用QGroupBox，直接用布局和分隔线）
-        layout.addWidget(HorizontalSeparator())
-        preset_label = BodyLabel("预设命令")
-        layout.addWidget(preset_label)
-        preset_layout = QGridLayout()
+        # 中部：左侧预设命令，右侧显示区
+        center_hbox = QHBoxLayout()
+        # 左侧：预设命令竖排
+        preset_vbox = QVBoxLayout()
+        preset_vbox.addWidget(SubtitleLabel("快捷指令"))
+        #快捷指令居中
+        preset_vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preset_commands = [
             ("线程监视器", "RESET"),
             ("陀螺仪校准", "GET_VERSION"),
             ("性能监视", "START"),
             ("重启", "STOP"),
-            ("显示所有device", "SELF_TEST"),
+            ("显示所有设备", "SELF_TEST"),
             ("查询id", "STATUS"),
         ]
-        for i, (label, cmd) in enumerate(self.preset_commands):
+        for label, cmd in self.preset_commands:
             btn = PushButton(label)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             btn.clicked.connect(lambda _, c=cmd: self.send_preset_command(c))
-            preset_layout.addWidget(btn, i // 3, i % 3)
-        layout.addLayout(preset_layout)
-        layout.addWidget(HorizontalSeparator())
+            preset_vbox.addWidget(btn)
+        preset_vbox.addStretch()
+        main_layout.addLayout(center_hbox, stretch=1)
+        
 
-
-        # 显示区
+        # 右侧：串口数据显示区
         self.text_edit = TextEdit()
         self.text_edit.setReadOnly(True)
-        layout.addWidget(self.text_edit)
+        self.text_edit.setMinimumWidth(400)
+        center_hbox.addWidget(self.text_edit, 3)
+        center_hbox.addLayout(preset_vbox, 1)
 
-        # 输入区
-        input_hbox = QHBoxLayout()
+        main_layout.addWidget(HorizontalSeparator())
+
+        # 底部：输入区
+        bottom_hbox = QHBoxLayout()
         self.input_line = LineEdit()
         self.input_line.setPlaceholderText("输入内容，回车发送")
         self.input_line.returnPressed.connect(self.send_data)
+        bottom_hbox.addWidget(self.input_line, 4)
         send_btn = PushButton("发送")
         send_btn.clicked.connect(self.send_data)
-        input_hbox.addWidget(self.input_line)
-        input_hbox.addWidget(send_btn)
-        layout.addLayout(input_hbox)
+        bottom_hbox.addWidget(send_btn, 1)
+        self.auto_enter_checkbox = CheckBox("自动回车")
+        self.auto_enter_checkbox.setChecked(True)
+        bottom_hbox.addWidget(self.auto_enter_checkbox)
+        bottom_hbox.addStretch()
+        main_layout.addLayout(bottom_hbox)
 
         self.ser = None
         self.read_thread = None
-
 
     def send_preset_command(self, cmd):
         self.input_line.setText(cmd)
@@ -311,8 +315,10 @@ class SerialTerminalInterface(BaseInterface):
                 self.text_edit.append(f"发送失败: {e}")
             self.input_line.clear()
 
+
 # ===================== 零件库页面 =====================
 
+# ...existing code...
 class DownloadThread(QThread):
     progressChanged = pyqtSignal(int)
     finished = pyqtSignal(list, list)  # success, fail
@@ -325,26 +331,34 @@ class DownloadThread(QThread):
         self.local_dir = local_dir
 
     def run(self):
-        import requests, shutil, os
         success, fail = [], []
         total = len(self.files)
+        max_retry = 3  # 最大重试次数
         for idx, rel_path in enumerate(self.files):
-            try:
-                url = f"{self.server_url}/download/{rel_path}"
-                params = {"key": self.secret_key}
-                resp = requests.get(url, params=params, stream=True, timeout=10)
-                if resp.status_code == 200:
-                    local_path = os.path.join(self.local_dir, rel_path)
-                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
-                    with open(local_path, "wb") as f:
-                        shutil.copyfileobj(resp.raw, f)
-                    success.append(rel_path)
-                else:
-                    fail.append(rel_path)
-            except Exception:
+            retry = 0
+            while retry < max_retry:
+                try:
+                    url = f"{self.server_url}/download/{rel_path}"
+                    params = {"key": self.secret_key}
+                    resp = requests.get(url, params=params, stream=True, timeout=10)
+                    if resp.status_code == 200:
+                        local_path = os.path.join(self.local_dir, rel_path)
+                        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                        with open(local_path, "wb") as f:
+                            shutil.copyfileobj(resp.raw, f)
+                        success.append(rel_path)
+                        break  # 下载成功，跳出重试循环
+                    else:
+                        print(f"下载失败({resp.status_code}): {rel_path}，第{retry+1}次尝试")
+                        retry += 1
+                except Exception as e:
+                    print(f"下载异常: {rel_path}，第{retry+1}次尝试，错误: {e}")
+                    retry += 1
+            else:
                 fail.append(rel_path)
             self.progressChanged.emit(int((idx + 1) / total * 100))
         self.finished.emit(success, fail)
+
 
 class PartLibraryInterface(BaseInterface):
     SERVER_URL = "http://154.37.215.220:5000"
@@ -359,7 +373,7 @@ class PartLibraryInterface(BaseInterface):
 
         layout.addWidget(SubtitleLabel("零件库（在线bate版）"))
         layout.addWidget(HorizontalSeparator())
-        layout.addWidget(BodyLabel("可浏览服务器零件库，选择需要的文件下载到本地。"))
+        layout.addWidget(BodyLabel("可浏览服务器零件库，选择需要的文件下载到本地。（如无法使用或者下载失败，请尝试重新下载或检查网络连接）"))
 
         btn_layout = QHBoxLayout()
         refresh_btn = PushButton(FluentIcon.SYNC, "刷新列表")
