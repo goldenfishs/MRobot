@@ -154,6 +154,7 @@ class DataInterface(BaseInterface):
     def back_to_select(self):
         self.stacked_layout.setCurrentWidget(self.select_widget)
 
+
 # ===================== 串口终端界面 =====================
 class SerialReadThread(QThread):
     data_received = pyqtSignal(str)
@@ -314,11 +315,7 @@ class SerialTerminalInterface(BaseInterface):
             except Exception as e:
                 self.text_edit.append(f"发送失败: {e}")
             self.input_line.clear()
-
-
 # ===================== 零件库页面 =====================
-
-# ...existing code...
 class DownloadThread(QThread):
     progressChanged = pyqtSignal(int)
     finished = pyqtSignal(list, list)  # success, fail
@@ -358,8 +355,6 @@ class DownloadThread(QThread):
                 fail.append(rel_path)
             self.progressChanged.emit(int((idx + 1) / total * 100))
         self.finished.emit(success, fail)
-
-
 class PartLibraryInterface(BaseInterface):
     SERVER_URL = "http://154.37.215.220:5000"
     SECRET_KEY = "MRobot_Download"
