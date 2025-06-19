@@ -10,3 +10,4 @@ const osThreadAttr_t attr_init = {
 
 /* User_task */
 {{task_attr_definitions}}
+

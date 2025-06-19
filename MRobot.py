@@ -52,7 +52,7 @@ from qfluentwidgets import (
 from urllib.parse import quote
 
 from packaging.version import parse as vparse
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 # ===================== 页面基类 =====================
 class BaseInterface(QWidget):
@@ -665,7 +665,7 @@ class DataInterface(BaseInterface):
         # 2. 在 /* USER CODE BEGIN RTOS_THREADS */ 区域添加 osThreadNew(Task_Init, NULL, &attr_init);
         rtos_threads_pattern = r'(\/\* *USER CODE BEGIN RTOS_THREADS *\*\/\s*)(.*?)(\/\* *USER CODE END RTOS_THREADS *\*\/)'
         match = re.search(rtos_threads_pattern, code, re.DOTALL)
-        task_line = '  initTaskHandle = osThreadNew(Task_Init, NULL, &attr_init); // 创建初始化任务\n'
+        task_line = ' osThreadNew(Task_Init, NULL, &attr_init); // 创建初始化任务\n'
         if match:
             threads_code = match.group(2)
             if 'Task_Init' not in threads_code:
@@ -1026,6 +1026,10 @@ class DataInterface(BaseInterface):
             with open(task_c_path, "w", encoding="utf-8") as f:
                 f.write(code)
 
+        # ----------- 保存任务配置到 config.yaml -----------
+        config_yaml_path = os.path.join(output_dir, "config.yaml")
+        with open(config_yaml_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(task_list, f, allow_unicode=True)
 # ===================== 串口终端界面 =====================
 class SerialReadThread(QThread):
     data_received = pyqtSignal(str)

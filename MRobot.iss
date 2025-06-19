@@ -1,6 +1,6 @@
 [Setup]
 AppName=MRobot
-AppVersion=1.0
+AppVersion=1.0.1
 DefaultDirName={userappdata}\MRobot
 DefaultGroupName=MRobot
 OutputDir=.

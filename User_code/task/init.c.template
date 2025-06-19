@@ -40,4 +40,3 @@ void Task_Init(void *argument) {
   osKernelUnlock(); // 解锁内核
   osThreadTerminate(osThreadGetId()); // 任务完成后结束自身
 }
-

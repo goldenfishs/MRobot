@@ -32,3 +32,4 @@ Examples/
 build/
 dist/
 *.spec
+*.exe
