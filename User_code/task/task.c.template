@@ -26,7 +26,9 @@ void {{task_function}}(void *argument) {
   const uint32_t delay_tick = osKernelGetTickFreq() / {{task_frequency}};
 
   osDelay({{task_delay}}); /* 延时一段时间再开启任务 */
+  /* USER CODE INIT BEGIN */
 
+  /* USER CODE INIT END */
   uint32_t tick = osKernelGetTickCount(); /* 控制任务运行频率的计时 */
   while (1) {
     tick += delay_tick; /* 计算下一个唤醒时刻 */
