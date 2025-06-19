@@ -91,3 +91,35 @@ pyinstaller --onefile --windowed
 pyinstaller MR_Toolbox.py --onefile --noconsole --icon=img\M.ico --add-data "mr_tool_img\MRobot.png;mr_tool_img"
 
 pyinstaller MR_Tool.py --onefile --noconsole --icon=img\M.ico --add-data "mr_tool_img\MRobot.png;mr_tool_img" --add-data "src;src" --add-data "User;User"
+
+pyinstaller --noconfirm --onefile --windowed ^
+  --add-data "User_code;User_code" ^
+  --add-data "img;img" ^
+  --icon "img\M.ico" ^
+  MRobot.py
+
+
+pyinstaller --noconfirm --onefile --windowed --add-data "img;img" --add-data "User_code;User_code" --add-data "mech_lib;mech_lib" --icon=img/MRobot.ico MRobot.py
+
+python3 -m PyInstaller --noconfirm --onefile --windowed \
+  --add-data "img:img" \
+  --add-data "User_code:User_code" \
+  --add-data "mech_lib:mech_lib" \
+  --icon=img/MRobot.ico \
+  MRobot.py
+
+  
+python3 -m PyInstaller --windowed --name MRobot \
+  --add-data "img:MRobot.app/Contents/Resources/img" \
+  --add-data "User_code:MRobot.app/Contents/Resources/User_code" \
+  --add-data "mech_lib:MRobot.app/Contents/Resources/mech_lib" \
+  MRobot.py
+
+
+
+pyinstaller --noconfirm --onefile --windowed --add-data "img;img" --add-data "User_code;User_code" --icon=img/M.ico MRobot.py
+
+
+pyinstaller MRobot.py
+
+pyinstaller --noconfirm --onefile --windowed --icon=img/M.ico --add-data "img;img" --add-data "User_code;User_code" --add-data "mech_lib;mech_lib" MRobot.py

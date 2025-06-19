@@ -1,4 +1,4 @@
-#include "task\user_task.h"
+#include "task/user_task.h"
 
 Task_Runtime_t task_runtime;
 
@@ -8,5 +8,5 @@ const osThreadAttr_t attr_init = {
     .stack_size = 256 * 4,
 };
 
-// USER TASK 
+/* User_task */
 {{task_attr_definitions}}

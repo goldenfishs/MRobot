@@ -3,12 +3,27 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+/* Includes ----------------------------------------------------------------- */
 #include <cmsis_os2.h>
 #include "FreeRTOS.h"
 #include "task.h"
 
-// 定义任务运行时结构体
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+/* Exported constants ------------------------------------------------------- */
+/* 任务运行频率 */
+{{task_frequency_definitions}}
+
+/* 任务初始化延时ms */
+#define TASK_INIT_DELAY (100u)
+{{task_init_delay_definitions}}
+
+/* Exported defines --------------------------------------------------------- */
+/* Exported macro ----------------------------------------------------------- */
+/* Exported types ----------------------------------------------------------- */
+
+/* 任务运行时结构体 */
 typedef struct {
     /* 各任务，也可以叫做线程 */
     struct {
@@ -16,41 +31,47 @@ typedef struct {
     } thread;
 
     /* USER MESSAGE BEGIN */
-
     struct {
         osMessageQueueId_t user_msg; /* 用户自定义任务消息队列 */
     } msgq;
-
     /* USER MESSAGE END */
 
+    /* 机器人状态 */
+    struct {
+        float battery; /* 电池电量百分比 */
+        float vbat; /* 电池电压 */
+        float cpu_temp; /* CPU温度 */
+    } status;
+
+    /* USER CONFIG BEGIN */
+
+    /* USER CONFIG END */
+
+    /* 各任务的stack使用 */
+    struct {
+{{stack_definitions}}
+    } stack_water_mark;
+
+    /* 各任务运行频率 */
     struct {
 {{freq_definitions}}
-    } freq; /* 任务运行频率 */
+    } freq;
 
+    /* 任务最近运行时间 */
     struct {
 {{last_up_time_definitions}}
-    } last_up_time; /* 任务最近运行时间 */
+    } last_up_time;
+
 } Task_Runtime_t;
 
-// 任务频率
-{{task_frequency_definitions}}
-// 任务初始化延时
-#define TASK_INIT_DELAY (100u)
-{{task_init_delay_definitions}}
-
-// 任务句柄
-typedef struct {
-{{task_handle_definitions}}
-} Task_Handles_t;
-
-// 任务运行时结构体
+/* 任务运行时结构体 */
 extern Task_Runtime_t task_runtime;
 
-// 初始化任务句柄
+/* 初始化任务句柄 */
 extern const osThreadAttr_t attr_init;
 {{task_attr_declarations}}
 
-// 任务函数声明
+/* 任务函数声明 */
 void Task_Init(void *argument);
 {{task_function_declarations}}
 
