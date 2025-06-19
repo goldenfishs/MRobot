@@ -22,6 +22,7 @@
 void {{task_function}}(void *argument) {
   (void)argument; /* 未使用argument，消除警告 */
 
+  {% if freq_control %}
   /* 计算任务运行到指定频率需要等待的tick数 */
   const uint32_t delay_tick = osKernelGetTickFreq() / {{task_frequency}};
 
@@ -39,4 +40,18 @@ void {{task_function}}(void *argument) {
     /* USER CODE END */
     osDelayUntil(tick); /* 运行结束，等待下一次唤醒 */
   }
+  {% else %}
+  osDelay({{task_delay}}); /* 延时一段时间再开启任务 */
+
+  /* USER CODE INIT BEGIN*/
+
+  /* USER CODE INIT END*/
+
+  while (1) {
+    /* USER CODE BEGIN */
+
+    /* USER CODE END */
+    osDelay(1); /* 默认1ms延时，防止死循环卡死CPU */
+  }
+  {% endif %}
 }
