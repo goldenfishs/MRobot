@@ -51,7 +51,6 @@ void {{task_function}}(void *argument) {
     /* USER CODE BEGIN */
 
     /* USER CODE END */
-    osDelay(1); /* 默认1ms延时，防止死循环卡死CPU */
   }
   {% endif %}
 }
