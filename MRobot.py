@@ -1003,7 +1003,7 @@ class DataInterface(BaseInterface):
                     def repl(m):
                         return m.group(0).replace(m.group(1), old_content)
                     return pattern.sub(repl, new_code, count=1)
-                for region in ["USER INCLUDE", "USER STRUCT", "USER CODE"]:
+                for region in ["USER INCLUDE", "USER STRUCT", "USER CODE", "USER INIT CODE"]:
                     code = preserve_user_region(code, old_code, region)
             with open(task_c_path, "w", encoding="utf-8") as f:
                 f.write(code)
