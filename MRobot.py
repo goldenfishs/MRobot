@@ -712,7 +712,7 @@ class DataInterface(BaseInterface):
             )
 
     def open_task_config_dialog(self):
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox
         import yaml
         import os
 
@@ -720,15 +720,16 @@ class DataInterface(BaseInterface):
             def __init__(self, parent=None, config_path=None):
                 super().__init__(parent)
                 self.setWindowTitle("任务配置")
-                self.resize(800, 420)
+                self.resize(900, 420)
                 layout = QVBoxLayout(self)
-                self.table = QTableWidget(0, 5)
-                self.table.setHorizontalHeaderLabels(["任务名称", "运行频率", "初始化延迟", "堆栈大小", "任务描述"])
+                self.table = QTableWidget(0, 6)
+                self.table.setHorizontalHeaderLabels(["任务名称", "运行频率", "初始化延迟", "堆栈大小", "任务描述", "频率控制"])
                 self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
                 self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
                 self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
                 self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
                 self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+                self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
                 self.table.setColumnWidth(4, 320)  # 任务描述更宽
                 layout.addWidget(self.table)
                 btn_layout = QHBoxLayout()
@@ -748,6 +749,8 @@ class DataInterface(BaseInterface):
                 cancel_btn.clicked.connect(self.reject)
 
 
+
+
                 # 自动读取配置文件
                 if config_path and os.path.exists(config_path):
                     try:
@@ -761,6 +764,10 @@ class DataInterface(BaseInterface):
                                     item = QTableWidgetItem(str(t.get(key, "")))
                                     item.setTextAlignment(Qt.AlignCenter)
                                     self.table.setItem(row, col, item)
+                                # 新增频率控制复选框
+                                freq_ctrl = QCheckBox()
+                                freq_ctrl.setChecked(t.get("freq_control", True))
+                                self.table.setCellWidget(row, 5, freq_ctrl)
                     except Exception as e:
                         pass  # 配置文件损坏时忽略
 
@@ -774,6 +781,9 @@ class DataInterface(BaseInterface):
                     item = QTableWidgetItem(val)
                     item.setTextAlignment(Qt.AlignCenter)
                     self.table.setItem(row, col, item)
+                freq_ctrl = QCheckBox()
+                freq_ctrl.setChecked(True)
+                self.table.setCellWidget(row, 5, freq_ctrl)
 
             def del_row(self):
                 rows = set([i.row() for i in self.table.selectedItems()])
@@ -784,22 +794,30 @@ class DataInterface(BaseInterface):
                 tasks = []
                 for row in range(self.table.rowCount()):
                     name = self.table.item(row, 0).text().strip()
-                    freq = int(self.table.item(row, 1).text())
+                    freq = self.table.item(row, 1).text()
                     delay = int(self.table.item(row, 2).text())
                     stack = int(self.table.item(row, 3).text())
                     desc = self.table.item(row, 4).text().strip()
+                    freq_ctrl = self.table.cellWidget(row, 5).isChecked()
                     # 校验 stack 必须为 128*2^n
                     if stack < 128 or (stack & (stack - 1)) != 0 or stack % 128 != 0:
                         raise ValueError(f"第{row+1}行任务“{name}”的堆栈大小必须为128、256、512、1024等（128*2^n）")
-                    tasks.append({
+                    task = {
                         "name": name,
                         "function": f"Task_{name}",
-                        "frequency": freq,
                         "delay": delay,
                         "stack": stack,
-                        "description": desc
-                    })
+                        "description": desc,
+                        "freq_control": freq_ctrl
+                    }
+                    if freq_ctrl:
+                        task["frequency"] = int(freq)
+                    tasks.append(task)
                 return tasks
+
+
+
+
 
         config_path = os.path.join(self.project_path, "User", "task", "config.yaml")
         dlg = TaskConfigDialog(self, config_path=config_path)
@@ -856,19 +874,21 @@ class DataInterface(BaseInterface):
         init_c_tpl = os.path.join(template_dir, "init.c.template")
         task_c_tpl = os.path.join(template_dir, "task.c.template")
 
+        # 只统计需要频率控制的任务
+        freq_tasks = [t for t in task_list if t.get("freq_control", True)]
+
         def render_template(path, context):
             with open(path, encoding="utf-8") as f:
                 tpl = Template(f.read())
             return tpl.render(**context)
 
-    
         # 构造模板上下文
         context_h = {
             "thread_definitions": "\n".join([f"        osThreadId_t {t['name']};" for t in task_list]),
-            "freq_definitions": "\n".join([f"        float {t['name']};" for t in task_list]),
+            "freq_definitions": "\n".join([f"        float {t['name']};" for t in freq_tasks]),
             "stack_definitions": "\n".join([f"        UBaseType_t {t['name']};" for t in task_list]),
-            "last_up_time_definitions": "\n".join([f"        float {t['name']};" for t in task_list]),
-            "task_frequency_definitions": "\n".join([f"#define {t['name'].upper()}_FREQ ({t['frequency']})" for t in task_list]),
+            "last_up_time_definitions": "\n".join([f"        float {t['name']};" for t in freq_tasks]),
+            "task_frequency_definitions": "\n".join([f"#define {t['name'].upper()}_FREQ ({t['frequency']})" for t in freq_tasks]),
             "task_init_delay_definitions": "\n".join([f"#define {t['name'].upper()}_INIT_DELAY ({t['delay']})" for t in task_list]),
             "task_attr_declarations": "\n".join([f"extern const osThreadAttr_t attr_{t['name']};" for t in task_list]),
             "task_function_declarations": "\n".join([f"void {t['function']}(void *argument);" for t in task_list]),
@@ -969,17 +989,16 @@ class DataInterface(BaseInterface):
             f.write(init_c)
     
         # ----------- 生成 task.c -----------
-        task_c_tpl = os.path.join(template_dir, "task.c.template")
         for t in task_list:
-            # 自动换行任务描述
             desc = t.get("description", "")
             desc_wrapped = "\n    ".join(textwrap.wrap(desc, 20))
             context_task = {
                 "task_name": t["name"],
                 "task_function": t["function"],
-                "task_frequency": f"{t['name'].upper()}_FREQ",         # 使用宏定义
-                "task_delay": f"{t['name'].upper()}_INIT_DELAY",       # 使用宏定义
-                "task_description": desc_wrapped
+                "task_frequency": f"{t['name'].upper()}_FREQ" if t.get("freq_control", True) else None,
+                "task_delay": f"{t['name'].upper()}_INIT_DELAY",
+                "task_description": desc_wrapped,
+                "freq_control": t.get("freq_control", True)
             }
             # 渲染模板
             with open(task_c_tpl, encoding="utf-8") as f:
@@ -990,7 +1009,6 @@ class DataInterface(BaseInterface):
             if os.path.exists(task_c_path):
                 with open(task_c_path, "r", encoding="utf-8") as f:
                     old_code = f.read()
-                # 只保留USER区域
                 def preserve_user_region(new_code, old_code, region_name):
                     pattern = re.compile(
                         rf"/\*\s*{region_name}\s*BEGIN\s*\*/(.*?)/\*\s*{region_name}\s*END\s*\*/",
@@ -1007,10 +1025,6 @@ class DataInterface(BaseInterface):
                     code = preserve_user_region(code, old_code, region)
             with open(task_c_path, "w", encoding="utf-8") as f:
                 f.write(code)
-        # ----------- 保存任务配置到 config.yaml -----------
-        config_path = os.path.join(output_dir, "config.yaml")
-        with open(config_path, "w", encoding="utf-8") as f:
-            yaml.dump(task_list, f, allow_unicode=True)
 
 # ===================== 串口终端界面 =====================
 class SerialReadThread(QThread):
