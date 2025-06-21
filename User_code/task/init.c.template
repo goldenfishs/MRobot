@@ -24,9 +24,9 @@
  */
 void Task_Init(void *argument) {
   (void)argument; /* 未使用argument，消除警告 */
-    /* USER CODE BEGIN Task_Init */
+    /* USER CODE INIT BEGIN */
 
-    /* USER CODE END Task_Init */
+    /* USER CODE INIT END */
   osKernelLock(); /* 锁定内核，防止任务切换 */
   
   /* 创建任务线程 */

@@ -48,9 +48,15 @@ from qfluentwidgets import (
     SettingCardGroup, ExpandSettingCard, SubtitleLabel, BodyLabel, HorizontalSeparator, FluentIcon, InfoBar
     
 )
+
+import os
+from jinja2 import Template
+import yaml
+import re
+import textwrap
 # 添加quote
 from urllib.parse import quote
-
+import re
 from packaging.version import parse as vparse
 __version__ = "1.0.1"
 
@@ -749,8 +755,6 @@ class DataInterface(BaseInterface):
                 cancel_btn.clicked.connect(self.reject)
 
 
-
-
                 # 自动读取配置文件
                 if config_path and os.path.exists(config_path):
                     try:
@@ -855,26 +859,38 @@ class DataInterface(BaseInterface):
                     parent=self,
                     duration=3000
                 )
-    
+
+    def preserve_user_region(self, new_code, old_code, region_name):
+        """
+        替换 new_code 中 region_name 区域为 old_code 中的内容（如果有）
+        region_name: 如 'USER INCLUDE'
+        """
+        pattern = re.compile(
+            rf"/\*\s*{region_name}\s*BEGIN\s*\*/(.*?)/\*\s*{region_name}\s*END\s*\*/",
+            re.DOTALL
+        )
+        old_match = pattern.search(old_code or "")
+        if not old_match:
+            return new_code  # 旧文件没有该区域，直接返回新代码
+
+        old_content = old_match.group(1)
+        def repl(m):
+            return m.group(0).replace(m.group(1), old_content)
+        # 替换新代码中的该区域
+        return pattern.sub(repl, new_code, count=1)
+
     def generate_task_code(self, task_list):
-        import os
-        from jinja2 import Template
-        import yaml
-        import re
-        import textwrap
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         template_dir = os.path.join(base_dir, "User_code", "task")
         output_dir = os.path.join(self.project_path, "User", "task")
         os.makedirs(output_dir, exist_ok=True)
 
-        # 模板路径
         user_task_h_tpl = os.path.join(template_dir, "user_task.h.template")
         user_task_c_tpl = os.path.join(template_dir, "user_task.c.template")
         init_c_tpl = os.path.join(template_dir, "init.c.template")
         task_c_tpl = os.path.join(template_dir, "task.c.template")
 
-        # 只统计需要频率控制的任务
         freq_tasks = [t for t in task_list if t.get("freq_control", True)]
 
         def render_template(path, context):
@@ -882,7 +898,6 @@ class DataInterface(BaseInterface):
                 tpl = Template(f.read())
             return tpl.render(**context)
 
-        # 构造模板上下文
         context_h = {
             "thread_definitions": "\n".join([f"        osThreadId_t {t['name']};" for t in task_list]),
             "freq_definitions": "\n".join([f"        float {t['name']};" for t in freq_tasks]),
@@ -893,49 +908,27 @@ class DataInterface(BaseInterface):
             "task_attr_declarations": "\n".join([f"extern const osThreadAttr_t attr_{t['name']};" for t in task_list]),
             "task_function_declarations": "\n".join([f"void {t['function']}(void *argument);" for t in task_list]),
         }
-    
-        # ----------- 用户区域保护函数 -----------
-        def preserve_user_region(new_code, old_code, region_name):
-            """
-            替换 new_code 中 region_name 区域为 old_code 中的内容（如果有）
-            region_name: 如 'USER INCLUDE'
-            """
-            pattern = re.compile(
-                rf"/\*\s*{region_name}\s*BEGIN\s*\*/(.*?)/\*\s*{region_name}\s*END\s*\*/",
-                re.DOTALL
-            )
-            old_match = pattern.search(old_code or "")
-            if not old_match:
-                return new_code  # 旧文件没有该区域，直接返回新代码
-    
-            old_content = old_match.group(1)
-            def repl(m):
-                return m.group(0).replace(m.group(1), old_content)
-            # 替换新代码中的该区域
-            return pattern.sub(repl, new_code, count=1)
-    
+
         # ----------- 生成 user_task.h -----------
         user_task_h_path = os.path.join(output_dir, "user_task.h")
         new_user_task_h = render_template(user_task_h_tpl, context_h)
-    
-        # 检查并保留所有用户区域
+
         if os.path.exists(user_task_h_path):
             with open(user_task_h_path, "r", encoding="utf-8") as f:
                 old_code = f.read()
-            # 只保留有内容的用户区域
             for region in ["USER INCLUDE", "USER MESSAGE", "USER CONFIG"]:
-                # 如果旧文件该区域有内容，则保留
                 pattern = re.compile(
                     rf"/\*\s*{region}\s*BEGIN\s*\*/(.*?)/\*\s*{region}\s*END\s*\*/",
                     re.DOTALL
                 )
                 old_match = pattern.search(old_code)
                 if old_match and old_match.group(1).strip():
-                    new_user_task_h = preserve_user_region(new_user_task_h, old_code, region)
-        # 写入
+                    new_user_task_h = self.preserve_user_region(
+                        new_user_task_h, old_code, region
+                    )
         with open(user_task_h_path, "w", encoding="utf-8") as f:
             f.write(new_user_task_h)
-    
+
         # ----------- 生成 user_task.c -----------
         context_c = {
             "task_attr_definitions": "\n".join([
@@ -950,44 +943,27 @@ class DataInterface(BaseInterface):
         user_task_c = render_template(user_task_c_tpl, context_c)
         with open(os.path.join(output_dir, "user_task.c"), "w", encoding="utf-8") as f:
             f.write(user_task_c)
-    
+
         # ----------- 生成 init.c -----------
-        # 线程创建代码
         thread_creation_code = "\n".join([
             f"  task_runtime.thread.{t['name']} = osThreadNew({t['function']}, NULL, &attr_{t['name']});"
             for t in task_list
         ])
-
         context_init = {
             "thread_creation_code": thread_creation_code,
         }
-        # 渲染模板
         init_c = render_template(init_c_tpl, context_init)
-
-        # 保留 USER MESSAGE 区域
-        def preserve_user_region(new_code, old_code, region_name):
-            pattern = re.compile(
-                rf"/\*\s*{region_name}\s*BEGIN\s*\*/(.*?)/\*\s*{region_name}\s*END\s*\*/",
-                re.DOTALL
-            )
-            old_match = pattern.search(old_code or "")
-            if not old_match:
-                return new_code
-            old_content = old_match.group(1)
-            def repl(m):
-                return m.group(0).replace(m.group(1), old_content)
-            return pattern.sub(repl, new_code, count=1)
-
         init_c_path = os.path.join(output_dir, "init.c")
         if os.path.exists(init_c_path):
             with open(init_c_path, "r", encoding="utf-8") as f:
                 old_code = f.read()
-            # 保留 USER MESSAGE 区域
-            init_c = preserve_user_region(init_c, old_code, "USER MESSAGE")
-
+            for region in ["USER INCLUDE", "USER CODE", "USER CODE INIT"]:
+                init_c = self.preserve_user_region(
+                    init_c, old_code, region
+                )
         with open(init_c_path, "w", encoding="utf-8") as f:
             f.write(init_c)
-    
+
         # ----------- 生成 task.c -----------
         for t in task_list:
             desc = t.get("description", "")
@@ -1000,29 +976,17 @@ class DataInterface(BaseInterface):
                 "task_description": desc_wrapped,
                 "freq_control": t.get("freq_control", True)
             }
-            # 渲染模板
             with open(task_c_tpl, encoding="utf-8") as f:
                 tpl = Template(f.read())
             code = tpl.render(**context_task)
-            # 保留USER区域
             task_c_path = os.path.join(output_dir, f"{t['name']}.c")
             if os.path.exists(task_c_path):
                 with open(task_c_path, "r", encoding="utf-8") as f:
                     old_code = f.read()
-                def preserve_user_region(new_code, old_code, region_name):
-                    pattern = re.compile(
-                        rf"/\*\s*{region_name}\s*BEGIN\s*\*/(.*?)/\*\s*{region_name}\s*END\s*\*/",
-                        re.DOTALL
+                for region in ["USER INCLUDE", "USER STRUCT", "USER CODE", "USER CODE INIT"]:
+                    code = self.preserve_user_region(
+                        code, old_code, region
                     )
-                    old_match = pattern.search(old_code or "")
-                    if not old_match:
-                        return new_code
-                    old_content = old_match.group(1)
-                    def repl(m):
-                        return m.group(0).replace(m.group(1), old_content)
-                    return pattern.sub(repl, new_code, count=1)
-                for region in ["USER INCLUDE", "USER STRUCT", "USER CODE", "USER INIT CODE"]:
-                    code = preserve_user_region(code, old_code, region)
             with open(task_c_path, "w", encoding="utf-8") as f:
                 f.write(code)
 
@@ -1030,6 +994,10 @@ class DataInterface(BaseInterface):
         config_yaml_path = os.path.join(output_dir, "config.yaml")
         with open(config_yaml_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(task_list, f, allow_unicode=True)
+
+    # ...existing code...
+
+
 # ===================== 串口终端界面 =====================
 class SerialReadThread(QThread):
     data_received = pyqtSignal(str)
