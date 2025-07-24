@@ -10,9 +10,10 @@ with redirect_stdout(None):
 
 from .home_interface import HomeInterface
 from .serial_terminal_interface import SerialTerminalInterface
-from .function_fit_interface import FunctionFitInterface
 from .part_library_interface import PartLibraryInterface
 from .data_interface import DataInterface
+from .mini_tool_interface import MiniToolInterface
+from .about_interface import AboutInterface
 import base64
 
 
@@ -47,17 +48,20 @@ class MainWindow(FluentWindow):
     def initInterface(self):
         self.homeInterface = HomeInterface(self)
         self.serialTerminalInterface = SerialTerminalInterface(self)
-        self.functionFitInterface = FunctionFitInterface(self)
         self.partLibraryInterface = PartLibraryInterface(self)
         self.dataInterface = DataInterface(self)
+        self.miniToolInterface = MiniToolInterface(self)
 
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, self.tr('主页'))
+        self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
-        self.addSubInterface(self.functionFitInterface, FIF.ROBOT, self.tr('函数拟合'))
         self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
-        self.addSubInterface(self.dataInterface, FIF.DOWNLOAD, self.tr('代码生成'))
+        self.addSubInterface(self.miniToolInterface, FIF.LIBRARY, self.tr('迷你工具箱'))
+        self.addSubInterface(AboutInterface(self), FIF.INFO, self.tr('关于'), position=NavigationItemPosition.BOTTOM)
+
+
         # self.navigationInterface.addWidget(
         #     'startGameButton',
         #     NavigationBarPushButton(FIF.PLAY, '启动游戏', isSelectable=False),
