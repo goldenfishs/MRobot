@@ -1,51 +1,12 @@
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QWidget
-from qfluentwidgets import SubtitleLabel, BodyLabel, HorizontalSeparator, PushButton, TreeWidget, ProgressBar, Dialog, InfoBar, InfoBarPosition, FluentIcon
+from qfluentwidgets import SubtitleLabel, BodyLabel, HorizontalSeparator, PushButton, TreeWidget, ProgressBar, Dialog, InfoBar, InfoBarPosition, FluentIcon, ProgressRing, Dialog
 import requests
 import shutil
 import os
+from .tools.part_download import DownloadThread  # 新增导入
+
 from urllib.parse import quote
-
-class DownloadThread(QThread):
-    progressChanged = pyqtSignal(int)
-    finished = pyqtSignal(list, list)  # success, fail
-
-    def __init__(self, files, server_url, secret_key, local_dir, parent=None):
-        super().__init__(parent)
-        self.files = files
-        self.server_url = server_url
-        self.secret_key = secret_key
-        self.local_dir = local_dir
-
-    def run(self):
-        success, fail = [], []
-        total = len(self.files)
-        max_retry = 3
-        for idx, rel_path in enumerate(self.files):
-            retry = 0
-            while retry < max_retry:
-                try:
-                    rel_path_unix = rel_path.replace("\\", "/")
-                    encoded_path = quote(rel_path_unix)
-                    url = f"{self.server_url}/download/{encoded_path}"
-                    params = {"key": self.secret_key}
-                    resp = requests.get(url, params=params, stream=True, timeout=10)
-                    if resp.status_code == 200:
-                        local_path = os.path.join(self.local_dir, rel_path)
-                        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-                        with open(local_path, "wb") as f:
-                            shutil.copyfileobj(resp.raw, f)
-                        success.append(rel_path)
-                        break
-                    else:
-                        retry += 1
-                except Exception:
-                    retry += 1
-            else:
-                fail.append(rel_path)
-            self.progressChanged.emit(int((idx + 1) / total * 100))
-        self.finished.emit(success, fail)
-
 class PartLibraryInterface(QWidget):
     SERVER_URL = "http://154.37.215.220:5000"
     SECRET_KEY = "MRobot_Download"
@@ -151,41 +112,64 @@ class PartLibraryInterface(QWidget):
     def download_selected_files(self):
         files = self.get_checked_files()
         if not files:
-            InfoBar.info(
-                title="提示",
-                content="请先勾选要下载的文件。",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=2000
+            dialog = Dialog(
+                title="温馨提示",
+                content="请先勾选需要下载的文件。",
+                parent=self
             )
+            dialog.yesButton.setText("知道啦")
+            dialog.cancelButton.hide()
+            dialog.exec()
             return
 
-        self.progress_dialog = Dialog(
-            title="正在下载",
-            content="正在下载选中文件，请稍候...",
-            parent=self
-        )
-        self.progress_bar = ProgressBar()
-        self.progress_bar.setValue(0)
-        self.progress_dialog.textLayout.addWidget(self.progress_bar)
-        self.progress_dialog.show()
+        # 创建进度环
+        self.progress_ring = ProgressRing()
+        self.progress_ring.setRange(0, 100)
+        self.progress_ring.setValue(0)
+        self.progress_ring.setTextVisible(True)
+        self.progress_ring.setFixedSize(32, 32)
+        self.progress_ring.setStrokeWidth(4)
 
+        # 展示消息条（关闭按钮即中断下载）
+        self.info_bar = InfoBar(
+            icon=FluentIcon.DOWNLOAD,
+            title="正在下载",
+            content="正在下载选中文件...",
+            parent=self,
+            position=InfoBarPosition.TOP,
+            duration=-1  # 不自动消失
+        )
+        self.info_bar.addWidget(self.progress_ring)
+        self.info_bar.closeButton.clicked.connect(self.stop_download)  # 关闭即中断下载
+        self.info_bar.show()
+
+        # 启动下载线程
         self.download_thread = DownloadThread(
             files, self.SERVER_URL, self.SECRET_KEY, self.LOCAL_LIB_DIR
         )
-        self.download_thread.progressChanged.connect(self.progress_bar.setValue)
+        self.download_thread.progressChanged.connect(self.progress_ring.setValue)
         self.download_thread.finished.connect(self.on_download_finished)
         self.download_thread.finished.connect(self.download_thread.deleteLater)
         self.download_thread.start()
 
+    def stop_download(self):
+        if hasattr(self, "download_thread") and self.download_thread.isRunning():
+            self.download_thread.terminate()
+            self.download_thread.wait()
+            self.info_bar.close()
+            InfoBar.warning(
+                title="下载已中断",
+                content="已手动中断下载任务。",
+                parent=self,
+                position=InfoBarPosition.TOP,
+                duration=2000
+            )
+            
     def on_download_finished(self, success, fail):
-        self.progress_dialog.close()
-        msg = f"成功下载: {len(success)} 个文件\n失败: {len(fail)} 个文件"
-        dialog = Dialog(
-            title="下载结果",
-            content=msg,
-            parent=self
-        )
+        self.info_bar.close()
+        msg = f"成功下载：{len(success)} 个文件，失败：{len(fail)} 个文件"
+
+        # 创建“打开文件夹”按钮
         open_btn = PushButton("打开文件夹")
         def open_folder():
             folder = os.path.abspath(self.LOCAL_LIB_DIR)
@@ -196,10 +180,18 @@ class PartLibraryInterface(QWidget):
                 subprocess.call(["explorer", folder])
             else:
                 subprocess.call(["xdg-open", folder])
-            dialog.close()
+
+        # 展示成功消息条，自动消失
+        self.result_bar = InfoBar.success(
+            title="下载完成",
+            content=msg,
+            parent=self,
+            position=InfoBarPosition.TOP,
+            duration=4000  # 4秒后自动消失
+        )
+        self.result_bar.addWidget(open_btn)
         open_btn.clicked.connect(open_folder)
-        dialog.textLayout.addWidget(open_btn)
-        dialog.exec()
+        self.result_bar.show()
 
     def open_local_lib(self):
         folder = os.path.abspath(self.LOCAL_LIB_DIR)

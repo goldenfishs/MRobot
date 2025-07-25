@@ -26,20 +26,29 @@ class AboutInterface(QWidget):
         layout.addWidget(card)
 
     def on_check_update_clicked(self):
-        latest = check_update(__version__)
-        if latest:
-            InfoBar.success(
-                title="发现新版本",
-                content=f"检测到新版本：{latest}，请前往官网或仓库下载更新。",
+        try:
+            latest = check_update(__version__)
+            if latest:
+                InfoBar.success(
+                    title="发现新版本",
+                    content=f"检测到新版本：{latest}，请前往官网或仓库下载更新。",
+                    parent=self,
+                    position=InfoBarPosition.TOP,
+                    duration=5000
+                )
+            elif latest is None:
+                InfoBar.info(
+                    title="已是最新版本",
+                    content="当前已是最新版本，无需更新。",
+                    parent=self,
+                    position=InfoBarPosition.TOP,
+                    duration=3000
+                )
+        except Exception:
+            InfoBar.error(
+                title="检查更新失败",
+                content="无法获取最新版本，请检查网络连接。",
                 parent=self,
                 position=InfoBarPosition.TOP,
-                duration=5000
-            )
-        else:
-            InfoBar.info(
-                title="已是最新版本",
-                content="当前已是最新版本，无需更新。",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=3000
+                duration=4000
             )

@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import QApplication
 from app.main_window import MainWindow
 
 
-
 # 启用 DPI 缩放
 QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling) # 启用高 DPI 缩放
