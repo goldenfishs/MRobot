@@ -1,6 +1,15 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
 from PyQt5.QtCore import Qt
 from qfluentwidgets import SubtitleLabel, BodyLabel, HorizontalSeparator, ImageLabel, FluentLabelBase, TitleLabel
+import sys
+import os
+
+def resource_path(relative_path):
+    """获取资源文件的绝对路径，兼容打包和开发环境"""
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller 打包后的临时目录
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 class HomeInterface(QWidget):
     def __init__(self, parent=None):
@@ -19,7 +28,7 @@ class HomeInterface(QWidget):
         content_layout.setContentsMargins(48, 48, 48, 48)
 
         # Logo
-        logo = ImageLabel('img/MRobot.png')
+        logo = ImageLabel(resource_path('assets/logo/MRobot.png'))
         logo.scaledToHeight(80)
         content_layout.addWidget(logo, alignment=Qt.AlignHCenter) # 居中对齐
 

@@ -10,12 +10,13 @@ from urllib.parse import quote
 class PartLibraryInterface(QWidget):
     SERVER_URL = "http://154.37.215.220:5000"
     SECRET_KEY = "MRobot_Download"
-    LOCAL_LIB_DIR = "mech_lib"
+    LOCAL_LIB_DIR = "assets/mech_lib"
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
         self.setObjectName("partLibraryInterface")
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)  # 添加边距
         layout.setSpacing(16)
 
         layout.addWidget(SubtitleLabel("零件库（在线bate版）"))
@@ -164,7 +165,7 @@ class PartLibraryInterface(QWidget):
                 position=InfoBarPosition.TOP,
                 duration=2000
             )
-            
+
     def on_download_finished(self, success, fail):
         self.info_bar.close()
         msg = f"成功下载：{len(success)} 个文件，失败：{len(fail)} 个文件"

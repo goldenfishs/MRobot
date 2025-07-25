@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QTableWidgetItem, QApplication
 from PyQt5.QtCore import Qt
 from qfluentwidgets import TitleLabel, BodyLabel, TableWidget, PushButton, SubtitleLabel, SpinBox, ComboBox, InfoBar,InfoBarPosition, FluentIcon
-import pandas as pd
+from openpyxl import load_workbook, Workbook
+
 import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -131,24 +132,30 @@ class FunctionFitInterface(QWidget):
                 self.dataTable.removeRow(row)
 
     def import_excel(self):
-        path, _ = QFileDialog.getOpenFileName(self, "导入 Excel", "", "Excel Files (*.xlsx *.xls)")
+        path, _ = QFileDialog.getOpenFileName(self, "导入 Excel", "", "Excel Files (*.xlsx)")
         if path:
-            df = pd.read_excel(path)
-            self.dataTable.setRowCount(0)  # 清空原有数据
-            for row_data in df.values.tolist():
+            wb = load_workbook(path)
+            ws = wb.active
+            self.dataTable.setRowCount(0)
+            for row_data in ws.iter_rows(min_row=2, values_only=True):  # 跳过表头
                 row = self.dataTable.rowCount()
                 self.dataTable.insertRow(row)
-                for col, value in enumerate(row_data):
-                    item = QTableWidgetItem(str(value))
+                for col, value in enumerate(row_data[:2]):
+                    item = QTableWidgetItem(str(value) if value is not None else "")
                     self.dataTable.setItem(row, col, item)
+
 
     def export_excel(self):
         path, _ = QFileDialog.getSaveFileName(self, "导出 Excel", "", "Excel Files (*.xlsx)")
         if path:
             data = self.parse_data()
             if data is not None:
-                df = pd.DataFrame(data, columns=["x", "y"])
-                df.to_excel(path, index=False)
+                wb = Workbook()
+                ws = wb.active
+                ws.append(["x", "y"])
+                for row in data:
+                    ws.append(row)
+                wb.save(path)
 
     def parse_data(self):
         data = []
@@ -184,9 +191,9 @@ class FunctionFitInterface(QWidget):
 
         self.figure.clear()
         ax = self.figure.add_subplot(111)
-        ax.scatter(x, y, color='blue', label='原始数据')
-        ax.plot(x_fit, y_fit, color='red', label=f'拟合: {degree}阶')
-        ax.set_title('函数图像')
+        ax.scatter(x, y, color='blue', label='raw data')
+        ax.plot(x_fit, y_fit, color='red', label=f'Fitted curve')
+        ax.set_title('graph of a function')
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         ax.legend()

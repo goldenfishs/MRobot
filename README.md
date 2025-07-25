@@ -123,3 +123,10 @@ pyinstaller --noconfirm --onefile --windowed --add-data "img;img" --add-data "Us
 pyinstaller MRobot.py
 
 pyinstaller --noconfirm --onefile --windowed --icon=img/M.ico --add-data "img;img" --add-data "User_code;User_code" --add-data "mech_lib;mech_lib" MRobot.py
+
+
+pyinstaller --onefile --windowed --icon=assets/logo/M.ico --add-data "assets/logo:assets/logo" --add-data "assets/User_code:assets/User_code" --add-data "assets/mech_lib:assets/mech_lib" --collect-all pandas MRobot.py
+
+pyinstaller --onefile --windowed --icon=assets/logo/M.ico --add-data "assets/logo:assets/logo" --add-data "assets/User_code:assets/User_code" --add-data "assets/mech_lib:assets/mech_lib" MRobot.py
+
+python3 -m pyinstaller MRobot.py --onefile --windowed --add-data "assets:assets" --add-data "app:app" --add-data "app/tools:app/tools"

@@ -106,7 +106,7 @@ class MainWindow(FluentWindow):
 
     # main_window.py 只需修改关闭事件
     def closeEvent(self, e):
-        if self.themeListener and self.themeListener.isRunning():
-            self.themeListener.terminate()
-            self.themeListener.deleteLater()
+        # if self.themeListener and self.themeListener.isRunning():
+        #     self.themeListener.terminate()
+        #     self.themeListener.deleteLater()
         super().closeEvent(e)

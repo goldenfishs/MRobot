@@ -6,8 +6,10 @@ import os
 import requests
 import zipfile
 import io
+import re
 import shutil
 import yaml
+import textwrap
 from jinja2 import Template
 
 class IocConfig:
@@ -253,7 +255,7 @@ class DataInterface(QWidget):
 
     def update_user_template(self):
         url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
-        local_dir = "User_code"
+        local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../assets/User_code")
         try:
             resp = requests.get(url, timeout=30)
             resp.raise_for_status()
@@ -287,7 +289,7 @@ class DataInterface(QWidget):
 
     def show_user_code_files(self):
         self.file_tree.clear()
-        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../User_code")
+        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../assets/User_code")
         user_dir = os.path.join(self.project_path, "User")
         sub_dirs = ["bsp", "component", "device", "module"]
     
@@ -407,7 +409,7 @@ class DataInterface(QWidget):
 
     def generate_code(self):
         import shutil
-        base_dir = "User_code"
+        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../assets/User_code")
         user_dir = os.path.join(self.project_path, "User")
         copied = []
         files = self.get_checked_files()
@@ -690,7 +692,7 @@ class DataInterface(QWidget):
     def generate_task_code(self, task_list):
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        template_dir = os.path.join(base_dir, "User_code", "task")
+        template_dir = os.path.join(base_dir, "../assets/User_code/task")
         output_dir = os.path.join(self.project_path, "User", "task")
         os.makedirs(output_dir, exist_ok=True)
 

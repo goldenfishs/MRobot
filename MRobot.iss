@@ -8,10 +8,11 @@ OutputBaseFilename=MRobotInstaller
 
 [Files]
 Source: "dist\MRobot.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "img\*"; DestDir: "{app}\img"; Flags: ignoreversion recursesubdirs
-Source: "User_code\*"; DestDir: "{app}\User_code"; Flags: ignoreversion recursesubdirs
-Source: "mech_lib\*"; DestDir: "{app}\mech_lib"; Flags: ignoreversion recursesubdirs
+Source: "assets\logo\*"; DestDir: "{app}\assets\logo"; Flags: ignoreversion recursesubdirs
+Source: "assets\User_code\*"; DestDir: "{app}\assets\User_code"; Flags: ignoreversion recursesubdirs
+Source: "assets\mech_lib\*"; DestDir: "{app}\assets\mech_lib"; Flags: ignoreversion recursesubdirs
+Source: "assets\logo\M.ico"; DestDir: "{app}\assets\logo"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\MRobot"; Filename: "{app}\MRobot.exe"; IconFilename: "{app}\img\M.ico"
-Name: "{userdesktop}\MRobot"; Filename: "{app}\MRobot.exe"; IconFilename: "{app}\img\M.ico"
+Name: "{group}\MRobot"; Filename: "{app}\MRobot.exe"; IconFilename: "{app}\assets\logo\M.ico"
+Name: "{userdesktop}\MRobot"; Filename: "{app}\MRobot.exe"; IconFilename: "{app}\assets\logo\M.ico"
