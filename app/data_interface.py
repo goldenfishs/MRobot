@@ -1,11 +1,12 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout, QFileDialog, QHeaderView
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QTreeWidgetItem as TreeItem
-from qfluentwidgets import TitleLabel, BodyLabel, SubtitleLabel, StrongBodyLabel, HorizontalSeparator, PushButton, TreeWidget, InfoBar,FluentIcon, Dialog
+from qfluentwidgets import TitleLabel, BodyLabel, SubtitleLabel, StrongBodyLabel, HorizontalSeparator, PushButton, TreeWidget, InfoBar,FluentIcon, Dialog,SubtitleLabel,BodyLabel
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox
 from qfluentwidgets import CardWidget, LineEdit, SpinBox, CheckBox, TextEdit, PrimaryPushButton, PushButton, InfoBar
 from qfluentwidgets import HeaderCardWidget
 from PyQt5.QtWidgets import QScrollArea, QWidget
+from qfluentwidgets import theme, Theme
 
 import os
 import requests
@@ -686,11 +687,20 @@ class DataInterface(QWidget):
             yaml.safe_dump(task_list, f, allow_unicode=True)
 
 
+
+
 class TaskConfigDialog(QDialog):
     def __init__(self, parent=None, config_path=None):
         super().__init__(parent)
         self.setWindowTitle("任务配置")
         self.resize(900, 520)
+
+        # 设置背景色跟随主题
+        if theme() == Theme.DARK:
+            self.setStyleSheet("background-color: #232323;")
+        else:
+            self.setStyleSheet("background-color: #faf9f8;")
+
 
         # 主布局
         main_layout = QVBoxLayout(self)
@@ -698,18 +708,18 @@ class TaskConfigDialog(QDialog):
         main_layout.setSpacing(12)
 
         # 顶部横向分栏
-        self.top_layout = QHBoxLayout()  # 注意：改为 self.top_layout
+        self.top_layout = QHBoxLayout()
         self.top_layout.setSpacing(16)
 
-        # 左侧：任务列表（按钮）
-        left_widget = QWidget()
-        left_vbox = QVBoxLayout(left_widget)
-        left_vbox.setContentsMargins(0, 0, 0, 0)
-        left_vbox.setSpacing(8)
+        # ----------- 左侧任务按钮区 -----------
+        self.left_widget = QWidget()
+        self.left_layout = QVBoxLayout(self.left_widget)
+        self.left_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_layout.setSpacing(8)
 
         self.add_btn = PrimaryPushButton("添加任务")
         self.add_btn.clicked.connect(self.add_task)
-        left_vbox.addWidget(self.add_btn)
+        self.left_layout.addWidget(self.add_btn)
 
         self.task_btn_area = QScrollArea()
         self.task_btn_area.setWidgetResizable(True)
@@ -720,10 +730,11 @@ class TaskConfigDialog(QDialog):
         self.task_btn_layout.setSpacing(4)
         self.task_btn_layout.addStretch()
         self.task_btn_area.setWidget(self.task_btn_container)
-        left_vbox.addWidget(self.task_btn_area, stretch=1)
+        self.left_layout.addWidget(self.task_btn_area, stretch=1)
 
-        left_widget.setFixedWidth(220)
-        self.top_layout.addWidget(left_widget, stretch=0)
+        self.left_widget.setFixedWidth(180)
+        self.top_layout.addWidget(self.left_widget, stretch=0)
+        # ----------- 左侧任务按钮区 END -----------
 
         main_layout.addLayout(self.top_layout, stretch=1)
 
@@ -753,8 +764,66 @@ class TaskConfigDialog(QDialog):
                 pass
         if not self.tasks:
             self.tasks.append(self._make_task_obj())
+        self.current_index = 0
         self.refresh_task_btns()
-        self.select_task(0)
+        self.show_task_form(self.tasks[0])
+
+    def refresh_task_btns(self):
+        # 清空旧按钮
+        while self.task_btn_layout.count():
+            item = self.task_btn_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        # 重新添加按钮
+        for idx, t in enumerate(self.tasks):
+            btn = PushButton(t["name"])
+            btn.setCheckable(True)
+            btn.setChecked(idx == self.current_index)
+            btn.clicked.connect(lambda checked, i=idx: self.select_task(i))
+            self.task_btn_layout.addWidget(btn)
+            # 删除按钮
+            del_btn = PushButton("删除")
+            del_btn.setFixedWidth(48)
+            del_btn.clicked.connect(lambda _, i=idx: self.delete_task(i))
+            hbox = QHBoxLayout()
+            hbox.addWidget(btn)
+            hbox.addWidget(del_btn)
+            hbox.setContentsMargins(0, 0, 0, 0)
+            hbox.setSpacing(4)
+            container = QWidget()
+            container.setLayout(hbox)
+            self.task_btn_layout.addWidget(container)
+        self.task_btn_layout.addStretch()
+
+    def add_task(self):
+        self.save_form()
+        new_idx = len(self.tasks)
+        self.tasks.append(self._make_task_obj({"name": f"Task{new_idx+1}"}))
+        self.current_index = new_idx
+        self.refresh_task_btns()
+        self.show_task_form(self.tasks[self.current_index])
+
+    def delete_task(self, idx):
+        if len(self.tasks) <= 1:
+            InfoBar.warning(
+                title="至少保留一个任务",
+                content="至少需要保留一个任务！",
+                parent=self,
+                duration=2000
+            )
+            return
+        del self.tasks[idx]
+        if self.current_index >= len(self.tasks):
+            self.current_index = len(self.tasks) - 1
+        self.refresh_task_btns()
+        self.show_task_form(self.tasks[self.current_index])
+
+    def select_task(self, idx):
+        self.save_form()
+        self.current_index = idx
+        self.refresh_task_btns()
+        self.show_task_form(self.tasks[idx])
 
     def show_task_form(self, task):
         # 先移除旧的 form_widget
@@ -773,7 +842,7 @@ class TaskConfigDialog(QDialog):
         self.top_layout.addWidget(self.form_widget, stretch=1)
 
         if not task:
-            label = QLabel("选择左侧任务。")
+            label = BodyLabel("未找到任务。")
             label.setAlignment(Qt.AlignCenter)
             self.form_layout.addWidget(label)
             self.form_layout.addStretch()
@@ -781,7 +850,7 @@ class TaskConfigDialog(QDialog):
 
         # 任务名称
         row1 = QHBoxLayout()
-        label_name = QLabel("任务名称")
+        label_name = BodyLabel("任务名称")
         self.name_edit = LineEdit()
         self.name_edit.setText(task["name"])
         self.name_edit.setPlaceholderText("任务名称")
@@ -791,7 +860,7 @@ class TaskConfigDialog(QDialog):
 
         # 频率
         row2 = QHBoxLayout()
-        label_freq = QLabel("频率")
+        label_freq = BodyLabel("频率")
         self.freq_spin = SpinBox()
         self.freq_spin.setRange(1, 10000)
         self.freq_spin.setSuffix(" Hz")
@@ -802,7 +871,7 @@ class TaskConfigDialog(QDialog):
 
         # 延迟
         row3 = QHBoxLayout()
-        label_delay = QLabel("延迟")
+        label_delay = BodyLabel("延迟")
         self.delay_spin = SpinBox()
         self.delay_spin.setRange(0, 10000)
         self.delay_spin.setSuffix(" ms")
@@ -813,7 +882,7 @@ class TaskConfigDialog(QDialog):
 
         # 堆栈
         row4 = QHBoxLayout()
-        label_stack = QLabel("堆栈")
+        label_stack = BodyLabel("堆栈")
         self.stack_spin = SpinBox()
         self.stack_spin.setRange(128, 8192)
         self.stack_spin.setSingleStep(128)
@@ -830,7 +899,7 @@ class TaskConfigDialog(QDialog):
         self.form_layout.addLayout(row5)
 
         # 描述
-        label_desc = QLabel("任务描述")
+        label_desc = BodyLabel("任务描述")
         self.desc_edit = TextEdit()
         self.desc_edit.setText(task.get("description", ""))
         self.desc_edit.setPlaceholderText("任务描述")
@@ -839,11 +908,9 @@ class TaskConfigDialog(QDialog):
 
         self.form_layout.addStretch()
 
-        
     def _make_task_obj(self, task=None):
-        # 生成一个任务数据结构
         return {
-            "name": task["name"] if task else f"Task{len(self.tasks)+1}",
+            "name": task["name"] if task else f"Task1",
             "frequency": task.get("frequency", 500) if task else 500,
             "delay": task.get("delay", 0) if task else 0,
             "stack": task.get("stack", 256) if task else 256,
@@ -851,66 +918,7 @@ class TaskConfigDialog(QDialog):
             "freq_control": task.get("freq_control", True) if task else True,
         }
 
-    def refresh_task_btns(self):
-        # 清空所有控件和stretch
-        while self.task_btn_layout.count():
-            item = self.task_btn_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            else:
-                # 是 QSpacerItem 也要删除
-                del item
-    
-        # 重新添加任务按钮
-        for idx, t in enumerate(self.tasks):
-            row = QWidget()
-            hbox = QHBoxLayout(row)
-            hbox.setContentsMargins(0, 0, 0, 0)
-            hbox.setSpacing(4)
-            btn = PushButton(t["name"])
-            btn.setCheckable(True)
-            btn.setChecked(idx == self.current_index)
-            btn.clicked.connect(lambda _, i=idx: self.select_task(i))
-            hbox.addWidget(btn, stretch=1)
-            row.setLayout(hbox)
-            self.task_btn_layout.addWidget(row)
-        self.task_btn_layout.addStretch()
-
-    def select_task(self, idx):
-        if idx < 0 or idx >= len(self.tasks):
-            # 没有可选任务时，右侧显示提示
-            self.show_task_form(None)
-            return
-        # 保存当前表单内容
-        self.save_form()
-        self.current_index = idx
-        self.refresh_task_btns()
-        self.show_task_form(self.tasks[idx])
-
-    def add_task(self):
-        self.save_form()
-        self.tasks.append(self._make_task_obj())
-        self.refresh_task_btns()
-        self.select_task(len(self.tasks) - 1)
-
-    def delete_task(self, idx):
-        if len(self.tasks) <= 1:
-            return  # 至少保留一个
-        if idx == self.current_index:
-            # 删除当前，切换到前一个
-            self.tasks.pop(idx)
-            self.current_index = max(0, idx - 1)
-        else:
-            self.tasks.pop(idx)
-            if self.current_index > idx:
-                self.current_index -= 1
-        self.refresh_task_btns()
-        self.select_task(self.current_index)
-
-
     def save_form(self):
-        # 保存当前表单内容到 self.tasks[self.current_index]
         if self.current_index < 0 or self.current_index >= len(self.tasks):
             return
         t = self.tasks[self.current_index]
@@ -931,7 +939,6 @@ class TaskConfigDialog(QDialog):
             stack = t["stack"]
             desc = t["description"].strip()
             freq_ctrl = t["freq_control"]
-            # 校验 stack 必须为 128*2^n
             if stack < 128 or (stack & (stack - 1)) != 0 or stack % 128 != 0:
                 raise ValueError(f"第{idx+1}个任务“{name}”的堆栈大小必须为128、256、512、1024等（128*2^n）")
             task = {
