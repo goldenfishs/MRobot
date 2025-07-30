@@ -3,10 +3,11 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QTreeWidgetItem as TreeItem
 from qfluentwidgets import TitleLabel, BodyLabel, SubtitleLabel, StrongBodyLabel, HorizontalSeparator, PushButton, TreeWidget, InfoBar,FluentIcon, Dialog,SubtitleLabel,BodyLabel
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QSpinBox, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox
-from qfluentwidgets import CardWidget, LineEdit, SpinBox, CheckBox, TextEdit, PrimaryPushButton, PushButton, InfoBar
+from qfluentwidgets import CardWidget, LineEdit, SpinBox, CheckBox, TextEdit, PrimaryPushButton, PushButton, InfoBar, DoubleSpinBox
 from qfluentwidgets import HeaderCardWidget
 from PyQt5.QtWidgets import QScrollArea, QWidget
 from qfluentwidgets import theme, Theme
+from PyQt5.QtWidgets import QDoubleSpinBox
 
 import os
 import requests
@@ -687,8 +688,6 @@ class DataInterface(QWidget):
             yaml.safe_dump(task_list, f, allow_unicode=True)
 
 
-
-
 class TaskConfigDialog(QDialog):
     def __init__(self, parent=None, config_path=None):
         super().__init__(parent)
@@ -699,8 +698,7 @@ class TaskConfigDialog(QDialog):
         if theme() == Theme.DARK:
             self.setStyleSheet("background-color: #232323;")
         else:
-            self.setStyleSheet("background-color: #faf9f8;")
-
+            self.setStyleSheet("background-color: #f7f9fc;")
 
         # 主布局
         main_layout = QVBoxLayout(self)
@@ -716,11 +714,16 @@ class TaskConfigDialog(QDialog):
         self.left_layout = QVBoxLayout(self.left_widget)
         self.left_layout.setContentsMargins(0, 0, 0, 0)
         self.left_layout.setSpacing(8)
+        self.task_list_label = BodyLabel("任务列表")
+        # self.left_layout.addWidget(self.task_list_label)
+        # 添加任务列表居中
+        self.task_list_label.setAlignment(Qt.AlignCenter)
+        self.left_layout.addWidget(self.task_list_label, alignment=Qt.AlignCenter)
 
-        self.add_btn = PrimaryPushButton("添加任务")
-        self.add_btn.clicked.connect(self.add_task)
-        self.left_layout.addWidget(self.add_btn)
+        # 添加一个水平分割线
+        self.left_layout.addWidget(HorizontalSeparator())
 
+        # 任务按钮区
         self.task_btn_area = QScrollArea()
         self.task_btn_area.setWidgetResizable(True)
         self.task_btn_area.setFrameShape(QScrollArea.NoFrame)
@@ -740,9 +743,27 @@ class TaskConfigDialog(QDialog):
 
         # 下方按钮区
         btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        self.ok_btn = PrimaryPushButton("生成")
+
+        # 左下角：添加/删除任务
+        self.add_btn = PrimaryPushButton("创建新任务")
+        self.add_btn.setAutoDefault(False)  # 禁止回车触发
+        self.add_btn.setDefault(False)
+        self.del_btn = PushButton("删除当前任务")
+        self.del_btn.setAutoDefault(False)  # 禁止回车触发
+        self.del_btn.setDefault(False)
+        self.add_btn.clicked.connect(self.add_task)
+        self.del_btn.clicked.connect(self.delete_current_task)
+        btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.del_btn)
+        btn_layout.addStretch()  # 添加/删除靠左，stretch在中间
+
+        # 右下角：生成/取消
+        self.ok_btn = PrimaryPushButton("生成任务")
+        self.ok_btn.setAutoDefault(False)  # 允许回车触发
+        self.ok_btn.setDefault(False)  # 设置为默认按钮
         self.cancel_btn = PushButton("取消")
+        self.cancel_btn.setAutoDefault(False)  # 禁止回车触发
+        self.cancel_btn.setDefault(False)
         btn_layout.addWidget(self.ok_btn)
         btn_layout.addWidget(self.cancel_btn)
         main_layout.addLayout(btn_layout)
@@ -762,11 +783,13 @@ class TaskConfigDialog(QDialog):
                         self.tasks.append(self._make_task_obj(t))
             except Exception:
                 pass
-        if not self.tasks:
-            self.tasks.append(self._make_task_obj())
-        self.current_index = 0
+        # 允许没有任何任务
+        self.current_index = 0 if self.tasks else -1
         self.refresh_task_btns()
-        self.show_task_form(self.tasks[0])
+        if self.tasks:
+            self.show_task_form(self.tasks[self.current_index])
+        else:
+            self.show_task_form(None)
 
     def refresh_task_btns(self):
         # 清空旧按钮
@@ -782,18 +805,6 @@ class TaskConfigDialog(QDialog):
             btn.setChecked(idx == self.current_index)
             btn.clicked.connect(lambda checked, i=idx: self.select_task(i))
             self.task_btn_layout.addWidget(btn)
-            # 删除按钮
-            del_btn = PushButton("删除")
-            del_btn.setFixedWidth(48)
-            del_btn.clicked.connect(lambda _, i=idx: self.delete_task(i))
-            hbox = QHBoxLayout()
-            hbox.addWidget(btn)
-            hbox.addWidget(del_btn)
-            hbox.setContentsMargins(0, 0, 0, 0)
-            hbox.setSpacing(4)
-            container = QWidget()
-            container.setLayout(hbox)
-            self.task_btn_layout.addWidget(container)
         self.task_btn_layout.addStretch()
 
     def add_task(self):
@@ -804,16 +815,15 @@ class TaskConfigDialog(QDialog):
         self.refresh_task_btns()
         self.show_task_form(self.tasks[self.current_index])
 
-    def delete_task(self, idx):
-        if len(self.tasks) <= 1:
-            InfoBar.warning(
-                title="至少保留一个任务",
-                content="至少需要保留一个任务！",
-                parent=self,
-                duration=2000
-            )
+    def delete_current_task(self):
+        if self.current_index < 0 or not self.tasks:
             return
-        del self.tasks[idx]
+        del self.tasks[self.current_index]
+        if not self.tasks:
+            self.current_index = -1
+            self.refresh_task_btns()
+            self.show_task_form(None)
+            return
         if self.current_index >= len(self.tasks):
             self.current_index = len(self.tasks) - 1
         self.refresh_task_btns()
@@ -842,8 +852,9 @@ class TaskConfigDialog(QDialog):
         self.top_layout.addWidget(self.form_widget, stretch=1)
 
         if not task:
-            label = BodyLabel("未找到任务。")
+            label = TitleLabel("暂无任务，请点击下方“添加任务”。")
             label.setAlignment(Qt.AlignCenter)
+            self.form_layout.addStretch()
             self.form_layout.addWidget(label)
             self.form_layout.addStretch()
             return
@@ -854,24 +865,28 @@ class TaskConfigDialog(QDialog):
         self.name_edit = LineEdit()
         self.name_edit.setText(task["name"])
         self.name_edit.setPlaceholderText("任务名称")
+        # 新增：名称编辑完成后刷新按钮
+        self.name_edit.editingFinished.connect(self.on_name_edit_finished)
         row1.addWidget(label_name)
         row1.addWidget(self.name_edit)
         self.form_layout.addLayout(row1)
 
         # 频率
         row2 = QHBoxLayout()
-        label_freq = BodyLabel("频率")
-        self.freq_spin = SpinBox()
-        self.freq_spin.setRange(1, 10000)
+        label_freq = BodyLabel("任务运行频率")
+        self.freq_spin = DoubleSpinBox()
+        self.freq_spin.setRange(0, 10000)
+        self.freq_spin.setDecimals(3)
+        self.freq_spin.setSingleStep(1)
         self.freq_spin.setSuffix(" Hz")
-        self.freq_spin.setValue(task.get("frequency", 500))
+        self.freq_spin.setValue(float(task.get("frequency", 500)))
         row2.addWidget(label_freq)
         row2.addWidget(self.freq_spin)
         self.form_layout.addLayout(row2)
 
         # 延迟
         row3 = QHBoxLayout()
-        label_delay = BodyLabel("延迟")
+        label_delay = BodyLabel("初始化延时")
         self.delay_spin = SpinBox()
         self.delay_spin.setRange(0, 10000)
         self.delay_spin.setSuffix(" ms")
@@ -882,10 +897,11 @@ class TaskConfigDialog(QDialog):
 
         # 堆栈
         row4 = QHBoxLayout()
-        label_stack = BodyLabel("堆栈")
+        label_stack = BodyLabel("堆栈大小")
         self.stack_spin = SpinBox()
         self.stack_spin.setRange(128, 8192)
         self.stack_spin.setSingleStep(128)
+        self.stack_spin.setSuffix(" Byte")  # 添加单位
         self.stack_spin.setValue(task.get("stack", 256))
         row4.addWidget(label_stack)
         row4.addWidget(self.stack_spin)
@@ -893,7 +909,7 @@ class TaskConfigDialog(QDialog):
 
         # 频率控制
         row5 = QHBoxLayout()
-        self.freq_ctrl = CheckBox("启用频率控制")
+        self.freq_ctrl = CheckBox("启用默认频率控制")
         self.freq_ctrl.setChecked(task.get("freq_control", True))
         row5.addWidget(self.freq_ctrl)
         self.form_layout.addLayout(row5)
@@ -907,6 +923,12 @@ class TaskConfigDialog(QDialog):
         self.form_layout.addWidget(self.desc_edit)
 
         self.form_layout.addStretch()
+
+    def on_name_edit_finished(self):
+        # 保存当前表单内容
+        self.save_form()
+        # 刷新左侧按钮名称
+        self.refresh_task_btns()
 
     def _make_task_obj(self, task=None):
         return {
@@ -923,11 +945,12 @@ class TaskConfigDialog(QDialog):
             return
         t = self.tasks[self.current_index]
         t["name"] = self.name_edit.text().strip()
-        t["frequency"] = self.freq_spin.value()
+        t["frequency"] = float(self.freq_spin.value())  # 支持小数
         t["delay"] = self.delay_spin.value()
         t["stack"] = self.stack_spin.value()
         t["description"] = self.desc_edit.toPlainText().strip()
         t["freq_control"] = self.freq_ctrl.isChecked()
+
 
     def get_tasks(self):
         self.save_form()
