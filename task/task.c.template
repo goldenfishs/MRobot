@@ -5,17 +5,17 @@
 
 /* Includes ----------------------------------------------------------------- */
 #include "task/user_task.h"
-/* USER INCLUDE BEGIN*/
+/* USER INCLUDE BEGIN */
 
-/* USER INCLUDE END*/
+/* USER INCLUDE END */
 
 /* Private typedef ---------------------------------------------------------- */
 /* Private define ----------------------------------------------------------- */
 /* Private macro ------------------------------------------------------------ */
 /* Private variables -------------------------------------------------------- */
-/* USER STRUCT BEGIN*/
+/* USER STRUCT BEGIN */
 
-/* USER STRUCT END*/
+/* USER STRUCT END */
 
 /* Private function --------------------------------------------------------- */
 /* Exported functions ------------------------------------------------------- */
@@ -28,11 +28,11 @@ void {{task_function}}(void *argument) {
 
   osDelay({{task_delay}}); /* 延时一段时间再开启任务 */
 
-  /* USER CODE INIT BEGIN*/
-
-  /* USER CODE INIT END*/
-
   uint32_t tick = osKernelGetTickCount(); /* 控制任务运行频率的计时 */
+  /* USER CODE INIT BEGIN */
+
+  /* USER CODE INIT END */
+  
   while (1) {
     tick += delay_tick; /* 计算下一个唤醒时刻 */
     /* USER CODE BEGIN */
@@ -43,9 +43,9 @@ void {{task_function}}(void *argument) {
   {% else %}
   osDelay({{task_delay}}); /* 延时一段时间再开启任务 */
 
-  /* USER CODE INIT BEGIN*/
+  /* USER CODE INIT BEGIN */
 
-  /* USER CODE INIT END*/
+  /* USER CODE INIT END */
 
   while (1) {
     /* USER CODE BEGIN */
