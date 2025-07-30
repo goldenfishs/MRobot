@@ -1,24 +1,34 @@
-#pragma once
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Includes ----------------------------------------------------------------- */
-#include <stdint.h>
+#include "bsp\delay.h"
 
-#include "bsp/bsp.h"
+#include <cmsis_os2.h>
+#include <main.h>
 
-/* Exported constants ------------------------------------------------------- */
-/* Exported macro ----------------------------------------------------------- */
-/* Exported types ----------------------------------------------------------- */
-/* Exported functions prototypes -------------------------------------------- */
-int8_t BSP_Delay(uint32_t ms);
+/* Private define ----------------------------------------------------------- */
+/* Private macro ------------------------------------------------------------ */
+/* Private typedef ---------------------------------------------------------- */
+/* Private variables -------------------------------------------------------- */
+/* Private function  -------------------------------------------------------- */
+/* Exported functions ------------------------------------------------------- */
+int8_t BSP_Delay(uint32_t ms) {
+  uint32_t tick_period = 1000u / osKernelGetTickFreq();
+  uint32_t ticks = ms / tick_period;
 
-int8_t BSP_Delay_Init(void);
-int8_t BSP_Delay_us(uint32_t us);
-int8_t BSP_Delay_ms(uint32_t ms);
+  switch (osKernelGetState()) {
+    case osKernelError:
+    case osKernelReserved:
+    case osKernelLocked:
+    case osKernelSuspended:
+      return BSP_ERR;
 
-#ifdef __cplusplus
+    case osKernelRunning:
+      osDelay(ticks ? ticks : 1);
+      break;
+
+    case osKernelInactive:
+    case osKernelReady:
+      HAL_Delay(ms);
+      break;
+  }
+  return BSP_OK;
 }
-#endif
