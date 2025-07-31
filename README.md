@@ -130,3 +130,9 @@ pyinstaller --onefile --windowed --icon=assets/logo/M.ico --add-data "assets/log
 pyinstaller --onefile --windowed --icon=assets/logo/M.ico --add-data "assets/logo:assets/logo" --add-data "assets/User_code:assets/User_code" --add-data "assets/mech_lib:assets/mech_lib" MRobot.py
 
 python3 -m pyinstaller MRobot.py --onefile --windowed --add-data "assets:assets" --add-data "app:app" --add-data "app/tools:app/tools"
+
+python -m pyinstaller MRobot.py --onefile --windowed --add-data "assets;assets" --add-data "app;app" --add-data "app/tools;app/tools"
+
+/Users/lvzucheng/Library/Python/3.9/bin/pyinstaller MRobot.py --onefile --windowed --add-data "assets:assets" --add-data "app:app" --add-data "app/tools:app/tools"
+
+pyinstaller MRobot.py --onefile --windowed --add-data "assets;assets" --add-data "app;app" --add-data "app/tools;app/tools"
