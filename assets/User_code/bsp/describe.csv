@@ -1,3 +1,5 @@
 uart,要求开启dma和中断
 can,要求开启can的中断
-delay,暂时只有delay_ms函数
+gpio,要求设置label开启中断
+spi,要求开启spi中断
+i2c,要求开始spi中断

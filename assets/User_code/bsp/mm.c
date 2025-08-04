@@ -1,8 +1,7 @@
 /* Includes ----------------------------------------------------------------- */
-#include "bsp/delay.h"
+#include "bsp\mm.h"
 
-#include <cmsis_os2.h>
-#include <main.h>
+#include "FreeRTOS.h"
 
 /* Private define ----------------------------------------------------------- */
 /* Private macro ------------------------------------------------------------ */
@@ -10,25 +9,6 @@
 /* Private variables -------------------------------------------------------- */
 /* Private function  -------------------------------------------------------- */
 /* Exported functions ------------------------------------------------------- */
-int8_t BSP_Delay(uint32_t ms) {
-  uint32_t tick_period = 1000u / osKernelGetTickFreq();
-  uint32_t ticks = ms / tick_period;
+inline void *BSP_Malloc(size_t size) { return pvPortMalloc(size); }
 
-  switch (osKernelGetState()) {
-    case osKernelError:
-    case osKernelReserved:
-    case osKernelLocked:
-    case osKernelSuspended:
-      return BSP_ERR;
-
-    case osKernelRunning:
-      osDelay(ticks ? ticks : 1);
-      break;
-
-    case osKernelInactive:
-    case osKernelReady:
-      HAL_Delay(ms);
-      break;
-  }
-  return BSP_OK;
-}
+inline void BSP_Free(void *pv) { vPortFree(pv); }

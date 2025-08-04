@@ -9,10 +9,7 @@ static void (*CAN_Callback[BSP_CAN_NUM][BSP_CAN_CB_NUM])(void);
 
 /* Private function  -------------------------------------------------------- */
 static BSP_CAN_t CAN_Get(CAN_HandleTypeDef *hcan) {
-  if (hcan->Instance == CAN2)
-    return BSP_CAN_2;
-  else if (hcan->Instance == CAN1)
-    return BSP_CAN_1;
+/* AUTO GENERATED CAN_GET */
   else
     return BSP_CAN_ERR;
 }
@@ -124,10 +121,7 @@ void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan) {
 /* Exported functions ------------------------------------------------------- */
 CAN_HandleTypeDef *BSP_CAN_GetHandle(BSP_CAN_t can) {
   switch (can) {
-    case BSP_CAN_2:
-      return &hcan2;
-    case BSP_CAN_1:
-      return &hcan1;
+/* AUTO GENERATED BSP_CAN_GET_HANDLE */
     default:
       return NULL;
   }

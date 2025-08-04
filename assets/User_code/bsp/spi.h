@@ -17,8 +17,7 @@ extern "C" {
 
 /* SPI实体枚举，与设备对应 */
 typedef enum {
-  BSP_SPI_EXAMPLE,
-  /* BSP_SPI_XXX,*/
+/* AUTO GENERATED BSP_SPI_NAME */
   BSP_SPI_NUM,
   BSP_SPI_ERR,
 } BSP_SPI_t;
