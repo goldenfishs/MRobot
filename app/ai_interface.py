@@ -15,7 +15,7 @@ class AIWorker(QThread):
         self.prompt = prompt
 
     def run(self):
-        url = "http://154.37.215.220:11434/api/generate"
+        url = "http://qutrobot.top:11434/api/generate"
         payload = {
             "model": "qwen3:0.6b",
             "prompt": self.prompt

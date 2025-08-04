@@ -8,7 +8,7 @@ from .tools.part_download import DownloadThread  # 新增导入
 
 from urllib.parse import quote
 class PartLibraryInterface(QWidget):
-    SERVER_URL = "http://154.37.215.220:5000"
+    SERVER_URL = "http://qutrobot.top:5000"
     SECRET_KEY = "MRobot_Download"
     LOCAL_LIB_DIR = "assets/mech_lib"
 

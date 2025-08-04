@@ -5,6 +5,8 @@ from qfluentwidgets import TitleLabel, BodyLabel, PushButton, FluentIcon
 
 from .function_fit_interface import FunctionFitInterface
 from .ai_interface import AIInterface
+from qfluentwidgets import InfoBar
+from .tools.update_code import update_code
 
 class CodeConfigurationInterface(QWidget):
     def __init__(self, parent=None):
@@ -64,8 +66,24 @@ class CodeConfigurationInterface(QWidget):
         self.tabBar.tabCloseRequested.connect(self.onCloseTab)
         # 你可以在此处连接按钮的槽函数
         # self.choose_btn.clicked.connect(self.choose_project_folder)
-        # self.update_template_btn.clicked.connect(self.update_user_template)
+        self.update_template_btn.clicked.connect(self.on_update_template)
 
+    def on_update_template(self):
+        def info(parent):
+            InfoBar.success(
+                title="更新成功",
+                content="用户模板已更新到最新版本！",
+                parent=parent,
+                duration=2000
+            )
+        def error(parent, msg):
+            InfoBar.error(
+                title="更新失败",
+                content=f"用户模板更新失败: {msg}",
+                parent=parent,
+                duration=3000
+            )
+        update_code(parent=self, info_callback=info, error_callback=error)
 
     def addSubInterface(self, widget: QWidget, objectName: str, text: str):
         widget.setObjectName(objectName)
