@@ -65,17 +65,6 @@ class MainWindow(FluentWindow):
         self.addSubInterface(AboutInterface(self), FIF.INFO, self.tr('关于'), position=NavigationItemPosition.BOTTOM)
 
 
-        # self.navigationInterface.addWidget(
-        #     'startGameButton',
-        #     NavigationBarPushButton(FIF.PLAY, '启动游戏', isSelectable=False),
-        #     self.startGame,
-        #     NavigationItemPosition.BOTTOM)
-
-        # self.navigationInterface.addWidget(
-        #     'themeButton',
-        #     NavigationBarPushButton(FIF.BRUSH, '主题', isSelectable=False),
-        #     lambda: toggleTheme(lazy=True),
-        #     NavigationItemPosition.BOTTOM)
 
         self.themeBtn = NavigationPushButton(FIF.BRUSH, "切换主题", False, self.navigationInterface)
         self.themeBtn.clicked.connect(lambda: toggleTheme(lazy=True))
@@ -85,27 +74,6 @@ class MainWindow(FluentWindow):
             None,
             NavigationItemPosition.BOTTOM
         )
-
-        # self.navigationInterface.addWidget(
-        #     'avatar',
-        #     NavigationBarPushButton(FIF.HEART, '赞赏', isSelectable=False),
-        #     lambda: MessageBoxSupport(
-        #         '支持作者🥰',
-        #         '此程序为免费开源项目，如果你付了钱请立刻退款\n如果喜欢本项目，可以微信赞赏送作者一杯咖啡☕\n您的支持就是作者开发和维护项目的动力🚀',
-        #         './assets/app/images/sponsor.jpg',
-        #         self
-        #     ).exec(),
-        #     NavigationItemPosition.BOTTOM
-        # )
-
-        # self.addSubInterface(self.settingInterface, FIF.SETTING, self.tr('设置'), position=NavigationItemPosition.BOTTOM)
-
-        # self.splashScreen.finish() # 结束启动画面
-        # self.themeListener = checkThemeChange(self)
-
-        # if not cfg.get_value(base64.b64decode("YXV0b191cGRhdGU=").decode("utf-8")):
-        #     disclaimer(self)
-
 
     # main_window.py 只需修改关闭事件
     def closeEvent(self, e):

@@ -73,6 +73,9 @@ class MiniToolInterface(QWidget):
     def onCloseTab(self, index: int):
         item = self.tabBar.tabItem(index)
         widget = self.findChild(QWidget, item.routeKey())
+        # 禁止关闭主页
+        if widget.objectName() == "mainPage":
+            return
         self.stackedWidget.removeWidget(widget)
         self.tabBar.removeTab(index)
         widget.deleteLater()

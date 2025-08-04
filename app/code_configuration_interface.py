@@ -2,11 +2,13 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QSizePolicy
 from PyQt5.QtCore import Qt
 from qfluentwidgets import PushSettingCard, FluentIcon, TabBar
 from qfluentwidgets import TitleLabel, BodyLabel, PushButton, FluentIcon
-
+from PyQt5.QtWidgets import QFileDialog
+import os
 from .function_fit_interface import FunctionFitInterface
 from .ai_interface import AIInterface
 from qfluentwidgets import InfoBar
 from .tools.update_code import update_code
+from .code_generate_interface import CodeGenerateInterface
 
 class CodeConfigurationInterface(QWidget):
     def __init__(self, parent=None):
@@ -28,9 +30,10 @@ class CodeConfigurationInterface(QWidget):
         self.mainPage = QWidget(self)
         mainLayout = QVBoxLayout(self.mainPage)
         mainLayout.setAlignment(Qt.AlignTop)
-        mainLayout.setSpacing(28)
-        mainLayout.setContentsMargins(48, 48, 48, 48)
+        mainLayout.setSpacing(28) # 设置间距
+        mainLayout.setContentsMargins(48, 48, 48, 48) # 设置内容边距
 
+        #添加空行
         title = TitleLabel("MRobot 代码生成")
         title.setAlignment(Qt.AlignCenter)
         mainLayout.addWidget(title)
@@ -64,9 +67,9 @@ class CodeConfigurationInterface(QWidget):
         # 信号连接
         self.stackedWidget.currentChanged.connect(self.onCurrentIndexChanged)
         self.tabBar.tabCloseRequested.connect(self.onCloseTab)
-        # 你可以在此处连接按钮的槽函数
-        # self.choose_btn.clicked.connect(self.choose_project_folder)
+        self.choose_btn.clicked.connect(self.choose_project_folder)  # 启用选择项目路径按钮
         self.update_template_btn.clicked.connect(self.on_update_template)
+
 
     def on_update_template(self):
         def info(parent):
@@ -84,6 +87,38 @@ class CodeConfigurationInterface(QWidget):
                 duration=3000
             )
         update_code(parent=self, info_callback=info, error_callback=error)
+
+    def choose_project_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "选择CUBEMX工程目录")
+        if not folder:
+            return
+        ioc_files = [f for f in os.listdir(folder) if f.endswith('.ioc')]
+        if ioc_files:
+            # 检查是否已存在 codeGenPage 标签页
+            for i in range(self.stackedWidget.count()):
+                widget = self.stackedWidget.widget(i)
+                if widget is not None and widget.objectName() == "codeGenPage":
+                    # 如果已存在，则切换到该标签页，并更新路径显示
+                    if hasattr(widget, "project_path"):
+                        widget.project_path = folder
+                        if hasattr(widget, "refresh"):
+                            widget.refresh()
+                    self.stackedWidget.setCurrentWidget(widget)
+                    self.tabBar.setCurrentTab("codeGenPage")
+                    return
+            # 不存在则新建
+            code_gen_page = CodeGenerateInterface(folder, self)
+            self.addSubInterface(code_gen_page, "codeGenPage", "代码生成")
+            self.stackedWidget.setCurrentWidget(code_gen_page)
+            self.tabBar.setCurrentTab("codeGenPage")
+        else:
+            InfoBar.error(
+                title="未找到.ioc文件",
+                content="所选文件夹不是有效的CUBEMX工程目录，请重新选择。",
+                parent=self,
+                duration=3000
+            )
+
 
     def addSubInterface(self, widget: QWidget, objectName: str, text: str):
         widget.setObjectName(objectName)
@@ -104,6 +139,9 @@ class CodeConfigurationInterface(QWidget):
     def onCloseTab(self, index: int):
         item = self.tabBar.tabItem(index)
         widget = self.findChild(QWidget, item.routeKey())
+        # 禁止关闭主页
+        if widget.objectName() == "mainPage":
+            return
         self.stackedWidget.removeWidget(widget)
         self.tabBar.removeTab(index)
         widget.deleteLater()
