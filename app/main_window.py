@@ -13,6 +13,7 @@ from .serial_terminal_interface import SerialTerminalInterface
 from .part_library_interface import PartLibraryInterface
 from .data_interface import DataInterface
 from .mini_tool_interface import MiniToolInterface
+from .code_configuration_interface import CodeConfigurationInterface
 from .about_interface import AboutInterface
 import base64
 
@@ -51,11 +52,13 @@ class MainWindow(FluentWindow):
         self.partLibraryInterface = PartLibraryInterface(self)
         self.dataInterface = DataInterface(self)
         self.miniToolInterface = MiniToolInterface(self)
+        self.codeConfigurationInterface = CodeConfigurationInterface(self)
 
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, self.tr('主页'))
         self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
+        self.addSubInterface(self.codeConfigurationInterface, FIF.SETTING, self.tr('代码配置'))
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
         self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
         self.addSubInterface(self.miniToolInterface, FIF.LIBRARY, self.tr('迷你工具箱'))
