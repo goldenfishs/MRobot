@@ -1,9 +1,43 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QCheckBox, QComboBox, QTableWidget, QHeaderView, QMessageBox
-from qfluentwidgets import TitleLabel, BodyLabel, PushButton
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QCheckBox, QComboBox, QTableWidget, QHeaderView, QMessageBox, QHBoxLayout
+from qfluentwidgets import TitleLabel, BodyLabel, PushButton, CheckBox, TableWidget, LineEdit, ComboBox,MessageBox,SubtitleLabel,FluentIcon
+from qfluentwidgets import InfoBar
+from PyQt5.QtCore import Qt
 from app.tools.analyzing_ioc import analyzing_ioc
 from app.tools.code_generator import CodeGenerator
 import os
 import csv
+import shutil
+
+def preserve_all_user_regions(new_code, old_code):
+    """ Preserves all user-defined regions in the new code based on the old code.
+    This function uses regex to find user-defined regions in the old code and replaces them in the new code.
+    Args:
+        new_code (str): The new code content.
+        old_code (str): The old code content.
+    Returns:
+        str: The new code with preserved user-defined regions.  
+    """
+    import re
+    pattern = re.compile(
+        r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
+        re.DOTALL
+    )
+    old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code or "")}
+    def repl(m):
+        region = m.group(1)
+        old_content = old_regions.get(region)
+        if old_content is not None:
+            return m.group(0).replace(m.group(2), old_content)
+        return m.group(0)
+    return pattern.sub(repl, new_code)
+
+def save_with_preserve(path, new_code):
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            old_code = f.read()
+        new_code = preserve_all_user_regions(new_code, old_code)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(new_code)
 
 class BspSimplePeripheral(QWidget):
     def __init__(self, project_path, peripheral_name, template_names):
@@ -19,13 +53,32 @@ class BspSimplePeripheral(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.addWidget(TitleLabel(f"{self.peripheral_name} 配置"))
+
+        # 顶部横向布局：左侧复选框，居中标题
+        top_layout = QHBoxLayout()
+        top_layout.setAlignment(Qt.AlignVCenter)
+
+        self.generate_checkbox = CheckBox(f"启用 {self.peripheral_name}")
+        top_layout.addWidget(self.generate_checkbox, alignment=Qt.AlignLeft)
+
+        # 弹性空间
+        top_layout.addStretch()
+
+        title = SubtitleLabel(f"{self.peripheral_name} 配置             ")
+        title.setAlignment(Qt.AlignHCenter)
+        top_layout.addWidget(title, alignment=Qt.AlignHCenter)
+
+        # 再加一个弹性空间，保证标题居中
+        top_layout.addStretch()
+
+        layout.addLayout(top_layout)
+
         desc = self.descriptions.get(self.peripheral_name.lower(), "")
         if desc:
-            layout.addWidget(BodyLabel(f"功能说明：{desc}"))
-        self.generate_checkbox = QCheckBox(f"启用 {self.peripheral_name}")
-        layout.addWidget(self.generate_checkbox)
-
+            desc_label = BodyLabel(f"功能说明：{desc}")
+            desc_label.setWordWrap(True)
+            layout.addWidget(desc_label)
+        layout.addStretch()
     def is_need_generate(self):
         return self.generate_checkbox.isChecked()
 
@@ -33,17 +86,16 @@ class BspSimplePeripheral(QWidget):
         if not self.is_need_generate():
             return False
         template_dir = CodeGenerator.get_template_dir()
-        # 直接拷贝模板，无需特殊处理
         for key, filename in self.template_names.items():
             template_path = os.path.join(template_dir, filename)
             template_content = CodeGenerator.load_template(template_path)
             if not template_content:
                 return False
             output_path = os.path.join(self.project_path, f"User/bsp/{filename}")
-            if not CodeGenerator.save_file(template_content, output_path):
-                return False
+            save_with_preserve(output_path, template_content)  # 使用保留用户区域的写入
         self._save_config()
         return True
+
 
     def _save_config(self):
         config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
@@ -57,7 +109,6 @@ class BspSimplePeripheral(QWidget):
         conf = config_data.get(self.peripheral_name.lower(), {})
         if conf.get('enabled', False):
             self.generate_checkbox.setChecked(True)
-
 
 class BspPeripheralBase(QWidget):
     def __init__(self, project_path, peripheral_name, template_names, enum_prefix, handle_prefix, yaml_key, get_available_func):
@@ -78,14 +129,30 @@ class BspPeripheralBase(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.addWidget(TitleLabel(f"{self.peripheral_name} 配置"))
+
+        top_layout = QHBoxLayout()
+        top_layout.setAlignment(Qt.AlignVCenter)
+
+        self.generate_checkbox = CheckBox(f"生成 {self.peripheral_name} 代码")
+        self.generate_checkbox.stateChanged.connect(self._on_generate_changed)
+        top_layout.addWidget(self.generate_checkbox, alignment=Qt.AlignLeft)
+
+        top_layout.addStretch()
+
+        title = SubtitleLabel(f"{self.peripheral_name} 配置             ")
+        title.setAlignment(Qt.AlignHCenter)
+        top_layout.addWidget(title, alignment=Qt.AlignHCenter)
+
+        top_layout.addStretch()
+
+        layout.addLayout(top_layout)
+
         desc = self.descriptions.get(self.peripheral_name.lower(), "")
         if desc:
-            layout.addWidget(BodyLabel(f"功能说明：{desc}"))
-        self.generate_checkbox = QCheckBox(f"生成 {self.peripheral_name} 代码")
-        self.generate_checkbox = QCheckBox(f"生成 {self.peripheral_name} 代码")
-        self.generate_checkbox.stateChanged.connect(self._on_generate_changed)
-        layout.addWidget(self.generate_checkbox)
+            desc_label = BodyLabel(f"功能说明：{desc}")
+            desc_label.setWordWrap(True)
+            layout.addWidget(desc_label)
+
         self.content_widget = QWidget()
         content_layout = QVBoxLayout(self.content_widget)
         self._get_available_list()
@@ -93,7 +160,8 @@ class BspPeripheralBase(QWidget):
             content_layout.addWidget(BodyLabel(f"在 .ioc 文件中未找到已启用的 {self.peripheral_name}"))
         else:
             content_layout.addWidget(BodyLabel(f"可用的 {self.peripheral_name}: {', '.join(self.available_list)}"))
-            self.table = QTableWidget(0, 3)
+            self.table = TableWidget()
+            self.table.setColumnCount(3)
             self.table.setHorizontalHeaderLabels(["设备名称", f"{self.peripheral_name}选择", "操作"])
             self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             content_layout.addWidget(self.table)
@@ -102,6 +170,7 @@ class BspPeripheralBase(QWidget):
             content_layout.addWidget(add_btn)
         layout.addWidget(self.content_widget)
         self.content_widget.setEnabled(False)
+
 
     def _get_available_list(self):
         self.available_list = self.get_available_func(self.project_path)
@@ -112,13 +181,13 @@ class BspPeripheralBase(QWidget):
     def _add_device(self):
         row = self.table.rowCount()
         self.table.insertRow(row)
-        name_edit = QLineEdit()
+        name_edit = LineEdit()
         name_edit.setPlaceholderText(f"输入设备名称")
         self.table.setCellWidget(row, 0, name_edit)
-        combo = QComboBox()
+        combo = ComboBox()  # 使用 Fluent 风格 ComboBox
         combo.addItems(self.available_list)
         self.table.setCellWidget(row, 1, combo)
-        del_btn = PushButton("删除")
+        del_btn = PushButton(FluentIcon.DELETE,"删除" )  # 添加垃圾桶图标
         del_btn.clicked.connect(lambda: self._delete_device(row))
         self.table.setCellWidget(row, 2, del_btn)
 
@@ -152,7 +221,12 @@ class BspPeripheralBase(QWidget):
         if not self._generate_source_file(configs, template_dir):
             return False
         self._save_config(configs)
-        QMessageBox.information(self, "成功", f"{self.peripheral_name} 代码生成成功！")
+        InfoBar.success(
+            title="任务生成成功",
+            content=f"{self.peripheral_name} 代码生成成功！",
+            parent=self,
+            duration=2000
+        )
         return True
 
     def _generate_header_file(self, configs, template_dir):
@@ -165,7 +239,8 @@ class BspPeripheralBase(QWidget):
             template_content, f"AUTO GENERATED {self.enum_prefix}_NAME", "\n".join(enum_lines)
         )
         output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['header']}")
-        return CodeGenerator.save_file(content, output_path)
+        save_with_preserve(output_path, content)  # 使用保留用户区域的写入
+        return True
 
     def _generate_source_file(self, configs, template_dir):
         template_path = os.path.join(template_dir, self.template_names['source'])
@@ -187,12 +262,19 @@ class BspPeripheralBase(QWidget):
         handle_lines = []
         for name, instance in configs:
             handle_lines.append(f"    case {self.enum_prefix}_{name}:")
-            handle_lines.append(f"      return &h{instance.lower()};")
+            # UART/USART统一用 huart 前缀
+            if self.enum_prefix == "BSP_UART":
+                # 提取数字部分
+                num = ''.join(filter(str.isdigit, instance))
+                handle_lines.append(f"      return &huart{num};")
+            else:
+                handle_lines.append(f"      return &h{instance.lower()};")
         content = CodeGenerator.replace_auto_generated(
             content, f"AUTO GENERATED {self.enum_prefix}_GET_HANDLE", "\n".join(handle_lines)
         )
         output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['source']}")
-        return CodeGenerator.save_file(content, output_path)
+        save_with_preserve(output_path, content)  # 使用保留用户区域的写入
+        return True
 
     def _save_config(self, configs):
         config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
@@ -345,23 +427,40 @@ class bsp_gpio(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.addWidget(TitleLabel("GPIO 配置"))
-        # 新增：显示描述
+
+        top_layout = QHBoxLayout()
+        top_layout.setAlignment(Qt.AlignVCenter)
+
+        self.generate_checkbox = CheckBox("生成 GPIO 代码")
+        top_layout.addWidget(self.generate_checkbox, alignment=Qt.AlignLeft)
+
+        top_layout.addStretch()
+
+        title = SubtitleLabel("GPIO 配置             ")
+        title.setAlignment(Qt.AlignHCenter)
+        top_layout.addWidget(title, alignment=Qt.AlignHCenter)
+
+        top_layout.addStretch()
+
+        layout.addLayout(top_layout)
+
         desc = self.descriptions.get("gpio", "")
         if desc:
-            layout.addWidget(BodyLabel(f"功能说明：{desc}"))
-        self.generate_checkbox = QCheckBox("生成 GPIO 代码")
-        layout.addWidget(self.generate_checkbox)
+            desc_label = BodyLabel(f"功能说明：{desc}")
+            desc_label.setWordWrap(True)
+            layout.addWidget(desc_label)
         if not self.available_list:
             layout.addWidget(BodyLabel("在 .ioc 文件中未找到可用的 GPIO"))
         else:
-            self.table = QTableWidget(len(self.available_list), 1)
+            self.table = TableWidget()
+            self.table.setColumnCount(1)
+            self.table.setRowCount(len(self.available_list))
             self.table.setHorizontalHeaderLabels(["Label"])
             self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             for row, item in enumerate(self.available_list):
                 from PyQt5.QtWidgets import QTableWidgetItem
                 self.table.setItem(row, 0, QTableWidgetItem(item['label']))
-            self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+            self.table.setEditTriggers(TableWidget.NoEditTriggers)
             layout.addWidget(self.table)
 
     def is_need_generate(self):
@@ -379,20 +478,19 @@ class bsp_gpio(QWidget):
         return True
 
     def _generate_header_file(self, template_dir):
-            template_path = os.path.join(template_dir, "gpio.h")
-            template_content = CodeGenerator.load_template(template_path)
-            if not template_content:
-                return False
-            # 如有需要可在此处插入自动生成内容
-            output_path = os.path.join(self.project_path, "User/bsp/gpio.h")
-            return CodeGenerator.save_file(template_content, output_path)
+        template_path = os.path.join(template_dir, "gpio.h")
+        template_content = CodeGenerator.load_template(template_path)
+        if not template_content:
+            return False
+        output_path = os.path.join(self.project_path, "User/bsp/gpio.h")
+        save_with_preserve(output_path, template_content)  # 使用保留用户区域的写入
+        return True
 
     def _generate_source_file(self, template_dir):
         template_path = os.path.join(template_dir, "gpio.c")
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
-        # 生成 IRQ 使能/禁用代码
         enable_lines = []
         disable_lines = []
         for item in self.available_list:
@@ -410,7 +508,8 @@ class bsp_gpio(QWidget):
             content, "AUTO GENERATED BSP_GPIO_DISABLE_IRQ", "\n".join(disable_lines)
         )
         output_path = os.path.join(self.project_path, "User/bsp/gpio.c")
-        return CodeGenerator.save_file(content, output_path)
+        save_with_preserve(output_path, content)  # 使用保留用户区域的写入
+        return True
 
     def _save_config(self):
         config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
@@ -421,7 +520,26 @@ class bsp_gpio(QWidget):
         }
         CodeGenerator.save_config(config_data, config_path)
 
-
+def get_bsp_page(peripheral_name, project_path):
+    """根据外设名返回对应的页面类，没有特殊类则返回默认BspSimplePeripheral"""
+    name_lower = peripheral_name.lower()
+    special_classes = {
+        "i2c": bsp_i2c,
+        "can": bsp_can,
+        "spi": bsp_spi,
+        "uart": bsp_uart,
+        "gpio": bsp_gpio,
+        # 以后可以继续添加特殊外设
+    }
+    if name_lower in special_classes:
+        return special_classes[name_lower](project_path)
+    else:
+        template_names = {
+            'header': f'{name_lower}.h',
+            'source': f'{name_lower}.c'
+        }
+        return BspSimplePeripheral(project_path, peripheral_name, template_names)
+    
 class bsp(QWidget):
     def __init__(self, project_path):
         super().__init__()
@@ -429,25 +547,37 @@ class bsp(QWidget):
 
     @staticmethod
     def generate_bsp(project_path, pages):
+        """生成所有BSP代码"""
+        # 自动添加 bsp.h
+        src_bsp_h = os.path.join(os.path.dirname(__file__), "../../assets/User_code/bsp/bsp.h")
+        dst_bsp_h = os.path.join(project_path, "User/bsp/bsp.h")
+        os.makedirs(os.path.dirname(dst_bsp_h), exist_ok=True)
+        if os.path.exists(src_bsp_h):
+            shutil.copyfile(src_bsp_h, dst_bsp_h)
+        
         total = 0
         success_count = 0
         fail_count = 0
         fail_list = []
+        
         for page in pages:
-            name = page.objectName() if hasattr(page, "objectName") else str(page)
-            if hasattr(page, "is_need_generate") and page.is_need_generate():
-                total += 1
-                try:
-                    result = page._generate_bsp_code_internal()
-                    if result:
-                        success_count += 1
-                    else:
+            # 只处理BSP页面：有 is_need_generate 方法但没有 component_name 属性的页面
+            if hasattr(page, 'is_need_generate') and not hasattr(page, 'component_name'):
+                if page.is_need_generate():
+                    total += 1
+                    try:
+                        result = page._generate_bsp_code_internal()
+                        if result:
+                            success_count += 1
+                        else:
+                            fail_count += 1
+                            fail_list.append(page.__class__.__name__)
+                    except Exception as e:
                         fail_count += 1
-                        fail_list.append(name)
-                except Exception as e:
-                    fail_count += 1
-                    fail_list.append(f"{name} (异常: {e})")
+                        fail_list.append(f"{page.__class__.__name__} (异常: {e})")
+        
         msg = f"总共尝试生成 {total} 项，成功 {success_count} 项，失败 {fail_count} 项。"
         if fail_list:
             msg += "\n失败项：\n" + "\n".join(fail_list)
-        QMessageBox.information(None, "代码生成结果", msg)
+        
+        return msg

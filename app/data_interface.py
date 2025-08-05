@@ -553,6 +553,7 @@ class DataInterface(QWidget):
                     parent=self,
                     duration=2000
                 )
+                self.task_generate_success = True  # 添加这一句
             except Exception as e:
                 InfoBar.error(
                     title="生成失败",

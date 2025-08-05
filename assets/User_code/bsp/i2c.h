@@ -18,7 +18,7 @@ extern "C" {
 /* I2C实体枚举，与设备对应 */
 typedef enum {
 /* AUTO GENERATED BSP_I2C_NAME */
-  /* USER BSP_I2C END*/
+  /* USER BSP_I2C BEGIN*/
   /* USER_I2C_XXX */
   /* USER BSP_I2C END */
   BSP_I2C_NUM,
