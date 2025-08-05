@@ -1,7 +1,3 @@
-/*
-  参考了Linux
-*/
-
 #pragma once
 
 #ifdef __cplusplus

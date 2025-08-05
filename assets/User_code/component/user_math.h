@@ -8,10 +8,13 @@
 extern "C" {
 #endif
 
+#include "stm32f4xx.h"
+#define ARM_MATH_CM4
+
 #include <float.h>
 #include <math.h>
 #include <stdbool.h>
-#include <stdint.h>
+
 #define M_DEG2RAD_MULT (0.01745329251f)
 #define M_RAD2DEG_MULT (57.2957795131f)
 
@@ -55,6 +58,13 @@ void Clip(float *origin, float min, float max);
 float Sign(float in);
 
 /**
+ * \brief 将运动向量置零
+ *
+ * \param mv 被操作的值
+ */
+void ResetMoveVector(MoveVector_t *mv);
+
+/**
  * \brief 计算循环值的误差，用于没有负数值，并在一定范围内变化的值
  * 例如编码器：相差1.5PI其实等于相差-0.5PI
  *
@@ -82,6 +92,16 @@ void CircleAdd(float *origin, float delta, float range);
  * @param origin 被操作的值
  */
 void CircleReverse(float *origin);
+
+/**
+ * @brief 根据目标弹丸速度计算摩擦轮转速
+ *
+ * @param bullet_speed 弹丸速度
+ * @param fric_radius 摩擦轮半径
+ * @param is17mm 是否为17mm
+ * @return 摩擦轮转速
+ */
+float CalculateRpm(float bullet_speed, float fric_radius, bool is17mm);
 
 #ifdef __cplusplus
 }
@@ -128,3 +148,11 @@ void CircleReverse(float *origin);
  */
 #define VERIFY(expr) ((void)(expr))
 #endif
+
+/**
+ * @brief 断言失败处理
+ *
+ * @param file 文件名
+ * @param line 行号
+ */
+void VerifyFailed(const char *file, uint32_t line);

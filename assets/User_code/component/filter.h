@@ -8,6 +8,8 @@
 extern "C" {
 #endif
 
+#include "user_math.h"
+
 /* 二阶低通滤波器 */
 typedef struct {
   float cutoff_freq; /* 截止频率 */
