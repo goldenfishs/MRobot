@@ -6,6 +6,7 @@ extern "C" {
 
 /* Includes ----------------------------------------------------------------- */
 #include <usart.h>
+#include <stdint.h>
 
 #include "bsp/bsp.h"
 
@@ -38,9 +39,13 @@ typedef enum {
 } BSP_UART_Callback_t;
 
 /* Exported functions prototypes -------------------------------------------- */
+
 UART_HandleTypeDef *BSP_UART_GetHandle(BSP_UART_t uart);
 int8_t BSP_UART_RegisterCallback(BSP_UART_t uart, BSP_UART_Callback_t type,
                                  void (*callback)(void));
+                                 
+int8_t BSP_UART_Transmit(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma);
+int8_t BSP_UART_Receive(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma);
 
 #ifdef __cplusplus
 }

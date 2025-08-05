@@ -4,3 +4,4 @@ gpio,要求设置label开启中断
 spi,要求开启spi中断
 i2c,要求开始spi中断
 mm,这是套了一层的内存
+time,需要使用开启freerots

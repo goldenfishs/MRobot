@@ -1,5 +1,7 @@
 /* Includes ----------------------------------------------------------------- */
-#include "bsp\uart.h"
+#include <uart.h>
+
+#include "bsp/uart.h"
 
 /* Private define ----------------------------------------------------------- */
 /* Private macro ------------------------------------------------------------ */
@@ -107,6 +109,29 @@ UART_HandleTypeDef *BSP_UART_GetHandle(BSP_UART_t uart) {
 int8_t BSP_UART_RegisterCallback(BSP_UART_t uart, BSP_UART_Callback_t type,
                                  void (*callback)(void)) {
   if (callback == NULL) return BSP_ERR_NULL;
+  if (uart >= BSP_UART_NUM || type >= BSP_UART_CB_NUM) return BSP_ERR;
   UART_Callback[uart][type] = callback;
   return BSP_OK;
+}
+
+int8_t BSP_UART_Transmit(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma) {
+  if (uart >= BSP_UART_NUM) return BSP_ERR;
+  if (data == NULL || size == 0) return BSP_ERR_NULL;
+
+  if (dma) {
+    return HAL_UART_Transmit_DMA(BSP_UART_GetHandle(uart), data, size);
+  } else {
+    return HAL_UART_Transmit_IT(BSP_UART_GetHandle(uart), data, size);
+  }
+}
+
+int8_t BSP_UART_Receive(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma) {
+  if (uart >= BSP_UART_NUM) return BSP_ERR;
+  if (data == NULL || size == 0) return BSP_ERR_NULL;
+
+  if (dma) {
+    return HAL_UART_Receive_DMA(BSP_UART_GetHandle(uart), data, size);
+  } else {
+    return HAL_UART_Receive_IT(BSP_UART_GetHandle(uart), data, size);
+  }
 }

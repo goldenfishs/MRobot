@@ -14,7 +14,11 @@ extern "C" {
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
 typedef enum {
-/* AUTO GENERATED BSP_GPIO_ENUM */
+  BSP_GPIO_IMU_ACCL_CS,
+  BSP_GPIO_IMU_GYRO_CS,
+  BSP_GPIO_IMU_ACCL_INT,
+  BSP_GPIO_IMU_GYRO_INT,
+  BSP_GPIO_USER_KEY,
   BSP_GPIO_NUM,
   BSP_GPIO_ERR,
 } BSP_GPIO_t;

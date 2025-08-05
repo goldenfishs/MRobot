@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "user_math.h": "c"
+        "user_math.h": "c",
+        "bsp.h": "c",
+        "stdint.h": "c"
     }
 }

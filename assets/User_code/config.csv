@@ -1,4 +1,4 @@
-bsp,can,delay,dwt,,gpio,i2c,mm,spi,uart,
+bsp,can,delay,dwt,,gpio,i2c,mm,spi,uart,pwm,time
 component,pid,filter,ahrs
 device,dr16,ai,nuc
 module,chassis,gimbal,arm,shoot

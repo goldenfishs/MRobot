@@ -14,7 +14,11 @@ typedef struct {
 
 /* Private variables -------------------------------------------------------- */
 static const BSP_GPIO_MAP_t GPIO_Map[BSP_GPIO_NUM] = {
-/* AUTO GENERATED BSP_GPIO_MAP */
+    {ACCL_CS_Pin, ACCL_CS_GPIO_Port},
+    {GYRO_CS_Pin, GYRO_CS_GPIO_Port},
+    {ACCL_INT_Pin, ACCL_INT_GPIO_Port},
+    {GYRO_INT_Pin, GYRO_INT_GPIO_Port},
+    {USER_KEY_Pin, USER_KEY_GPIO_Port},
 };
 
 static void (*GPIO_Callback[16])(void);
@@ -45,7 +49,12 @@ int8_t BSP_GPIO_RegisterCallback(uint16_t pin, void (*callback)(void)) {
 
 int8_t BSP_GPIO_EnableIRQ(uint16_t pin) {
   switch (pin) {
-/* AUTO GENERATED BSP_GPIO_ENABLE_IRQ */
+    case BSP_GPIO_IMU_ACCL_CS:
+      HAL_NVIC_EnableIRQ(ACCL_INT_EXTI_IRQn);
+      break;
+    case BSP_GPIO_IMU_GYRO_CS:
+      HAL_NVIC_EnableIRQ(GYRO_INT_EXTI_IRQn);
+      break;
     default:
       return BSP_ERR;
   }
@@ -54,7 +63,12 @@ int8_t BSP_GPIO_EnableIRQ(uint16_t pin) {
 
 int8_t BSP_GPIO_DisableIRQ(uint16_t pin) {
   switch (pin) {
-/* AUTO GENERATED BSP_GPIO_DISABLE_IRQ */
+    case BSP_GPIO_IMU_ACCL_INT:
+      HAL_NVIC_DisableIRQ(ACCL_INT_EXTI_IRQn);
+      break;
+    case BSP_GPIO_IMU_GYRO_INT:
+      HAL_NVIC_DisableIRQ(GYRO_INT_EXTI_IRQn);
+      break;
     default:
       return BSP_ERR;
   }

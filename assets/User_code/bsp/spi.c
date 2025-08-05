@@ -94,3 +94,74 @@ int8_t BSP_SPI_RegisterCallback(BSP_SPI_t spi, BSP_SPI_Callback_t type,
   SPI_Callback[spi][type] = callback;
   return BSP_OK;
 }
+
+int8_t BSP_SPI_Transmit(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma) {
+  if (spi >= BSP_SPI_NUM) return BSP_ERR;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL) return BSP_ERR;
+
+  if (dma) {
+    return HAL_SPI_Transmit_DMA(hspi, data, size);
+  } else {
+    return HAL_SPI_Transmit_IT(hspi, data, size);
+  }
+}
+
+int8_t BSP_SPI_Receive(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma) {
+  if (spi >= BSP_SPI_NUM) return BSP_ERR;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL) return BSP_ERR;
+
+  if (dma) {
+    return HAL_SPI_Receive_DMA(hspi, data, size);
+  } else {
+    return HAL_SPI_Receive_IT(hspi, data, size);
+  }
+}
+
+int8_t BSP_SPI_TransmitReceive(BSP_SPI_t spi, uint8_t *txData, uint8_t *rxData,
+                               uint16_t size, bool dma) {
+  if (spi >= BSP_SPI_NUM) return BSP_ERR;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL) return BSP_ERR;
+  
+  if (dma) {
+    return HAL_SPI_TransmitReceive_DMA(hspi, txData, rxData, size);
+  } else {
+    return HAL_SPI_TransmitReceive_IT(hspi, txData, rxData, size);
+  }
+}
+
+uint8_t BSP_SPI_MemReadByte(BSP_SPI_t spi, uint8_t reg) {
+  if (spi >= BSP_SPI_NUM) return 0xFF;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL) return 0xFF;
+
+  uint8_t data = 0;
+  HAL_SPI_Mem_Read(hspi, reg, &data, sizeof(data));
+  return data;
+}
+
+int8_t BSP_SPI_MemWriteByte(BSP_SPI_t spi, uint8_t reg, uint8_t data) {
+  if (spi >= BSP_SPI_NUM) return BSP_ERR;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL) return BSP_ERR;
+
+  return HAL_SPI_Mem_Write(hspi, reg, &data, sizeof(data));
+}
+
+int8_t BSP_SPI_MemRead(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size) {
+  if (spi >= BSP_SPI_NUM) return BSP_ERR;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL || data == NULL || size == 0) return BSP_ERR_NULL;
+
+  return HAL_SPI_Mem_Read(hspi, reg, data, size);
+}
+
+int8_t BSP_SPI_MemWrite(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size) {
+  if (spi >= BSP_SPI_NUM) return BSP_ERR;
+  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
+  if (hspi == NULL || data == NULL || size == 0) return BSP_ERR_NULL;
+
+  return HAL_SPI_Mem_Write(hspi, reg, data, size);
+}

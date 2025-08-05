@@ -113,13 +113,15 @@ class analyzing_ioc:
                             enabled_uart.append(uart_name)
         return sorted(enabled_uart)
     
+
     @staticmethod
     def get_enabled_gpio_from_ioc(ioc_path):
         """
-        获取所有带 EXTI 且有 Label 的 GPIO，返回 [{'pin': 'PC4', 'label': 'ACCL_INT'}, ...]
+        获取所有带 EXTI 且有 Label 的 GPIO，排除其他外设功能的引脚
         """
         gpio_list = []
-        gpio_params = {}
+        gpio_configs = {}
+        
         with open(ioc_path, encoding='utf-8', errors='ignore') as f:
             for line in f:
                 line = line.strip()
@@ -129,18 +131,191 @@ class analyzing_ioc:
                     key, value = line.split('=', 1)
                     key = key.strip()
                     value = value.strip()
-                    if '.GPIOParameters' in key:
-                        gpio_params[key.split('.')[0]] = value
-                    elif '.GPIO_Label' in key:
+                    
+                    # 收集GPIO相关配置
+                    if '.' in key:
                         pin = key.split('.')[0]
-                        gpio_params[f"{pin}_label"] = value
-                    elif '.GPIO_ModeDefaultEXTI' in key:
-                        pin = key.split('.')[0]
-                        gpio_params[f"{pin}_exti"] = value
-        for pin in gpio_params:
-            if not pin.endswith('_label') and not pin.endswith('_exti'):
-                label = gpio_params.get(f"{pin}_label", None)
-                exti = gpio_params.get(f"{pin}_exti", None)
-                if label and exti:
-                    gpio_list.append({'pin': pin, 'label': label})
+                        param = key.split('.', 1)[1]
+                        
+                        if pin not in gpio_configs:
+                            gpio_configs[pin] = {}
+                        
+                        gpio_configs[pin][param] = value
+        
+        # 定义需要排除的Signal类型
+        excluded_signals = [
+            'SPI1_SCK', 'SPI1_MISO', 'SPI1_MOSI', 'SPI2_SCK', 'SPI2_MISO', 'SPI2_MOSI', 
+            'SPI3_SCK', 'SPI3_MISO', 'SPI3_MOSI',
+            'I2C1_SCL', 'I2C1_SDA', 'I2C2_SCL', 'I2C2_SDA', 'I2C3_SCL', 'I2C3_SDA',
+            'USART1_TX', 'USART1_RX', 'USART2_TX', 'USART2_RX', 'USART3_TX', 'USART3_RX',
+            'USART6_TX', 'USART6_RX', 'UART4_TX', 'UART4_RX', 'UART5_TX', 'UART5_RX',
+            'CAN1_TX', 'CAN1_RX', 'CAN2_TX', 'CAN2_RX',
+            'USB_OTG_FS_DM', 'USB_OTG_FS_DP', 'USB_OTG_HS_DM', 'USB_OTG_HS_DP',
+            'SYS_JTMS-SWDIO', 'SYS_JTCK-SWCLK', 'SYS_JTDI', 'SYS_JTDO-SWO',
+            'RCC_OSC_IN', 'RCC_OSC_OUT',
+        ]
+        
+        # 处理每个GPIO配置，只选择EXTI类型的
+        for pin, config in gpio_configs.items():
+            signal = config.get('Signal', '')
+            
+            # 只处理有Label和EXTI功能的GPIO
+            if ('GPIO_Label' not in config or 
+                ('GPIO_ModeDefaultEXTI' not in config and not signal.startswith('GPXTI'))):
+                continue
+                
+            # 排除用于其他外设功能的引脚
+            if signal in excluded_signals or signal.startswith('S_TIM') or signal.startswith('ADC'):
+                continue
+                
+            # 只包含EXTI功能的GPIO
+            if signal.startswith('GPXTI'):
+                label = config['GPIO_Label']
+                gpio_list.append({'pin': pin, 'label': label})
+        
         return gpio_list
+
+
+
+    @staticmethod  
+    def get_all_gpio_from_ioc(ioc_path):
+        """
+        获取所有GPIO配置，但排除用于其他外设功能的引脚
+        只包含纯GPIO功能：GPIO_Input, GPIO_Output, GPXTI
+        """
+        gpio_list = []
+        gpio_configs = {}
+        
+        with open(ioc_path, encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # 收集GPIO相关配置
+                    if '.' in key:
+                        pin = key.split('.')[0]
+                        param = key.split('.', 1)[1]
+                        
+                        if pin not in gpio_configs:
+                            gpio_configs[pin] = {}
+                        
+                        gpio_configs[pin][param] = value
+        
+        # 定义需要排除的Signal类型（用于其他外设功能的）
+        excluded_signals = [
+            # SPI相关
+            'SPI1_SCK', 'SPI1_MISO', 'SPI1_MOSI', 'SPI2_SCK', 'SPI2_MISO', 'SPI2_MOSI', 
+            'SPI3_SCK', 'SPI3_MISO', 'SPI3_MOSI',
+            # I2C相关
+            'I2C1_SCL', 'I2C1_SDA', 'I2C2_SCL', 'I2C2_SDA', 'I2C3_SCL', 'I2C3_SDA',
+            # UART/USART相关
+            'USART1_TX', 'USART1_RX', 'USART2_TX', 'USART2_RX', 'USART3_TX', 'USART3_RX',
+            'USART6_TX', 'USART6_RX', 'UART4_TX', 'UART4_RX', 'UART5_TX', 'UART5_RX',
+            # CAN相关
+            'CAN1_TX', 'CAN1_RX', 'CAN2_TX', 'CAN2_RX',
+            # USB相关
+            'USB_OTG_FS_DM', 'USB_OTG_FS_DP', 'USB_OTG_HS_DM', 'USB_OTG_HS_DP',
+            # 系统相关
+            'SYS_JTMS-SWDIO', 'SYS_JTCK-SWCLK', 'SYS_JTDI', 'SYS_JTDO-SWO',
+            'RCC_OSC_IN', 'RCC_OSC_OUT',
+        ]
+        
+        # 处理每个GPIO配置
+        for pin, config in gpio_configs.items():
+            signal = config.get('Signal', '')
+            
+            # 只处理有Label的GPIO
+            if 'GPIO_Label' not in config:
+                continue
+                
+            # 排除用于其他外设功能的引脚
+            if signal in excluded_signals:
+                continue
+                
+            # 排除TIM相关的引脚（以S_TIM开头的信号）
+            if signal.startswith('S_TIM'):
+                continue
+                
+            # 排除ADC相关的引脚
+            if signal.startswith('ADC'):
+                continue
+                
+            # 只包含纯GPIO功能
+            if signal in ['GPIO_Input', 'GPIO_Output'] or signal.startswith('GPXTI'):
+                gpio_info = {
+                    'pin': pin,
+                    'label': config['GPIO_Label'],
+                    'has_exti': 'GPIO_ModeDefaultEXTI' in config or signal.startswith('GPXTI'),
+                    'signal': signal,
+                    'mode': config.get('GPIO_ModeDefaultEXTI', ''),
+                    'is_output': signal == 'GPIO_Output',
+                    'is_input': signal == 'GPIO_Input'
+                }
+                gpio_list.append(gpio_info)
+        
+        return gpio_list
+    
+    @staticmethod
+    def get_enabled_pwm_from_ioc(ioc_path):
+        """
+        获取已启用的PWM通道列表
+        返回格式: [{'timer': 'TIM1', 'channel': 'TIM_CHANNEL_1', 'label': 'PWM_MOTOR1'}, ...]
+        """
+        pwm_channels = []
+        gpio_configs = {}
+        
+        with open(ioc_path, encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    
+                    # 收集GPIO相关配置
+                    if '.' in key:
+                        pin = key.split('.')[0]
+                        param = key.split('.', 1)[1]
+                        
+                        if pin not in gpio_configs:
+                            gpio_configs[pin] = {}
+                        
+                        gpio_configs[pin][param] = value
+        
+        # 处理每个GPIO配置，查找PWM信号
+        for pin, config in gpio_configs.items():
+            signal = config.get('Signal', '')
+            
+            # 检查是否为PWM信号（格式如：S_TIM1_CH1, S_TIM2_CH3等）
+            if signal.startswith('S_TIM') and '_CH' in signal:
+                # 解析定时器和通道信息
+                # 例如：S_TIM1_CH1 -> TIM1, CH1
+                parts = signal.replace('S_', '').split('_')
+                if len(parts) >= 2:
+                    timer = parts[0]  # TIM1
+                    channel_part = parts[1]  # CH1
+                    
+                    # 转换通道格式：CH1 -> TIM_CHANNEL_1
+                    if channel_part.startswith('CH'):
+                        channel_num = channel_part[2:]  # 提取数字
+                        channel = f"TIM_CHANNEL_{channel_num}"
+                        
+                        # 获取标签
+                        label = config.get('GPIO_Label', f"{timer}_{channel_part}")
+                        
+                        pwm_channels.append({
+                            'timer': timer,
+                            'channel': channel,
+                            'label': label,
+                            'pin': pin,
+                            'signal': signal
+                        })
+        
+        return pwm_channels
