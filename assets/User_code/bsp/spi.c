@@ -101,9 +101,9 @@ int8_t BSP_SPI_Transmit(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma) {
   if (hspi == NULL) return BSP_ERR;
 
   if (dma) {
-    return HAL_SPI_Transmit_DMA(hspi, data, size);
+    return HAL_SPI_Transmit_DMA(hspi, data, size)!= HAL_OK;;
   } else {
-    return HAL_SPI_Transmit_IT(hspi, data, size);
+    return HAL_SPI_Transmit_IT(hspi, data, size)!= HAL_OK;;
   }
 }
 
@@ -113,9 +113,9 @@ int8_t BSP_SPI_Receive(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma) {
   if (hspi == NULL) return BSP_ERR;
 
   if (dma) {
-    return HAL_SPI_Receive_DMA(hspi, data, size);
+    return HAL_SPI_Receive_DMA(hspi, data, size)!= HAL_OK;;
   } else {
-    return HAL_SPI_Receive_IT(hspi, data, size);
+    return HAL_SPI_Receive_IT(hspi, data, size)!= HAL_OK;;
   }
 }
 
@@ -126,9 +126,9 @@ int8_t BSP_SPI_TransmitReceive(BSP_SPI_t spi, uint8_t *txData, uint8_t *rxData,
   if (hspi == NULL) return BSP_ERR;
   
   if (dma) {
-    return HAL_SPI_TransmitReceive_DMA(hspi, txData, rxData, size);
+    return HAL_SPI_TransmitReceive_DMA(hspi, txData, rxData, size)!= HAL_OK;;
   } else {
-    return HAL_SPI_TransmitReceive_IT(hspi, txData, rxData, size);
+    return HAL_SPI_TransmitReceive_IT(hspi, txData, rxData, size)!= HAL_OK;;
   }
 }
 

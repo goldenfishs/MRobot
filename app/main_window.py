@@ -50,15 +50,15 @@ class MainWindow(FluentWindow):
         self.homeInterface = HomeInterface(self)
         self.serialTerminalInterface = SerialTerminalInterface(self)
         self.partLibraryInterface = PartLibraryInterface(self)
-        self.dataInterface = DataInterface(self)
+        # self.dataInterface = DataInterface(self)
         self.miniToolInterface = MiniToolInterface(self)
         self.codeConfigurationInterface = CodeConfigurationInterface(self)
 
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, self.tr('主页'))
-        self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
-        self.addSubInterface(self.codeConfigurationInterface, FIF.SETTING, self.tr('代码配置'))
+        # self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
+        self.addSubInterface(self.codeConfigurationInterface, FIF.CODE, self.tr('代码生成'))
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
         self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
         self.addSubInterface(self.miniToolInterface, FIF.LIBRARY, self.tr('迷你工具箱'))

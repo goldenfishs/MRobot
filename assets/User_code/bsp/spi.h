@@ -7,6 +7,7 @@ extern "C" {
 /* Includes ----------------------------------------------------------------- */
 #include <spi.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "bsp/bsp.h"
 

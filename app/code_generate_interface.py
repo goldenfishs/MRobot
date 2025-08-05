@@ -64,7 +64,13 @@ class CodeGenerateInterface(QWidget):
         freertos_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         top_layout.addWidget(freertos_label)
 
-        # 配置并生成FreeRTOS任务按钮，直接调用已有方法
+        # 自动生成FreeRTOS任务按钮
+        auto_task_btn = PushButton(FluentIcon.SEND, "自动生成FreeRTOS任务")
+        auto_task_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        auto_task_btn.clicked.connect(self.on_freertos_task_btn_clicked)
+        top_layout.addWidget(auto_task_btn, alignment=Qt.AlignRight)
+
+        # 配置并生成FreeRTOS任务按钮
         freertos_task_btn = PushButton(FluentIcon.SETTING, "配置并生成FreeRTOS任务")
         freertos_task_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         freertos_task_btn.clicked.connect(self.on_task_code_btn_clicked)
@@ -112,6 +118,41 @@ class CodeGenerateInterface(QWidget):
                 parent=self,
                 duration=2000
             )
+
+    def on_freertos_task_btn_clicked(self):
+        # 检查是否开启 FreeRTOS
+        ioc_files = [f for f in os.listdir(self.project_path) if f.endswith('.ioc')]
+        if ioc_files:
+            ioc_path = os.path.join(self.project_path, ioc_files[0])
+            if not analyzing_ioc.is_freertos_enabled_from_ioc(ioc_path):
+                InfoBar.error(
+                    title="错误",
+                    content="请先在 .ioc 文件中开启 FreeRTOS，再自动生成任务！",
+                    parent=self,
+                    duration=3000
+                )
+                return
+        else:
+            InfoBar.error(
+                title="错误",
+                content="未找到 .ioc 文件，无法检测 FreeRTOS 状态！",
+                parent=self,
+                duration=3000
+            )
+            return
+
+        # 自动生成FreeRTOS任务代码
+        from app.data_interface import DataInterface
+        di = DataInterface()
+        di.project_path = self.project_path
+        di.generate_freertos_task()
+        InfoBar.success(
+            title="自动生成成功",
+            content="FreeRTOS任务代码已自动生成！",
+            parent=self,
+            duration=2000
+        )
+
 
     def generate_code(self):
         """生成代码逻辑"""
