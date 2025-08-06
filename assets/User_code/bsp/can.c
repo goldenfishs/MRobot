@@ -11,32 +11,34 @@
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
 typedef struct BSP_CAN_QueueNode {
-    uint32_t can_id;
-    osMessageQueueId_t queue;
-    uint8_t queue_size;
-    struct BSP_CAN_QueueNode *next;
+    uint32_t can_id; /* 解析后的CAN ID */
+    osMessageQueueId_t queue; /* 消息队列ID */
+    uint8_t queue_size; /* 队列大小 */
+    struct BSP_CAN_QueueNode *next; /* 指向下一个节点的指针 */
 } BSP_CAN_QueueNode_t;
 
 /* Private variables -------------------------------------------------------- */
-static BSP_CAN_QueueNode_t *g_can_queue_list = NULL;
-static osMutexId_t g_can_queue_mutex = NULL;
-static void (*g_can_callbacks[BSP_CAN_NUM][BSP_CAN_CB_NUM])(void);
-static bool g_can_initialized = false;
+static BSP_CAN_QueueNode_t *queue_list = NULL;
+static osMutexId_t queue_mutex = NULL;
+static void (*CAN_Callback[BSP_CAN_NUM][BSP_CAN_CB_NUM])(void);
+static bool inited = false;
+static BSP_CAN_IdParser_t id_parser = NULL; /* ID解析器 */
 
 /* Private function prototypes ---------------------------------------------- */
-static BSP_CAN_t BSP_CAN_GetInstance(CAN_HandleTypeDef *hcan);
+static BSP_CAN_t CAN_Get(CAN_HandleTypeDef *hcan);
 static osMessageQueueId_t BSP_CAN_FindQueue(uint32_t can_id);
 static int8_t BSP_CAN_CreateIdQueue(uint32_t can_id, uint8_t queue_size);
 static int8_t BSP_CAN_DeleteIdQueue(uint32_t can_id);
-static void BSP_CAN_RxFifo0Handler(void);
-static void BSP_CAN_RxFifo1Handler(void);
+static void BSP_CAN_RxFifoCallback(void);
+static BSP_CAN_FrameType_t BSP_CAN_GetFrameType(CAN_RxHeaderTypeDef *header);
+static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
 
 /* Private functions -------------------------------------------------------- */
 
 /**
  * @brief 根据CAN句柄获取BSP_CAN实例
  */
-static BSP_CAN_t BSP_CAN_GetInstance(CAN_HandleTypeDef *hcan) {
+static BSP_CAN_t CAN_Get(CAN_HandleTypeDef *hcan) {
     if (hcan == NULL) return BSP_CAN_ERR;
     
 /* AUTO GENERATED CAN_GET */
@@ -49,7 +51,7 @@ static BSP_CAN_t BSP_CAN_GetInstance(CAN_HandleTypeDef *hcan) {
  * @note 调用前需要获取互斥锁
  */
 static osMessageQueueId_t BSP_CAN_FindQueue(uint32_t can_id) {
-    BSP_CAN_QueueNode_t *node = g_can_queue_list;
+    BSP_CAN_QueueNode_t *node = queue_list;
     while (node != NULL) {
         if (node->can_id == can_id) {
             return node->queue;
@@ -69,15 +71,15 @@ static int8_t BSP_CAN_CreateIdQueue(uint32_t can_id, uint8_t queue_size) {
     }
     
     // 获取互斥锁
-    if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
+    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
         return BSP_ERR_TIMEOUT;
     }
     
     // 检查是否已存在
-    BSP_CAN_QueueNode_t *node = g_can_queue_list;
+    BSP_CAN_QueueNode_t *node = queue_list;
     while (node != NULL) {
         if (node->can_id == can_id) {
-            osMutexRelease(g_can_queue_mutex);
+            osMutexRelease(queue_mutex);
             return BSP_ERR;  // 已存在
         }
         node = node->next;
@@ -86,7 +88,7 @@ static int8_t BSP_CAN_CreateIdQueue(uint32_t can_id, uint8_t queue_size) {
     // 创建新节点
     BSP_CAN_QueueNode_t *new_node = (BSP_CAN_QueueNode_t *)BSP_Malloc(sizeof(BSP_CAN_QueueNode_t));
     if (new_node == NULL) {
-        osMutexRelease(g_can_queue_mutex);
+        osMutexRelease(queue_mutex);
         return BSP_ERR_NULL;
     }
     
@@ -94,17 +96,17 @@ static int8_t BSP_CAN_CreateIdQueue(uint32_t can_id, uint8_t queue_size) {
     new_node->queue = osMessageQueueNew(queue_size, sizeof(BSP_CAN_Message_t), NULL);
     if (new_node->queue == NULL) {
         BSP_Free(new_node);
-        osMutexRelease(g_can_queue_mutex);
+        osMutexRelease(queue_mutex);
         return BSP_ERR;
     }
     
     // 初始化节点
     new_node->can_id = can_id;
     new_node->queue_size = queue_size;
-    new_node->next = g_can_queue_list;
-    g_can_queue_list = new_node;
+    new_node->next = queue_list;
+    queue_list = new_node;
     
-    osMutexRelease(g_can_queue_mutex);
+    osMutexRelease(queue_mutex);
     return BSP_OK;
 }
 
@@ -114,11 +116,11 @@ static int8_t BSP_CAN_CreateIdQueue(uint32_t can_id, uint8_t queue_size) {
  */
 static int8_t BSP_CAN_DeleteIdQueue(uint32_t can_id) {
     // 获取互斥锁
-    if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
+    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
         return BSP_ERR_TIMEOUT;
     }
     
-    BSP_CAN_QueueNode_t **current = &g_can_queue_list;
+    BSP_CAN_QueueNode_t **current = &queue_list;
     while (*current != NULL) {
         if ((*current)->can_id == can_id) {
             BSP_CAN_QueueNode_t *to_delete = *current;
@@ -128,20 +130,39 @@ static int8_t BSP_CAN_DeleteIdQueue(uint32_t can_id) {
             osMessageQueueDelete(to_delete->queue);
             BSP_Free(to_delete);
             
-            osMutexRelease(g_can_queue_mutex);
+            osMutexRelease(queue_mutex);
             return BSP_OK;
         }
         current = &(*current)->next;
     }
     
-    osMutexRelease(g_can_queue_mutex);
+    osMutexRelease(queue_mutex);
     return BSP_ERR;  // 未找到
 }
 
 /**
- * @brief FIFO0接收处理函数
+ * @brief 获取帧类型
  */
-static void BSP_CAN_RxFifo0Handler(void) {
+static BSP_CAN_FrameType_t BSP_CAN_GetFrameType(CAN_RxHeaderTypeDef *header) {
+    if (header->RTR == CAN_RTR_REMOTE) {
+        return (header->IDE == CAN_ID_EXT) ? BSP_CAN_FRAME_EXT_REMOTE : BSP_CAN_FRAME_STD_REMOTE;
+    } else {
+        return (header->IDE == CAN_ID_EXT) ? BSP_CAN_FRAME_EXT_DATA : BSP_CAN_FRAME_STD_DATA;
+    }
+}
+
+/**
+ * @brief 默认ID解析器（直接返回原始ID）
+ */
+static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_t frame_type) {
+    (void)frame_type;  // 避免未使用参数警告
+    return original_id;
+}
+
+/**
+ * @brief FIFO接收处理函数
+ */
+static void BSP_CAN_RxFifoCallback(void) {
     CAN_RxHeaderTypeDef rx_header;
     uint8_t rx_data[BSP_CAN_MAX_DLC];
     
@@ -152,59 +173,32 @@ static void BSP_CAN_RxFifo0Handler(void) {
         
         while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO0) > 0) {
             if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rx_header, rx_data) == HAL_OK) {
-                uint32_t can_id = (rx_header.IDE == CAN_ID_STD) ? rx_header.StdId : rx_header.ExtId;
+                // 获取原始ID
+                uint32_t original_id = (rx_header.IDE == CAN_ID_STD) ? rx_header.StdId : rx_header.ExtId;
                 
-                // 线程安全地查找队列
-                if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) == osOK) {
-                    osMessageQueueId_t queue = BSP_CAN_FindQueue(can_id);
-                    osMutexRelease(g_can_queue_mutex);
-                    
-                    if (queue != NULL) {
-                        BSP_CAN_Message_t msg;
-                        msg.header = rx_header;
-                        memcpy(msg.data, rx_data, BSP_CAN_MAX_DLC);
-                        
-                        // 非阻塞发送，如果队列满了就丢弃
-                        osMessageQueuePut(queue, &msg, 0, BSP_CAN_TIMEOUT_IMMEDIATE);
-                    }
-                }
-                // 如果没有找到对应的队列或获取互斥锁超时，消息被直接丢弃
-            }
-        }
-    }
-}
-
-/**
- * @brief FIFO1接收处理函数
- */
-static void BSP_CAN_RxFifo1Handler(void) {
-    CAN_RxHeaderTypeDef rx_header;
-    uint8_t rx_data[BSP_CAN_MAX_DLC];
-    
-    // 遍历所有CAN接口处理FIFO1
-    for (int can_idx = 0; can_idx < BSP_CAN_NUM; can_idx++) {
-        CAN_HandleTypeDef *hcan = BSP_CAN_GetHandle((BSP_CAN_t)can_idx);
-        if (hcan == NULL) continue;
-        
-        while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO1) > 0) {
-            if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &rx_header, rx_data) == HAL_OK) {
-                uint32_t can_id = (rx_header.IDE == CAN_ID_STD) ? rx_header.StdId : rx_header.ExtId;
+                // 获取帧类型
+                BSP_CAN_FrameType_t frame_type = BSP_CAN_GetFrameType(&rx_header);
                 
-                // 线程安全地查找队列
-                if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) == osOK) {
-                    osMessageQueueId_t queue = BSP_CAN_FindQueue(can_id);
-                    osMutexRelease(g_can_queue_mutex);
-                    
-                    if (queue != NULL) {
-                        BSP_CAN_Message_t msg;
-                        msg.header = rx_header;
-                        memcpy(msg.data, rx_data, BSP_CAN_MAX_DLC);
-                        
-                        // 非阻塞发送，如果队列满了就丢弃
-                        osMessageQueuePut(queue, &msg, 0, BSP_CAN_TIMEOUT_IMMEDIATE);
+                // 解析ID
+                uint32_t parsed_id = BSP_CAN_ParseId(original_id, frame_type);
+                
+                // 直接查找队列，不使用互斥锁（中断中快速执行）
+                osMessageQueueId_t queue = BSP_CAN_FindQueue(parsed_id);
+                
+                if (queue != NULL) {
+                    BSP_CAN_Message_t msg = {0};
+                    msg.frame_type = frame_type;
+                    msg.original_id = original_id;
+                    msg.parsed_id = parsed_id;
+                    msg.dlc = rx_header.DLC;
+                    if (rx_header.RTR == CAN_RTR_DATA) {
+                        memcpy(msg.data, rx_data, rx_header.DLC);
                     }
+                    msg.timestamp = HAL_GetTick();  // 添加时间戳
+                    
+                    // 非阻塞发送，如果队列满了就丢弃
+                    osMessageQueuePut(queue, &msg, 0, BSP_CAN_TIMEOUT_IMMEDIATE);
                 }
-                // 如果没有找到对应的队列或获取互斥锁超时，消息被直接丢弃
             }
         }
     }
@@ -212,178 +206,165 @@ static void BSP_CAN_RxFifo1Handler(void) {
 
 /* HAL Callback Functions --------------------------------------------------- */
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX0_CPLT_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX0_CPLT_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_CPLT_CB])
+      CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_CPLT_CB]();
+  }
 }
 
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX1_CPLT_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX1_CPLT_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_CPLT_CB])
+      CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_CPLT_CB]();
+  }
 }
 
 void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX2_CPLT_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX2_CPLT_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_CPLT_CB])
+      CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_CPLT_CB]();
+  }
 }
 
 void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX0_ABORT_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX0_ABORT_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_ABORT_CB])
+      CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_ABORT_CB]();
+  }
 }
 
 void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX1_ABORT_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX1_ABORT_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_ABORT_CB])
+      CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_ABORT_CB]();
+  }
 }
 
 void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX2_ABORT_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_TX_MAILBOX2_ABORT_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_ABORT_CB])
+      CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_ABORT_CB]();
+  }
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO0_MSG_PENDING_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO0_MSG_PENDING_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_RX_FIFO0_MSG_PENDING_CB])
+      CAN_Callback[bsp_can][HAL_CAN_RX_FIFO0_MSG_PENDING_CB]();
+  }
 }
 
 void HAL_CAN_RxFifo0FullCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO0_FULL_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO0_FULL_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_RX_FIFO0_FULL_CB])
+      CAN_Callback[bsp_can][HAL_CAN_RX_FIFO0_FULL_CB]();
+  }
 }
 
 void HAL_CAN_RxFifo1MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO1_MSG_PENDING_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO1_MSG_PENDING_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_RX_FIFO1_MSG_PENDING_CB])
+      CAN_Callback[bsp_can][HAL_CAN_RX_FIFO1_MSG_PENDING_CB]();
+  }
 }
 
 void HAL_CAN_RxFifo1FullCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO1_FULL_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_RX_FIFO1_FULL_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_RX_FIFO1_FULL_CB])
+      CAN_Callback[bsp_can][HAL_CAN_RX_FIFO1_FULL_CB]();
+  }
 }
 
 void HAL_CAN_SleepCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_SLEEP_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_SLEEP_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_SLEEP_CB])
+      CAN_Callback[bsp_can][HAL_CAN_SLEEP_CB]();
+  }
 }
 
 void HAL_CAN_WakeUpFromRxMsgCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_WAKEUP_FROM_RX_MSG_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_WAKEUP_FROM_RX_MSG_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_WAKEUP_FROM_RX_MSG_CB])
+      CAN_Callback[bsp_can][HAL_CAN_WAKEUP_FROM_RX_MSG_CB]();
+  }
 }
 
 void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = BSP_CAN_GetInstance(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        if (g_can_callbacks[bsp_can][BSP_CAN_ERROR_CB] != NULL) {
-            g_can_callbacks[bsp_can][BSP_CAN_ERROR_CB]();
-        }
-    }
+  BSP_CAN_t bsp_can = CAN_Get(hcan);
+  if (bsp_can != BSP_CAN_ERR) {
+    if (CAN_Callback[bsp_can][HAL_CAN_ERROR_CB])
+      CAN_Callback[bsp_can][HAL_CAN_ERROR_CB]();
+  }
 }
 
 /* Exported functions ------------------------------------------------------- */
 
 int8_t BSP_CAN_Init(void) {
-    if (g_can_initialized) {
+    if (inited) {
         return BSP_ERR_INITED;
     }
     
     // 清零回调函数数组
-    memset(g_can_callbacks, 0, sizeof(g_can_callbacks));
+    memset(CAN_Callback, 0, sizeof(CAN_Callback));
+    
+    // 初始化ID解析器为默认解析器
+    id_parser = BSP_CAN_DefaultIdParser;
     
     // 创建互斥锁
-    g_can_queue_mutex = osMutexNew(NULL);
-    if (g_can_queue_mutex == NULL) {
+    queue_mutex = osMutexNew(NULL);
+    if (queue_mutex == NULL) {
         return BSP_ERR;
     }
     
 /* AUTO GENERATED CAN_INIT */
     
-    // 注册默认的接收中断处理函数
-    for (int can_idx = 0; can_idx < BSP_CAN_NUM; can_idx++) {
-        BSP_CAN_RegisterCallback((BSP_CAN_t)can_idx, BSP_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Handler);
-        BSP_CAN_RegisterCallback((BSP_CAN_t)can_idx, BSP_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifo1Handler);
-    }
-    
-    g_can_initialized = true;
+    inited = true;
     return BSP_OK;
 }
 
 int8_t BSP_CAN_DeInit(void) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR;
     }
     
     // 删除所有队列
-    if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) == osOK) {
-        BSP_CAN_QueueNode_t *current = g_can_queue_list;
+    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) == osOK) {
+        BSP_CAN_QueueNode_t *current = queue_list;
         while (current != NULL) {
             BSP_CAN_QueueNode_t *next = current->next;
             osMessageQueueDelete(current->queue);
             BSP_Free(current);
             current = next;
         }
-        g_can_queue_list = NULL;
-        osMutexRelease(g_can_queue_mutex);
+        queue_list = NULL;
+        osMutexRelease(queue_mutex);
     }
     
     // 删除互斥锁
-    if (g_can_queue_mutex != NULL) {
-        osMutexDelete(g_can_queue_mutex);
-        g_can_queue_mutex = NULL;
+    if (queue_mutex != NULL) {
+        osMutexDelete(queue_mutex);
+        queue_mutex = NULL;
     }
     
     // 清零回调函数数组
-    memset(g_can_callbacks, 0, sizeof(g_can_callbacks));
+    memset(CAN_Callback, 0, sizeof(CAN_Callback));
     
-    g_can_initialized = false;
+    // 重置ID解析器
+    id_parser = NULL;
+    
+    inited = false;
     return BSP_OK;
 }
 
@@ -401,7 +382,7 @@ CAN_HandleTypeDef *BSP_CAN_GetHandle(BSP_CAN_t can) {
 
 int8_t BSP_CAN_RegisterCallback(BSP_CAN_t can, BSP_CAN_Callback_t type,
                                 void (*callback)(void)) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR_INITED;
     }
     if (callback == NULL) {
@@ -414,19 +395,19 @@ int8_t BSP_CAN_RegisterCallback(BSP_CAN_t can, BSP_CAN_Callback_t type,
         return BSP_ERR;
     }
     
-    g_can_callbacks[can][type] = callback;
+    CAN_Callback[can][type] = callback;
     return BSP_OK;
 }
 
 int8_t BSP_CAN_Transmit(BSP_CAN_t can, BSP_CAN_Format_t format,
                         uint32_t id, uint8_t *data, uint8_t dlc) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR_INITED;
     }
     if (can >= BSP_CAN_NUM) {
         return BSP_ERR;
     }
-    if (data == NULL) {
+    if (data == NULL && format != BSP_CAN_FORMAT_STD_REMOTE && format != BSP_CAN_FORMAT_EXT_REMOTE) {
         return BSP_ERR_NULL;
     }
     if (dlc > BSP_CAN_MAX_DLC) {
@@ -473,8 +454,30 @@ int8_t BSP_CAN_Transmit(BSP_CAN_t can, BSP_CAN_Format_t format,
     return (result == HAL_OK) ? BSP_OK : BSP_ERR;
 }
 
+int8_t BSP_CAN_TransmitStdDataFrame(BSP_CAN_t can, BSP_CAN_StdDataFrame_t *frame) {
+    if (frame == NULL) {
+        return BSP_ERR_NULL;
+    }
+    return BSP_CAN_Transmit(can, BSP_CAN_FORMAT_STD_DATA, frame->id, frame->data, frame->dlc);
+}
+
+int8_t BSP_CAN_TransmitExtDataFrame(BSP_CAN_t can, BSP_CAN_ExtDataFrame_t *frame) {
+    if (frame == NULL) {
+        return BSP_ERR_NULL;
+    }
+    return BSP_CAN_Transmit(can, BSP_CAN_FORMAT_EXT_DATA, frame->id, frame->data, frame->dlc);
+}
+
+int8_t BSP_CAN_TransmitRemoteFrame(BSP_CAN_t can, BSP_CAN_RemoteFrame_t *frame) {
+    if (frame == NULL) {
+        return BSP_ERR_NULL;
+    }
+    BSP_CAN_Format_t format = frame->is_extended ? BSP_CAN_FORMAT_EXT_REMOTE : BSP_CAN_FORMAT_STD_REMOTE;
+    return BSP_CAN_Transmit(can, format, frame->id, NULL, frame->dlc);
+}
+
 int8_t BSP_CAN_RegisterId(uint32_t can_id, uint8_t queue_size) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR_INITED;
     }
     
@@ -482,7 +485,7 @@ int8_t BSP_CAN_RegisterId(uint32_t can_id, uint8_t queue_size) {
 }
 
 int8_t BSP_CAN_UnregisterIdQueue(uint32_t can_id) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR_INITED;
     }
     
@@ -490,7 +493,7 @@ int8_t BSP_CAN_UnregisterIdQueue(uint32_t can_id) {
 }
 
 int8_t BSP_CAN_GetMessage(uint32_t can_id, BSP_CAN_Message_t *msg, uint32_t timeout) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR_INITED;
     }
     if (msg == NULL) {
@@ -498,12 +501,12 @@ int8_t BSP_CAN_GetMessage(uint32_t can_id, BSP_CAN_Message_t *msg, uint32_t time
     }
     
     // 线程安全地查找队列
-    if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
+    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
         return BSP_ERR_TIMEOUT;
     }
     
     osMessageQueueId_t queue = BSP_CAN_FindQueue(can_id);
-    osMutexRelease(g_can_queue_mutex);
+    osMutexRelease(queue_mutex);
     
     if (queue == NULL) {
         return BSP_ERR_NO_DEV;  // 队列不存在
@@ -514,17 +517,17 @@ int8_t BSP_CAN_GetMessage(uint32_t can_id, BSP_CAN_Message_t *msg, uint32_t time
 }
 
 int32_t BSP_CAN_GetQueueCount(uint32_t can_id) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return -1;
     }
     
     // 线程安全地查找队列
-    if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
+    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
         return -1;
     }
     
     osMessageQueueId_t queue = BSP_CAN_FindQueue(can_id);
-    osMutexRelease(g_can_queue_mutex);
+    osMutexRelease(queue_mutex);
     
     if (queue == NULL) {
         return -1;  // 队列不存在
@@ -534,17 +537,17 @@ int32_t BSP_CAN_GetQueueCount(uint32_t can_id) {
 }
 
 int8_t BSP_CAN_FlushQueue(uint32_t can_id) {
-    if (!g_can_initialized) {
+    if (!inited) {
         return BSP_ERR_INITED;
     }
     
     // 线程安全地查找队列
-    if (osMutexAcquire(g_can_queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
+    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
         return BSP_ERR_TIMEOUT;
     }
     
     osMessageQueueId_t queue = BSP_CAN_FindQueue(can_id);
-    osMutexRelease(g_can_queue_mutex);
+    osMutexRelease(queue_mutex);
     
     if (queue == NULL) {
         return BSP_ERR_NO_DEV;  // 队列不存在
@@ -557,6 +560,34 @@ int8_t BSP_CAN_FlushQueue(uint32_t can_id) {
     }
     
     return BSP_OK;
+}
+
+int8_t BSP_CAN_RegisterIdParser(BSP_CAN_IdParser_t parser) {
+    if (!inited) {
+        return BSP_ERR_INITED;
+    }
+    if (parser == NULL) {
+        return BSP_ERR_NULL;
+    }
+    
+    id_parser = parser;
+    return BSP_OK;
+}
+
+int8_t BSP_CAN_UnregisterIdParser(void) {
+    if (!inited) {
+        return BSP_ERR_INITED;
+    }
+    
+    id_parser = BSP_CAN_DefaultIdParser;
+    return BSP_OK;
+}
+
+uint32_t BSP_CAN_ParseId(uint32_t original_id, BSP_CAN_FrameType_t frame_type) {
+    if (id_parser != NULL) {
+        return id_parser(original_id, frame_type);
+    }
+    return BSP_CAN_DefaultIdParser(original_id, frame_type);
 }
 
 /* USER CAN FUNCTIONS BEGIN */

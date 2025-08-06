@@ -26,8 +26,9 @@ typedef enum {
 /* Exported functions prototypes -------------------------------------------- */
 int8_t BSP_GPIO_RegisterCallback(uint16_t pin, void (*callback)(void));
 
-int8_t BSP_GPIO_EnableIRQ(uint16_t pin);
-int8_t BSP_GPIO_DisableIRQ(uint16_t pin);
+int8_t BSP_GPIO_EnableIRQ(BSP_GPIO_t gpio);
+int8_t BSP_GPIO_DisableIRQ(BSP_GPIO_t gpio);
+
 
 int8_t BSP_GPIO_WritePin(BSP_GPIO_t gpio, bool value);
 int8_t BSP_GPIO_TogglePin(BSP_GPIO_t gpio);

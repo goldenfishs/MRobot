@@ -45,12 +45,12 @@ typedef enum {
   WHITE
 } UI_Color_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   uint8_t op;
   uint8_t num_layer;
 } UI_InterStudent_UIDel_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   uint8_t name[3];
   uint8_t type_op : 3;
   uint8_t type_ele : 3;
@@ -66,28 +66,28 @@ typedef struct __packed {
   uint16_t y_end : 11;
 } UI_Ele_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   UI_Ele_t grapic;
 } UI_Drawgrapic_1_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   UI_Ele_t grapic[2];
 } UI_Drawgrapic_2_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   UI_Ele_t grapic[5];
 } UI_Drawgrapic_5_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   UI_Ele_t grapic[7];
 } UI_Drawgrapic_7_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   UI_Ele_t grapic;
   uint8_t character[30];
 } UI_Drawcharacter_t;
 
-typedef struct __packed {
+typedef __Packed struct {
   uint8_t del_operation;
   uint8_t layer;
 } UI_Del_t;

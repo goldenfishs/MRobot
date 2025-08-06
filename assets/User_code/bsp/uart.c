@@ -1,5 +1,5 @@
 /* Includes ----------------------------------------------------------------- */
-#include <uart.h>
+#include <usart.h>
 
 #include "bsp/uart.h"
 

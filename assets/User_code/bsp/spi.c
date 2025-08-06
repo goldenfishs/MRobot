@@ -1,4 +1,5 @@
 /* Includes ----------------------------------------------------------------- */
+#include <spi.h>
 #include "bsp\spi.h"
 
 /* Private define ----------------------------------------------------------- */
@@ -134,34 +135,29 @@ int8_t BSP_SPI_TransmitReceive(BSP_SPI_t spi, uint8_t *txData, uint8_t *rxData,
 
 uint8_t BSP_SPI_MemReadByte(BSP_SPI_t spi, uint8_t reg) {
   if (spi >= BSP_SPI_NUM) return 0xFF;
-  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
-  if (hspi == NULL) return 0xFF;
-
-  uint8_t data = 0;
-  HAL_SPI_Mem_Read(hspi, reg, &data, sizeof(data));
-  return data;
+  uint8_t tmp[2] = {reg | 0x80, 0x00};
+  BSP_SPI_TransmitReceive(spi, tmp, tmp, 2u, true);
+  return tmp[1];
 }
 
 int8_t BSP_SPI_MemWriteByte(BSP_SPI_t spi, uint8_t reg, uint8_t data) {
   if (spi >= BSP_SPI_NUM) return BSP_ERR;
-  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
-  if (hspi == NULL) return BSP_ERR;
-
-  return HAL_SPI_Mem_Write(hspi, reg, &data, sizeof(data));
+  uint8_t tmp[2] = {reg & 0x7f, data};
+  return BSP_SPI_Transmit(spi, tmp, 2u, true);
 }
 
 int8_t BSP_SPI_MemRead(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size) {
   if (spi >= BSP_SPI_NUM) return BSP_ERR;
-  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
-  if (hspi == NULL || data == NULL || size == 0) return BSP_ERR_NULL;
-
-  return HAL_SPI_Mem_Read(hspi, reg, data, size);
+  if (data == NULL || size == 0) return BSP_ERR_NULL;
+  reg = reg | 0x80;
+  BSP_SPI_Transmit(spi, &reg, 1u, true);
+  return BSP_SPI_Receive(spi, data, size, true);
 }
 
 int8_t BSP_SPI_MemWrite(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size) {
   if (spi >= BSP_SPI_NUM) return BSP_ERR;
-  SPI_HandleTypeDef *hspi = BSP_SPI_GetHandle(spi);
-  if (hspi == NULL || data == NULL || size == 0) return BSP_ERR_NULL;
-
-  return HAL_SPI_Mem_Write(hspi, reg, data, size);
+  if (data == NULL || size == 0) return BSP_ERR_NULL;
+  reg = reg & 0x7f;
+  BSP_SPI_Transmit(spi, &reg, 1u, true);
+  return BSP_SPI_Transmit(spi, data, size, true);
 }

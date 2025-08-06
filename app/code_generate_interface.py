@@ -155,30 +155,49 @@ class CodeGenerateInterface(QWidget):
 
 
     def generate_code(self):
-        """生成代码逻辑"""
-        # 收集所有已加载的页面对象
-        pages = []
-        for i in range(self.stack.count()):
-            widget = self.stack.widget(i)
-            pages.append(widget)
-        
-        # 生成 BSP 代码
-        bsp_result = bsp.generate_bsp(self.project_path, pages)
-        
-        # 生成 Component 代码
-        from app.code_page.component_interface import component
-        component_result = component.generate_component(self.project_path, pages)
-        
-        # 合并结果信息
-        combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}"
-        
-        # 用 InfoBar 在主界面弹出
-        InfoBar.success(
-            title="代码生成结果",
-            content=combined_result,
-            parent=self,
-            duration=5000  # 增加显示时间，因为内容更多
-        )
+        """生成代码逻辑 - 修复导入问题"""
+        try:
+            # 收集所有已加载的页面对象
+            pages = []
+            for i in range(self.stack.count()):
+                widget = self.stack.widget(i)
+                pages.append(widget)
+            
+            # 确保导入成功
+            from app.code_page.bsp_interface import bsp
+            from app.code_page.component_interface import component
+            
+            # 生成 BSP 代码
+            bsp_result = bsp.generate_bsp(self.project_path, pages)
+            
+            # 生成 Component 代码  
+            component_result = component.generate_component(self.project_path, pages)
+            
+            # 合并结果信息
+            combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}"
+            
+            # 用 InfoBar 在主界面弹出
+            InfoBar.success(
+                title="代码生成结果",
+                content=combined_result,
+                parent=self,
+                duration=5000
+            )
+            
+        except ImportError as e:
+            InfoBar.error(
+                title="导入错误", 
+                content=f"模块导入失败: {str(e)}",
+                parent=self,
+                duration=3000
+            )
+        except Exception as e:
+            InfoBar.error(
+                title="生成失败",
+                content=f"代码生成过程中出现错误: {str(e)}",
+                parent=self,
+                duration=3000
+            )
 
     def _get_freertos_status(self):
         """获取FreeRTOS状态"""
@@ -220,7 +239,6 @@ class CodeGenerateInterface(QWidget):
             if widget:
                 self.stack.setCurrentWidget(widget)
 
-# ...existing code...
     def _get_or_create_page(self, class_name):
         """获取或创建页面"""
         if class_name in self.page_cache:
@@ -235,12 +253,12 @@ class CodeGenerateInterface(QWidget):
             if class_name.startswith('bsp_'):
                 # BSP页面
                 from app.code_page.bsp_interface import get_bsp_page
-                # 提取外设名，如 bsp_delay -> delay
-                periph_name = class_name[len('bsp_'):].replace("_", " ")
+                # 提取外设名，如 bsp_error_detect -> error_detect
+                periph_name = class_name[len('bsp_'):]  # 移除 .replace("_", " ")
                 page = get_bsp_page(periph_name, self.project_path)
             elif class_name.startswith('component_'):
                 from app.code_page.component_interface import get_component_page
-                comp_name = class_name[len('component_'):].replace("_", " ")
+                comp_name = class_name[len('component_'):]  # 移除 .replace("_", " ")
                 page = get_component_page(comp_name, self.project_path, self.component_manager)
                 self.component_manager.register_component(page.component_name, page)
             else:
@@ -253,5 +271,4 @@ class CodeGenerateInterface(QWidget):
         except Exception as e:
             print(f"创建页面 {class_name} 失败: {e}")
             return None
-
-# ...existing code...
+    

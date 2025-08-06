@@ -43,8 +43,8 @@ int8_t BSP_GPIO_RegisterCallback(uint16_t pin, void (*callback)(void)) {
   return BSP_OK;
 }
 
-int8_t BSP_GPIO_EnableIRQ(uint16_t pin) {
-  switch (pin) {
+int8_t BSP_GPIO_EnableIRQ(BSP_GPIO_t gpio) {
+  switch (gpio) {
 /* AUTO GENERATED BSP_GPIO_ENABLE_IRQ */
     default:
       return BSP_ERR;
@@ -52,15 +52,14 @@ int8_t BSP_GPIO_EnableIRQ(uint16_t pin) {
   return BSP_OK;
 }
 
-int8_t BSP_GPIO_DisableIRQ(uint16_t pin) {
-  switch (pin) {
+int8_t BSP_GPIO_DisableIRQ(BSP_GPIO_t gpio) {
+  switch (gpio) {
 /* AUTO GENERATED BSP_GPIO_DISABLE_IRQ */
     default:
       return BSP_ERR;
   }
   return BSP_OK;
 }
-
 int8_t BSP_GPIO_WritePin(BSP_GPIO_t gpio, bool value){
   if (gpio >= BSP_GPIO_NUM) return BSP_ERR;
   HAL_GPIO_WritePin(GPIO_Map[gpio].gpio, GPIO_Map[gpio].pin, value);

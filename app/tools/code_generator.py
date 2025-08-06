@@ -2,7 +2,8 @@ import os
 import yaml
 import shutil
 from typing import Dict, List, Tuple
-
+import sys
+import os
 class CodeGenerator:
     """通用代码生成器"""
     
@@ -61,15 +62,20 @@ class CodeGenerator:
     
     @staticmethod
     def get_template_dir():
-        """获取模板文件目录"""
-        # 从当前文件向上找到 MRobot 目录，然后定位到模板目录
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 向上找到 MRobot 根目录
-        while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
-            current_dir = os.path.dirname(current_dir)
-        
-        if os.path.basename(current_dir) == 'MRobot':
-            return os.path.join(current_dir, "assets/User_code/bsp")
+        """获取模板目录路径，兼容打包环境"""
+        if getattr(sys, 'frozen', False):
+            # 打包后的环境
+            base_path = sys._MEIPASS
+            template_dir = os.path.join(base_path, "assets", "User_code", "bsp")
         else:
-            # 如果找不到，使用相对路径作为备选
-            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets/User_code/bsp")
+            # 开发环境
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
+                current_dir = os.path.dirname(current_dir)
+            template_dir = os.path.join(current_dir, "assets", "User_code", "bsp")
+        
+        print(f"模板目录路径: {template_dir}")
+        if not os.path.exists(template_dir):
+            print(f"警告：模板目录不存在: {template_dir}")
+        
+        return template_dir

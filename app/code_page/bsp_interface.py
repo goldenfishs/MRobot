@@ -399,20 +399,21 @@ class bsp_can(BspPeripheralBase):
             get_available_can
         )
 
+
     def _generate_source_file(self, configs, template_dir):
         template_path = os.path.join(template_dir, self.template_names['source'])
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
             
-        # Get函数
+        # CAN_Get函数
         get_lines = []
         for idx, (name, instance) in enumerate(configs):
             if idx == 0:
-                get_lines.append(f"  if (hcan->Instance == {instance})")
+                get_lines.append(f"    if (hcan->Instance == {instance})")
             else:
-                get_lines.append(f"  else if (hcan->Instance == {instance})")
-            get_lines.append(f"    return {self.enum_prefix}_{name};")
+                get_lines.append(f"    else if (hcan->Instance == {instance})")
+            get_lines.append(f"        return {self.enum_prefix}_{name};")
         content = CodeGenerator.replace_auto_generated(
             template_content, "AUTO GENERATED CAN_GET", "\n".join(get_lines)
         )
@@ -420,41 +421,106 @@ class bsp_can(BspPeripheralBase):
         # Handle函数
         handle_lines = []
         for name, instance in configs:
+            num = ''.join(filter(str.isdigit, instance))  # 提取数字
             handle_lines.append(f"    case {self.enum_prefix}_{name}:")
-            handle_lines.append(f"      return &h{instance.lower()};")
+            handle_lines.append(f"      return &hcan{num};")
         content = CodeGenerator.replace_auto_generated(
             content, f"AUTO GENERATED {self.enum_prefix}_GET_HANDLE", "\n".join(handle_lines)
         )
         
         # 生成CAN初始化代码
         init_lines = []
-        for idx, (name, instance) in enumerate(configs):
-            can_num = instance[-1]  # CAN1 -> 1, CAN2 -> 2
-            
-            init_lines.append(f"  // 初始化 {instance}")
-            init_lines.append(f"  CAN_FilterTypeDef can{can_num}_filter = {{0}};")
-            init_lines.append(f"  can{can_num}_filter.FilterBank = {0 if can_num == '1' else 14};")
-            init_lines.append(f"  can{can_num}_filter.FilterIdHigh = 0;")
-            init_lines.append(f"  can{can_num}_filter.FilterIdLow = 0;")
-            init_lines.append(f"  can{can_num}_filter.FilterMode = CAN_FILTERMODE_IDMASK;")
-            init_lines.append(f"  can{can_num}_filter.FilterScale = CAN_FILTERSCALE_32BIT;")
-            init_lines.append(f"  can{can_num}_filter.FilterMaskIdHigh = 0;")
-            init_lines.append(f"  can{can_num}_filter.FilterMaskIdLow = 0;")
-            init_lines.append(f"  can{can_num}_filter.FilterActivation = ENABLE;")
-            if can_num == '1':
-                init_lines.append(f"  can{can_num}_filter.SlaveStartFilterBank = 14;")
-                init_lines.append(f"  can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO0;")
-            else:
-                init_lines.append(f"  can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO1;")
-            
-            init_lines.append(f"  HAL_CAN_ConfigFilter(BSP_CAN_GetHandle({self.enum_prefix}_{name}), &can{can_num}_filter);")
-            init_lines.append(f"  HAL_CAN_Start(BSP_CAN_GetHandle({self.enum_prefix}_{name}));")
-            
-            # 注册回调和激活中断
-            fifo = "FIFO0" if can_num == '1' else "FIFO1"
-            init_lines.append(f"  HAL_CAN_ActivateNotification(BSP_CAN_GetHandle({self.enum_prefix}_{name}), CAN_IT_RX_{fifo}_MSG_PENDING);")
-            init_lines.append("")
-            
+        # 先设置初始化标志
+        init_lines.append("    // 先设置初始化标志，以便后续回调注册能通过检查")
+        init_lines.append("    inited = true;")
+        init_lines.append("")
+        
+        # 检查是否同时有CAN1和CAN2
+        has_can1 = any(instance == 'CAN1' for _, instance in configs)
+        has_can2 = any(instance == 'CAN2' for _, instance in configs)
+        
+        if has_can1 and has_can2:
+            # 同时配置CAN1和CAN2的情况 - 统一使用FIFO0
+            init_lines.extend([
+                "    // 初始化 CAN1 - 使用 FIFO0",
+                "    CAN_FilterTypeDef can1_filter = {0};",
+                "    can1_filter.FilterBank = 0;",
+                "    can1_filter.FilterIdHigh = 0;",
+                "    can1_filter.FilterIdLow = 0;",
+                "    can1_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                "    can1_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                "    can1_filter.FilterMaskIdHigh = 0;",
+                "    can1_filter.FilterMaskIdLow = 0;",
+                "    can1_filter.FilterActivation = ENABLE;",
+                "    can1_filter.SlaveStartFilterBank = 14;  // 重要：设置从过滤器起始组",
+                "    can1_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
+                "    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);",
+                "    HAL_CAN_Start(&hcan1);",
+                "    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
+                "",
+                "    // 初始化 CAN2 - 使用 FIFO0（注意：通过 CAN1 配置 CAN2 的过滤器）",
+                "    CAN_FilterTypeDef can2_filter = {0};",
+                "    can2_filter.FilterBank = 14;  // CAN2 使用过滤器组 14",
+                "    can2_filter.FilterIdHigh = 0;",
+                "    can2_filter.FilterIdLow = 0;",
+                "    can2_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                "    can2_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                "    can2_filter.FilterMaskIdHigh = 0;",
+                "    can2_filter.FilterMaskIdLow = 0;",
+                "    can2_filter.FilterActivation = ENABLE;",
+                "    can2_filter.FilterFIFOAssignment = CAN_RX_FIFO0;  // 改为 FIFO0",
+                "    HAL_CAN_ConfigFilter(&hcan1, &can2_filter);  // 通过 CAN1 配置",
+                "    HAL_CAN_Start(&hcan2);",
+                "    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);  // 激活 FIFO0 中断",
+                "",
+                "    // 注册回调函数",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_CAN1, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_CAN2, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+            ])
+        else:
+            # 只有单个CAN的情况
+            for idx, (name, instance) in enumerate(configs):
+                can_num = instance[-1]  # CAN1 -> 1, CAN2 -> 2
+                
+                init_lines.append(f"    // 初始化 {instance}")
+                init_lines.append(f"    CAN_FilterTypeDef can{can_num}_filter = {{0}};")
+                
+                if instance == 'CAN1':
+                    init_lines.extend([
+                        f"    can{can_num}_filter.FilterBank = 0;",
+                        f"    can{can_num}_filter.SlaveStartFilterBank = 14;",
+                        f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
+                    ])
+                else:  # CAN2
+                    init_lines.extend([
+                        f"    can{can_num}_filter.FilterBank = 14;",
+                        f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
+                    ])
+                
+                init_lines.extend([
+                    f"    can{can_num}_filter.FilterIdHigh = 0;",
+                    f"    can{can_num}_filter.FilterIdLow = 0;",
+                    f"    can{can_num}_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                    f"    can{can_num}_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                    f"    can{can_num}_filter.FilterMaskIdHigh = 0;",
+                    f"    can{can_num}_filter.FilterMaskIdLow = 0;",
+                    f"    can{can_num}_filter.FilterActivation = ENABLE;",
+                ])
+                
+                if instance == 'CAN2':
+                    init_lines.append(f"    HAL_CAN_ConfigFilter(&hcan1, &can{can_num}_filter);  // 通过 CAN1 配置")
+                else:
+                    init_lines.append(f"    HAL_CAN_ConfigFilter(&hcan{can_num}, &can{can_num}_filter);")
+                
+                init_lines.extend([
+                    f"    HAL_CAN_Start(&hcan{can_num});",
+                    f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING);",
+                    "",
+                    f"    // 注册回调函数",
+                    f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                    ""
+                ])
+        
         content = CodeGenerator.replace_auto_generated(
             content, "AUTO GENERATED CAN_INIT", "\n".join(init_lines)
         )
@@ -462,6 +528,8 @@ class bsp_can(BspPeripheralBase):
         output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['source']}")
         save_with_preserve(output_path, content)
         return True
+
+
 
 class bsp_spi(BspPeripheralBase):
     def __init__(self, project_path):
@@ -654,16 +722,17 @@ class bsp_gpio(QWidget):
             template_content, "AUTO GENERATED BSP_GPIO_MAP", "\n".join(map_lines)
         )
         
-        # 生成EXTI使能代码
+        # 生成EXTI使能代码 - 使用用户自定义的BSP枚举名称
         enable_lines = []
         disable_lines = []
         for config in configs:
             if config['has_exti']:
                 ioc_label = config['ioc_label']
-                enable_lines.append(f"    case {ioc_label}_Pin:")
+                custom_name = config['custom_name']
+                enable_lines.append(f"    case BSP_GPIO_{custom_name}:")
                 enable_lines.append(f"      HAL_NVIC_EnableIRQ({ioc_label}_EXTI_IRQn);")
                 enable_lines.append(f"      break;")
-                disable_lines.append(f"    case {ioc_label}_Pin:")
+                disable_lines.append(f"    case BSP_GPIO_{custom_name}:")
                 disable_lines.append(f"      HAL_NVIC_DisableIRQ({ioc_label}_EXTI_IRQn);")
                 disable_lines.append(f"      break;")
                 
@@ -677,6 +746,8 @@ class bsp_gpio(QWidget):
         output_path = os.path.join(self.project_path, "User/bsp/gpio.c")
         save_with_preserve(output_path, content)
         return True
+
+
 
     def _save_config(self, configs):
         config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
