@@ -103,7 +103,7 @@ static void BMI_WriteSingle(BMI_Device_t dv, uint8_t reg, uint8_t data) {
       break;
   }
 
-  HAL_SPI_Transmit(BSP_SPI_GetHandle(BSP_SPI_BMI088), buffer, 2u, 20u);
+  BSP_SPI_Transmit(BSP_SPI_BMI088, buffer, 2u, false);
 
   switch (dv) {
     case BMI_ACCL:
@@ -128,8 +128,8 @@ static uint8_t BMI_ReadSingle(BMI_Device_t dv, uint8_t reg) {
       break;
   }
   buffer[0] = (uint8_t)(reg | 0x80);
-  HAL_SPI_Transmit(BSP_SPI_GetHandle(BSP_SPI_BMI088), buffer, 1u, 20u);
-  HAL_SPI_Receive(BSP_SPI_GetHandle(BSP_SPI_BMI088), buffer, 2u, 20u);
+  BSP_SPI_Transmit(BSP_SPI_BMI088, buffer, 1u, false);
+  BSP_SPI_Receive(BSP_SPI_BMI088, buffer, 2u, false);
 
   switch (dv) {
     case BMI_ACCL:
@@ -155,16 +155,16 @@ static void BMI_Read(BMI_Device_t dv, uint8_t reg, uint8_t *data, uint8_t len) {
       break;
   }
   buffer[0] = (uint8_t)(reg | 0x80);
-  HAL_SPI_Transmit(BSP_SPI_GetHandle(BSP_SPI_BMI088), buffer, 1u, 20u);
-  HAL_SPI_Receive_DMA(BSP_SPI_GetHandle(BSP_SPI_BMI088), data, len);
+  BSP_SPI_Transmit(BSP_SPI_BMI088, buffer, 1u, false); 
+  BSP_SPI_Receive(BSP_SPI_BMI088, data, len, true);
 }
 
 static void BMI088_RxCpltCallback(void) {
-  if (HAL_GPIO_ReadPin(ACCL_CS_GPIO_Port, ACCL_CS_Pin) == GPIO_PIN_RESET) {
+  if (BSP_GPIO_ReadPin(BSP_GPIO_ACCL_CS) == GPIO_PIN_RESET) {
     BMI088_ACCL_NSS_SET();
     osThreadFlagsSet(thread_alert, SIGNAL_BMI088_ACCL_RAW_REDY);
   }
-  if (HAL_GPIO_ReadPin(GYRO_CS_GPIO_Port, GYRO_CS_Pin) == GPIO_PIN_RESET) {
+  if (BSP_GPIO_ReadPin(BSP_GPIO_GYRO_CS) == GPIO_PIN_RESET) {
     BMI088_GYRO_NSS_SET();
     osThreadFlagsSet(thread_alert, SIGNAL_BMI088_GYRO_RAW_REDY);
   }
@@ -205,10 +205,9 @@ int8_t BMI088_Init(BMI088_t *bmi088, const BMI088_Cali_t *cali) {
 
   BSP_SPI_RegisterCallback(BSP_SPI_BMI088, BSP_SPI_RX_CPLT_CB,
                            BMI088_RxCpltCallback);
-  // BSP_GPIO_RegisterCallback(ACCL_INT_Pin, BMI088_AcclIntCallback);
-  // BSP_GPIO_RegisterCallback(GYRO_INT_Pin, BMI088_GyroIntCallback);
   BSP_GPIO_RegisterCallback(BSP_GPIO_ACCL_INT, BMI088_AcclIntCallback);
   BSP_GPIO_RegisterCallback(BSP_GPIO_GYRO_INT, BMI088_GyroIntCallback);
+
   /* Accl init. */
   /* Filter setting: Normal. */
   /* ODR: 0xAB: 800Hz. 0xAA: 400Hz. 0xA9: 200Hz. 0xA8: 100Hz. 0xA6: 25Hz. */
@@ -248,8 +247,6 @@ int8_t BMI088_Init(BMI088_t *bmi088, const BMI088_Cali_t *cali) {
 
   inited = true;
 
-  // BSP_GPIO_EnableIRQ(ACCL_INT_Pin);
-  // BSP_GPIO_EnableIRQ(GYRO_INT_Pin);
   BSP_GPIO_EnableIRQ(BSP_GPIO_ACCL_INT);
   BSP_GPIO_EnableIRQ(BSP_GPIO_GYRO_INT);
   return DEVICE_OK;

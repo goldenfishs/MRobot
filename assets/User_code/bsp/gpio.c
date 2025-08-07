@@ -31,9 +31,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 /* Exported functions ------------------------------------------------------- */
-int8_t BSP_GPIO_RegisterCallback(uint16_t pin, void (*callback)(void)) {
+int8_t BSP_GPIO_RegisterCallback(BSP_GPIO_t gpio, void (*callback)(void)) {
   if (callback == NULL) return BSP_ERR_NULL;
+  if (gpio >= BSP_GPIO_NUM) return BSP_ERR;
 
+  // 从GPIO映射中获取对应的pin值
+  uint16_t pin = GPIO_Map[gpio].pin;
+  
   for (uint8_t i = 0; i < 16; i++) {
     if (pin & (1 << i)) {
       GPIO_Callback[i] = callback;

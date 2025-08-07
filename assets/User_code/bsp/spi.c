@@ -1,6 +1,6 @@
 /* Includes ----------------------------------------------------------------- */
 #include <spi.h>
-#include "bsp\spi.h"
+#include "bsp/spi.h"
 
 /* Private define ----------------------------------------------------------- */
 /* Private macro ------------------------------------------------------------ */
@@ -10,7 +10,8 @@ static void (*SPI_Callback[BSP_SPI_NUM][BSP_SPI_CB_NUM])(void);
 
 /* Private function  -------------------------------------------------------- */
 static BSP_SPI_t SPI_Get(SPI_HandleTypeDef *hspi) {
-/* AUTO GENERATED SPI_GET */
+  if (hspi->Instance == SPI1)
+    return BSP_SPI_BMI088;
   else
     return BSP_SPI_ERR;
 }
@@ -83,7 +84,8 @@ void HAL_SPI_AbortCpltCallback(SPI_HandleTypeDef *hspi) {
 /* Exported functions ------------------------------------------------------- */
 SPI_HandleTypeDef *BSP_SPI_GetHandle(BSP_SPI_t spi) {
   switch (spi) {
-/* AUTO GENERATED BSP_SPI_GET_HANDLE */
+    case BSP_SPI_BMI088:
+      return &hspi1;
     default:
       return NULL;
   }
@@ -104,7 +106,7 @@ int8_t BSP_SPI_Transmit(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma) {
   if (dma) {
     return HAL_SPI_Transmit_DMA(hspi, data, size)!= HAL_OK;;
   } else {
-    return HAL_SPI_Transmit_IT(hspi, data, size)!= HAL_OK;;
+    return HAL_SPI_Transmit(hspi, data, size, 20)!= HAL_OK;;
   }
 }
 
@@ -116,7 +118,7 @@ int8_t BSP_SPI_Receive(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma) {
   if (dma) {
     return HAL_SPI_Receive_DMA(hspi, data, size)!= HAL_OK;;
   } else {
-    return HAL_SPI_Receive_IT(hspi, data, size)!= HAL_OK;;
+    return HAL_SPI_Receive(hspi, data, size, 20)!= HAL_OK;;
   }
 }
 
@@ -129,7 +131,7 @@ int8_t BSP_SPI_TransmitReceive(BSP_SPI_t spi, uint8_t *txData, uint8_t *rxData,
   if (dma) {
     return HAL_SPI_TransmitReceive_DMA(hspi, txData, rxData, size)!= HAL_OK;;
   } else {
-    return HAL_SPI_TransmitReceive_IT(hspi, txData, rxData, size)!= HAL_OK;;
+    return HAL_SPI_TransmitReceive(hspi, txData, rxData, size, 20)!= HAL_OK;;
   }
 }
 

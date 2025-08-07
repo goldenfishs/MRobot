@@ -20,7 +20,7 @@ typedef enum {
 } BSP_GPIO_t;
 
 /* Exported functions prototypes -------------------------------------------- */
-int8_t BSP_GPIO_RegisterCallback(uint16_t pin, void (*callback)(void));
+int8_t BSP_GPIO_RegisterCallback(BSP_GPIO_t gpio, void (*callback)(void));
 
 int8_t BSP_GPIO_EnableIRQ(BSP_GPIO_t gpio);
 int8_t BSP_GPIO_DisableIRQ(BSP_GPIO_t gpio);
