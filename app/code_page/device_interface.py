@@ -14,22 +14,25 @@ def load_device_config(config_path):
             return yaml.safe_load(f)
     return {}
 
-def get_available_bsp_devices(project_path, bsp_type):
-    """获取可用的BSP设备"""
+def get_available_bsp_devices(project_path, bsp_type, gpio_type=None):
+    """获取可用的BSP设备，GPIO可选类型过滤"""
     bsp_config_path = os.path.join(project_path, "User/bsp/bsp_config.yaml")
     if not os.path.exists(bsp_config_path):
         return []
-    
     try:
         with open(bsp_config_path, 'r', encoding='utf-8') as f:
             bsp_config = yaml.safe_load(f)
-        
-        if bsp_type in bsp_config and bsp_config[bsp_type].get('enabled', False):
+        if bsp_type == "gpio" and bsp_config.get("gpio", {}).get("enabled", False):
+            configs = bsp_config["gpio"].get("configs", [])
+            # 增加类型过滤
+            if gpio_type:
+                configs = [cfg for cfg in configs if cfg.get('type', '').lower() == gpio_type.lower()]
+            return [f"BSP_GPIO_{cfg['custom_name']}" for cfg in configs]
+        elif bsp_type in bsp_config and bsp_config[bsp_type].get('enabled', False):
             devices = bsp_config[bsp_type].get('devices', [])
             return [f"BSP_{bsp_type.upper()}_{device['name']}" for device in devices]
     except Exception as e:
         print(f"读取BSP配置失败: {e}")
-    
     return []
 
 def generate_device_header(project_path, enabled_devices):
@@ -156,49 +159,40 @@ class DeviceSimple(QWidget):
             layout.addWidget(deps_label)
     
     def _add_bsp_config(self, layout):
-        """添加BSP配置区域"""
         bsp_requirements = self.device_config.get('bsp_requirements', [])
         self.bsp_combos = {}
-        
         if bsp_requirements:
             layout.addWidget(BodyLabel("BSP设备配置:"))
-            
             for req in bsp_requirements:
                 bsp_type = req['type']
                 var_name = req['var_name']
                 description = req.get('description', '')
-                
-                # 创建选择组合框
+                gpio_type = req.get('gpio_type', None)  # 新增
                 req_layout = QHBoxLayout()
-                
                 label = BodyLabel(f"{bsp_type.upper()}:")
                 label.setMinimumWidth(80)
                 req_layout.addWidget(label)
-                
                 combo = ComboBox()
-                self._update_bsp_combo(combo, bsp_type)
-                
+                # 传递gpio_type参数
+                self._update_bsp_combo(combo, bsp_type, gpio_type)
                 req_layout.addWidget(combo)
-                
                 if description:
                     desc_label = BodyLabel(f"({description})")
                     desc_label.setStyleSheet("color: #666666; font-size: 12px;")
                     req_layout.addWidget(desc_label)
-                
                 req_layout.addStretch()
                 layout.addLayout(req_layout)
-                
                 self.bsp_combos[var_name] = combo
     
-    def _update_bsp_combo(self, combo, bsp_type):
-        """更新BSP组合框选项"""
+    def _update_bsp_combo(self, combo, bsp_type, gpio_type=None):
         combo.clear()
-        available_devices = get_available_bsp_devices(self.project_path, bsp_type)
+        available_devices = get_available_bsp_devices(self.project_path, bsp_type, gpio_type)
         if available_devices:
             combo.addItems(available_devices)
         else:
             combo.addItem(f"未找到可用的{bsp_type.upper()}设备")
             combo.setEnabled(False)
+
     
     def refresh_bsp_combos(self):
         """刷新所有BSP组合框"""
@@ -245,8 +239,17 @@ class DeviceSimple(QWidget):
         for file_type, filename in files.items():
             src_path = os.path.join(template_dir, filename)
             dst_path = os.path.join(self.project_path, f"User/device/{filename}")
-            
+
             if os.path.exists(src_path):
+                # 头文件和源文件都做变量替换
+                with open(src_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                for var_name, device_name in bsp_config.items():
+                    content = content.replace(var_name, device_name)
+                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                with open(dst_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
                 if file_type == 'header':
                     # 头文件直接复制，不做修改
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)

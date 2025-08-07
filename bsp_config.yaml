@@ -123,4 +123,6 @@ uart:
   devices:
   - instance: USART3
     name: DR16
+  - instance: UART5
+    name: AI
   enabled: true

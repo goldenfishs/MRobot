@@ -94,12 +94,9 @@ def get_all_dependency_components(dependencies):
             dependent_components.add(dep_name.lower())
     return dependent_components
 
+
 class ComponentSimple(QWidget):
     """简单组件界面 - 只有开启/关闭功能"""
-    
-    # 添加信号，用于通知其他组件状态变化
-    dependency_changed = pyqtSignal(str, bool)  # 组件名, 是否启用
-    
     def __init__(self, project_path, component_name, template_names, component_manager=None):
         super().__init__()
         self.project_path = project_path
@@ -108,259 +105,106 @@ class ComponentSimple(QWidget):
         self.component_manager = component_manager
         
         # 加载描述和依赖信息
-        component_dir = os.path.join(os.path.dirname(__file__), "../../assets/User_code/component")
+        component_dir = os.path.dirname(__file__) + "/../../assets/User_code/component"
         describe_path = os.path.join(component_dir, "describe.csv")
         dependencies_path = os.path.join(component_dir, "dependencies.csv")
-        
         self.descriptions = load_descriptions(describe_path)
         self.dependencies = load_dependencies(dependencies_path)
-        self.all_dependent_components = get_all_dependency_components(self.dependencies)
-        
-        # 判断当前组件是否被其他组件依赖
-        self.is_dependency = self.component_name.lower() in self.all_dependent_components
-        
-        # 强制启用状态相关
-        self._forced_enabled = False
-        self._dependency_count = 0  # 有多少个组件依赖此组件
         
         self._init_ui()
         self._load_config()
     
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        
-        # 顶部横向布局：左侧复选框，居中标题
         top_layout = QHBoxLayout()
         top_layout.setAlignment(Qt.AlignVCenter)
-        
-        # 所有组件都有复选框
         self.generate_checkbox = CheckBox(f"启用 {self.component_name}")
         self.generate_checkbox.stateChanged.connect(self._on_checkbox_changed)
         top_layout.addWidget(self.generate_checkbox, alignment=Qt.AlignLeft)
-        
-        # 如果是被依赖的组件，添加状态标签
-        if self.is_dependency:
-            self.dependency_status_label = BodyLabel("")
-            self.dependency_status_label.setStyleSheet("color: #888888; font-style: italic; margin-left: 10px;")
-            top_layout.addWidget(self.dependency_status_label, alignment=Qt.AlignLeft)
-        
-        # 弹性空间
         top_layout.addStretch()
-        
         title = SubtitleLabel(f"{self.component_name} 配置             ")
         title.setAlignment(Qt.AlignHCenter)
         top_layout.addWidget(title, alignment=Qt.AlignHCenter)
-        
-        # 再加一个弹性空间，保证标题居中
         top_layout.addStretch()
-        
         layout.addLayout(top_layout)
         
-        # 功能说明
         desc = self.descriptions.get(self.component_name.lower(), "")
         if desc:
             desc_label = BodyLabel(f"功能说明：{desc}")
             desc_label.setWordWrap(True)
             layout.addWidget(desc_label)
         
-        # 依赖信息
         deps = self.dependencies.get(self.component_name.lower(), [])
         if deps:
             deps_text = f"依赖组件：{', '.join([os.path.basename(dep) for dep in deps])}"
-            self.deps_label = BodyLabel(deps_text)
-            self.deps_label.setWordWrap(True)
-            self.deps_label.setStyleSheet("color: #888888;")
-            layout.addWidget(self.deps_label)
-            
-            # 依赖状态显示
-            self.deps_status_widget = QWidget()
-            deps_status_layout = QVBoxLayout(self.deps_status_widget)
-            deps_status_layout.setContentsMargins(20, 10, 20, 10)
-            
-            self.deps_checkboxes = {}
-            for dep in deps:
-                # 从路径中提取组件名
-                dep_name = os.path.basename(dep)
-                dep_checkbox = CheckBox(f"自动启用 {dep_name}")
-                dep_checkbox.setEnabled(False)  # 依赖项自动管理，不允许手动取消
-                deps_status_layout.addWidget(dep_checkbox)
-                self.deps_checkboxes[dep] = dep_checkbox
-            
-            layout.addWidget(self.deps_status_widget)
-        
-        # 如果是被依赖的组件，显示被哪些组件依赖
-        if self.is_dependency:
-            dependent_by = []
-            for component, deps in self.dependencies.items():
-                for dep_path in deps:
-                    if os.path.basename(dep_path).lower() == self.component_name.lower():
-                        dependent_by.append(component)
-            
-            if dependent_by:
-                dependent_text = f"被以下组件依赖：{', '.join(dependent_by)}"
-                dependent_label = BodyLabel(dependent_text)
-                dependent_label.setWordWrap(True)
-                dependent_label.setStyleSheet("color: #0078d4;")
-                layout.addWidget(dependent_label)
+            deps_label = BodyLabel(deps_text)
+            deps_label.setWordWrap(True)
+            deps_label.setStyleSheet("color: #888888;")
+            layout.addWidget(deps_label)
+            # 不再自动启用依赖，只做提示
         
         layout.addStretch()
-        
-        # 初始化界面状态
-        self._update_ui_state()
-    
-    def _update_ui_state(self):
-        """更新界面状态"""
-        if self.is_dependency:
-            if self._dependency_count > 0:
-                # 有组件依赖此组件，设置为强制启用状态
-                self.generate_checkbox.setEnabled(False)
-                self.generate_checkbox.setChecked(True)
-                self.dependency_status_label.setText(f"(被 {self._dependency_count} 个组件自动启用)")
-                self.dependency_status_label.setStyleSheet("color: #0078d4; font-style: italic; margin-left: 10px;")
-            else:
-                # 没有组件依赖此组件，恢复正常状态
-                self.generate_checkbox.setEnabled(True)
-                self.dependency_status_label.setText("(可选组件)")
-                self.dependency_status_label.setStyleSheet("color: #888888; font-style: italic; margin-left: 10px;")
     
     def _on_checkbox_changed(self, state):
-        """处理复选框状态变化，自动管理依赖"""
-        # 如果是被强制启用的，不允许用户取消
-        if self.is_dependency and self._dependency_count > 0:
-            return
-            
-        if state == 2:  # 选中状态
-            # 自动选中所有依赖项
-            deps = self.dependencies.get(self.component_name.lower(), [])
-            for dep in deps:
-                if dep in self.deps_checkboxes:
-                    self.deps_checkboxes[dep].setChecked(True)
-            
-            # 通知组件管理器启用依赖项
-            if self.component_manager:
-                self.component_manager.enable_dependencies(self.component_name, deps)
-        else:  # 未选中状态
-            # 取消选中所有依赖项
-            if hasattr(self, 'deps_checkboxes'):
-                for checkbox in self.deps_checkboxes.values():
-                    checkbox.setChecked(False)
-            
-            # 通知组件管理器禁用依赖项
-            if self.component_manager:
-                deps = self.dependencies.get(self.component_name.lower(), [])
-                self.component_manager.disable_dependencies(self.component_name, deps)
+        pass  # 不再自动启用依赖
     
-    def set_forced_enabled(self, enabled: bool):
-        """设置强制启用状态（用于依赖自动启用）"""
-        self._forced_enabled = enabled
-        if enabled:
-            self.set_dependency_count(max(1, self._dependency_count))
-        else:
-            self.set_dependency_count(0)
-            
     def is_need_generate(self):
-        """检查是否需要生成代码"""
         return self.generate_checkbox.isChecked()
     
-    def set_dependency_count(self, count):
-        """设置依赖计数并更新UI状态"""
-        self._dependency_count = count
-        if count > 0:
-            self._forced_enabled = True
-            if not self.generate_checkbox.isChecked():
-                # 阻止信号触发，直接设置状态
-                self.generate_checkbox.blockSignals(True)
-                self.generate_checkbox.setChecked(True)
-                self.generate_checkbox.blockSignals(False)
-        else:
-            self._forced_enabled = False
-        
-        self._update_ui_state()
-        self._save_config()  # 保存状态变化
-    
     def get_enabled_dependencies(self):
-        """获取已启用的依赖项列表"""
         if not self.is_need_generate():
             return []
         return self.dependencies.get(self.component_name.lower(), [])
     
     def _generate_component_code_internal(self):
-        """生成组件代码"""
         if not self.is_need_generate():
             return False
-        
         template_dir = self._get_component_template_dir()
-        
-        # 生成头文件和源文件
         for key, filename in self.template_names.items():
             template_path = os.path.join(template_dir, filename)
             template_content = CodeGenerator.load_template(template_path)
             if not template_content:
                 print(f"模板文件不存在或为空: {template_path}")
                 continue
-            
             output_path = os.path.join(self.project_path, f"User/component/{filename}")
             save_with_preserve(output_path, template_content)
-        
         self._save_config()
         return True
     
     def _get_component_template_dir(self):
-        """获取组件模板目录"""
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 向上找到 MRobot 根目录
         while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
             current_dir = os.path.dirname(current_dir)
-        
         if os.path.basename(current_dir) == 'MRobot':
             return os.path.join(current_dir, "assets/User_code/component")
         else:
-            # 如果找不到，使用相对路径作为备选
             return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets/User_code/component")
     
     def _save_config(self):
-        """保存配置"""
         config_path = os.path.join(self.project_path, "User/component/component_config.yaml")
         config_data = CodeGenerator.load_config(config_path)
         config_data[self.component_name.lower()] = {
             'enabled': self.is_need_generate(),
-            'dependencies': self.dependencies.get(self.component_name.lower(), []),
-            'is_dependency': self.is_dependency,
-            'dependency_count': self._dependency_count,
-            'forced_enabled': self._forced_enabled
+            'dependencies': self.dependencies.get(self.component_name.lower(), [])
         }
         CodeGenerator.save_config(config_data, config_path)
     
     def _load_config(self):
-        """加载配置"""
         config_path = os.path.join(self.project_path, "User/component/component_config.yaml")
         config_data = CodeGenerator.load_config(config_path)
         conf = config_data.get(self.component_name.lower(), {})
-        
-        # 加载依赖计数
-        self._dependency_count = conf.get('dependency_count', 0)
-        self._forced_enabled = conf.get('forced_enabled', False)
-        
-        # 设置复选框状态
         if conf.get('enabled', False):
             self.generate_checkbox.setChecked(True)
-        
-        # 更新UI状态
-        self._update_ui_state()
 
 class ComponentManager:
     """组件依赖管理器"""
     
     def __init__(self):
         self.component_pages = {}  # 组件名 -> 页面对象
-        self.dependency_count = {}  # 被依赖组件 -> 依赖计数
     
     def register_component(self, component_name, page):
         """注册组件页面"""
         self.component_pages[component_name.lower()] = page
-        
-        # 注册后立即同步状态
-        self._sync_dependency_states()
     
     def _sync_dependency_states(self):
         """同步所有依赖状态"""
@@ -474,7 +318,7 @@ class component(QWidget):
                 # 创建临时组件页面
                 template_names = {'header': f'{comp_name}.h', 'source': f'{comp_name}.c'}
                 temp_page = ComponentSimple(project_path, comp_name.upper(), template_names)
-                temp_page.set_forced_enabled(True)  # 自动启用依赖组件
+                # temp_page.set_forced_enabled(True)  # 自动启用依赖组件
                 component_pages[comp_name] = temp_page
         
         # 如果没有组件需要生成，返回提示信息

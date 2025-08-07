@@ -752,16 +752,23 @@ class bsp_gpio(QWidget):
     def _save_config(self, configs):
         config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
         config_data = CodeGenerator.load_config(config_path)
+        gpio_configs = []
+        for config in configs:
+            # 根据 pin 查找原始 available_list 项
+            match = next((item for item in self.available_list if item['pin'] == config['pin']), None)
+            gpio_type = "EXTI" if config['has_exti'] else (
+                "OUTPUT" if match and match.get('is_output') else "INPUT"
+            )
+            gpio_configs.append({
+                'custom_name': config['custom_name'],
+                'ioc_label': config['ioc_label'],
+                'pin': config['pin'],
+                'has_exti': config['has_exti'],
+                'type': gpio_type
+            })
         config_data['gpio'] = {
             'enabled': True,
-            'configs': [
-                {
-                    'custom_name': config['custom_name'],
-                    'ioc_label': config['ioc_label'],
-                    'pin': config['pin'],
-                    'has_exti': config['has_exti']
-                } for config in configs
-            ]
+            'configs': gpio_configs
         }
         CodeGenerator.save_config(config_data, config_path)
 

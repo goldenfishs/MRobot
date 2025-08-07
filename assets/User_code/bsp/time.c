@@ -16,14 +16,15 @@
 uint32_t BSP_TIME_Get_ms() { return xTaskGetTickCount(); }
 
 uint64_t BSP_TIME_Get_us() {
-  uint32_t ms_old = xTaskGetTickCount();
+  uint32_t tick_freq = osKernelGetTickFreq();
+  uint32_t ticks_old = xTaskGetTickCount()*(1000/tick_freq);
   uint32_t tick_value_old = SysTick->VAL;
-  uint32_t ms_new = xTaskGetTickCount();
+  uint32_t ticks_new = xTaskGetTickCount()*(1000/tick_freq);
   uint32_t tick_value_new = SysTick->VAL;
-  if (ms_old == ms_new) {
-    return ms_new * 1000 + 1000 - tick_value_old * 1000 / (SysTick->LOAD + 1);
+  if (ticks_old == ticks_new) {
+    return ticks_new * 1000 + 1000 - tick_value_old * 1000 / (SysTick->LOAD + 1);
   } else {
-    return ms_new * 1000 + 1000 - tick_value_new * 1000 / (SysTick->LOAD + 1);
+    return ticks_new * 1000 + 1000 - tick_value_new * 1000 / (SysTick->LOAD + 1);
   }
 }
 

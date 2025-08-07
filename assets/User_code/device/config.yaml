@@ -14,3 +14,38 @@ devices:
     files:
       header: "dr16.h"
       source: "dr16.c"
+  
+  bmi088:
+    name: "BMI088"
+    description: "BMI088 陀螺仪+加速度计传感器"
+    dependencies:
+      bsp: ["spi", "gpio"]
+      component: ["user_math"]
+    bsp_requirements:
+      - type: "spi"
+        var_name: "BSP_SPI_BMI088"
+        description: "用于与 BMI088 通信的 SPI 总线"
+      - type: "gpio"
+        var_name: "BSP_GPIO_ACCL_CS"
+        description: "加速度计片选输出引脚"
+        gpio_type: "output"
+      - type: "gpio"
+        var_name: "BSP_GPIO_GYRO_CS"
+        description: "陀螺仪片选输出引脚"
+        gpio_type: "output"
+      - type: "gpio"
+        var_name: "BSP_GPIO_ACCL_INT"
+        description: "加速度计中断输入引脚"
+        gpio_type: "EXTI"
+      - type: "gpio"
+        var_name: "BSP_GPIO_GYRO_INT"
+        description: "陀螺仪中断输入引脚"
+        gpio_type: "EXTI"
+    thread_signals:
+      - name: "SIGNAL_BMI088_ACCL_RAW_REDY"
+      - name: "SIGNAL_BMI088_GYRO_RAW_REDY"
+      - name: "SIGNAL_BMI088_ACCL_NEW_DATA"
+      - name: "SIGNAL_BMI088_GYRO_NEW_DATA"
+    files:
+      header: "bmi088.h"
+      source: "bmi088.c"
