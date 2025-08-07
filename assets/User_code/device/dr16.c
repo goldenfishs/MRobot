@@ -8,7 +8,7 @@
 #include <string.h>
 
 #include "bsp/uart.h"
-
+#include "bsp/time.h"
 /* Private define ----------------------------------------------------------- */
 #define DR16_CH_VALUE_MIN (364u)
 #define DR16_CH_VALUE_MID (1024u)

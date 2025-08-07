@@ -155,50 +155,64 @@ class CodeGenerateInterface(QWidget):
 
 
 
-
     def generate_code(self):
-        """生成代码逻辑 - 修复导入问题并添加配置重载"""
+        """生成所有代码，包括未加载页面"""
         try:
-            # 收集所有已加载的页面对象，并按类型分类
+            # 先收集所有页面名（从CSV配置文件读取）
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            csv_path = os.path.join(script_dir, "../assets/User_code/config.csv")
+            csv_path = os.path.abspath(csv_path)
+            all_class_names = []
+            if os.path.exists(csv_path):
+                with open(csv_path, newline='', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        row = [cell.strip() for cell in row if cell.strip()]
+                        if not row:
+                            continue
+                        main_title = row[0]
+                        for sub in row[1:]:
+                            class_name = f"{main_title}_{sub}".replace("-", "_")
+                            all_class_names.append(class_name)
+
+            # 创建所有页面对象（无论是否点击过）
             bsp_pages = []
             component_pages = []
             device_pages = []
-            
-            for i in range(self.stack.count()):
-                widget = self.stack.widget(i)
-                # 根据页面类型分类
-                if hasattr(widget, '_generate_bsp_code_internal'):
-                    bsp_pages.append(widget)
-                elif hasattr(widget, '_generate_component_code_internal'):
-                    component_pages.append(widget)
-                elif hasattr(widget, '_generate_device_code_internal'):
-                    device_pages.append(widget)
-            
+            for class_name in all_class_names:
+                widget = self._get_or_create_page(class_name)
+                if widget:
+                    if hasattr(widget, '_generate_bsp_code_internal') and widget not in bsp_pages:
+                        bsp_pages.append(widget)
+                    elif hasattr(widget, '_generate_component_code_internal') and widget not in component_pages:
+                        component_pages.append(widget)
+                    elif hasattr(widget, '_generate_device_code_internal') and widget not in device_pages:
+                        device_pages.append(widget)
+
             # 确保导入成功
             from app.code_page.bsp_interface import bsp
             from app.code_page.component_interface import component
             from app.code_page.device_interface import device
-            
+
             # 生成 BSP 代码
             bsp_result = bsp.generate_bsp(self.project_path, bsp_pages)
-            
+
             # 生成 Component 代码  
             component_result = component.generate_component(self.project_path, component_pages)
-            
+
             # 生成 Device 代码
             device_result = device.generate_device(self.project_path, device_pages)
-            
+
             # 合并结果信息
             combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}\n\nDevice代码生成:\n{device_result}"
-            
-            # 用 InfoBar 在主界面弹出
+
             InfoBar.success(
                 title="代码生成结果",
                 content=combined_result,
                 parent=self,
                 duration=5000
             )
-            
+
         except ImportError as e:
             InfoBar.error(
                 title="导入错误", 
@@ -213,8 +227,6 @@ class CodeGenerateInterface(QWidget):
                 parent=self,
                 duration=3000
             )
-
-
 
 
     def _get_freertos_status(self):

@@ -49,3 +49,28 @@ devices:
     files:
       header: "bmi088.h"
       source: "bmi088.c"
+
+  ist8310:
+    name: "IST8310"
+    description: "IST8310 地磁传感器"
+    dependencies:
+      bsp: ["i2c", "gpio"]
+      component: []
+    bsp_requirements:
+      - type: "i2c"
+        var_name: "BSP_I2C_COMP"
+        description: "用于与 IST8310 通信的 I2C 总线"
+      - type: "gpio"
+        var_name: "CMPS_RST_Pin"
+        description: "IST8310 复位引脚"
+        gpio_type: "output"
+      - type: "gpio"
+        var_name: "CMPS_INT_Pin"
+        description: "IST8310 数据中断引脚"
+        gpio_type: "EXTI"
+    thread_signals:
+      - name: "SIGNAL_IST8310_MAGN_RAW_REDY"
+      - name: "SIGNAL_IST8310_MAGN_NEW_DATA"
+    files:
+      header: "ist8310.h"
+      source: "ist8310.c"

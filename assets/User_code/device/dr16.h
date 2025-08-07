@@ -30,6 +30,7 @@ typedef struct __packed {
 } DR16_Data_t;
 
 typedef struct {
+  DEVICE_Header_t header;
   DR16_Data_t data;
 } DR16_t;
 

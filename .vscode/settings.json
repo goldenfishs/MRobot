@@ -9,6 +9,7 @@
         "vector": "c",
         "can.h": "c",
         "device.h": "c",
-        "gpio.h": "c"
+        "gpio.h": "c",
+        "uart.h": "c"
     }
 }

@@ -23,6 +23,7 @@ typedef struct {
 } BMI088_Cali_t; /* BMI088校准数据 */
 
 typedef struct {
+  DEVICE_Header_t header;
   AHRS_Accl_t accl;
   AHRS_Gyro_t gyro;
 

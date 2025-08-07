@@ -1,4 +1,4 @@
 bsp,can,dwt,gpio,i2c,mm,spi,uart,pwm,time
 component,ahrs,ballistics,capacity,cmd,crc8,crc16,error_detect,filter,FreeRTOS_CLI,limiter,mixer,pid,ui,user_math
-device,dr16,bmi088
-module,chassis,gimbal,arm,shoot
+device,dr16,bmi088,ist8310
+module,
