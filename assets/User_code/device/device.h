@@ -10,6 +10,19 @@ extern "C" {
 #define DEVICE_ERR_INITED (-3)
 #define DEVICE_ERR_NO_DEV (-4)
 
+/* AUTO GENERATED SIGNALS BEGIN */
+
+/* AUTO GENERATED SIGNALS END */
+
+/* USER SIGNALS BEGIN */
+
+/* USER SIGNALS END */
+/*设备层通用Header*/
+typedef struct {
+    bool online;
+    uint64_t last_online_time;
+} DEVICE_Header_t;
+
 #ifdef __cplusplus
 }
 #endif

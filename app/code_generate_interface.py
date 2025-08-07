@@ -154,27 +154,42 @@ class CodeGenerateInterface(QWidget):
         )
 
 
+
+
     def generate_code(self):
-        """生成代码逻辑 - 修复导入问题"""
+        """生成代码逻辑 - 修复导入问题并添加配置重载"""
         try:
-            # 收集所有已加载的页面对象
-            pages = []
+            # 收集所有已加载的页面对象，并按类型分类
+            bsp_pages = []
+            component_pages = []
+            device_pages = []
+            
             for i in range(self.stack.count()):
                 widget = self.stack.widget(i)
-                pages.append(widget)
+                # 根据页面类型分类
+                if hasattr(widget, '_generate_bsp_code_internal'):
+                    bsp_pages.append(widget)
+                elif hasattr(widget, '_generate_component_code_internal'):
+                    component_pages.append(widget)
+                elif hasattr(widget, '_generate_device_code_internal'):
+                    device_pages.append(widget)
             
             # 确保导入成功
             from app.code_page.bsp_interface import bsp
             from app.code_page.component_interface import component
+            from app.code_page.device_interface import device
             
             # 生成 BSP 代码
-            bsp_result = bsp.generate_bsp(self.project_path, pages)
+            bsp_result = bsp.generate_bsp(self.project_path, bsp_pages)
             
             # 生成 Component 代码  
-            component_result = component.generate_component(self.project_path, pages)
+            component_result = component.generate_component(self.project_path, component_pages)
+            
+            # 生成 Device 代码
+            device_result = device.generate_device(self.project_path, device_pages)
             
             # 合并结果信息
-            combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}"
+            combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}\n\nDevice代码生成:\n{device_result}"
             
             # 用 InfoBar 在主界面弹出
             InfoBar.success(
@@ -198,6 +213,9 @@ class CodeGenerateInterface(QWidget):
                 parent=self,
                 duration=3000
             )
+
+
+
 
     def _get_freertos_status(self):
         """获取FreeRTOS状态"""
@@ -261,6 +279,11 @@ class CodeGenerateInterface(QWidget):
                 comp_name = class_name[len('component_'):]  # 移除 .replace("_", " ")
                 page = get_component_page(comp_name, self.project_path, self.component_manager)
                 self.component_manager.register_component(page.component_name, page)
+            elif class_name.startswith('device_'):
+                # Device页面
+                from app.code_page.device_interface import get_device_page
+                device_name = class_name[len('device_'):]  # 移除 device_ 前缀
+                page = get_device_page(device_name, self.project_path)
             else:
                 print(f"未知的页面类型: {class_name}")
                 return None
@@ -271,4 +294,3 @@ class CodeGenerateInterface(QWidget):
         except Exception as e:
             print(f"创建页面 {class_name} 失败: {e}")
             return None
-    

@@ -1,0 +1,16 @@
+devices:
+  dr16:
+    name: "DR16"
+    description: "大疆遥控器接收机"
+    dependencies:
+      bsp: ["uart"]
+      component: ["user_math"]
+    bsp_requirements:
+      - type: "uart"
+        var_name: "BSP_UART_DR16"  # 需要替换的变量名
+        description: "用于接收遥控器数据"
+    thread_signals:
+      - name: "SIGNAL_DR16_RAW_REDY"
+    files:
+      header: "dr16.h"
+      source: "dr16.c"

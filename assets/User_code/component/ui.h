@@ -11,7 +11,7 @@ extern "C" {
 #include <stdint.h>
 #include <string.h>
 
-#include "component\user_math.h"
+#include "component/user_math.h"
 
 #define UI_DEL_OPERATION_NOTHING (0)
 #define UI_DEL_OPERATION_DEL (1)
@@ -45,12 +45,12 @@ typedef enum {
   WHITE
 } UI_Color_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   uint8_t op;
   uint8_t num_layer;
 } UI_InterStudent_UIDel_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   uint8_t name[3];
   uint8_t type_op : 3;
   uint8_t type_ele : 3;
@@ -66,28 +66,28 @@ typedef __Packed struct {
   uint16_t y_end : 11;
 } UI_Ele_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   UI_Ele_t grapic;
 } UI_Drawgrapic_1_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   UI_Ele_t grapic[2];
 } UI_Drawgrapic_2_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   UI_Ele_t grapic[5];
 } UI_Drawgrapic_5_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   UI_Ele_t grapic[7];
 } UI_Drawgrapic_7_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   UI_Ele_t grapic;
   uint8_t character[30];
 } UI_Drawcharacter_t;
 
-typedef __Packed struct {
+typedef struct __packed {
   uint8_t del_operation;
   uint8_t layer;
 } UI_Del_t;

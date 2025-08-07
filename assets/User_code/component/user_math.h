@@ -25,6 +25,10 @@ extern "C" {
 #define M_2PI 6.28318530717958647692f
 #endif
 
+#ifndef __packed
+  #define __packed __attribute__((__packed__))
+#endif /* __packed */
+
 #define max(a, b)           \
   ({                        \
     __typeof__(a) _a = (a); \
