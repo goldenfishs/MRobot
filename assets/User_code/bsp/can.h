@@ -162,41 +162,46 @@ int8_t BSP_CAN_TransmitRemoteFrame(BSP_CAN_t can, BSP_CAN_RemoteFrame_t *frame);
 
 /**
  * @brief 注册 CAN ID 接收队列
+ * @param can CAN 枚举
  * @param can_id 解析后的CAN ID
  * @param queue_size 队列大小，0使用默认值
  * @return BSP_OK 成功，其他值失败
  */
-int8_t BSP_CAN_RegisterId(uint32_t can_id, uint8_t queue_size);
+int8_t BSP_CAN_RegisterId(BSP_CAN_t can, uint32_t can_id, uint8_t queue_size);
 
 /**
  * @brief 注销 CAN ID 接收队列
+ * @param can CAN 枚举
  * @param can_id 解析后的CAN ID
  * @return BSP_OK 成功，其他值失败
  */
-int8_t BSP_CAN_UnregisterIdQueue(uint32_t can_id);
+int8_t BSP_CAN_UnregisterIdQueue(BSP_CAN_t can, uint32_t can_id);
 
 /**
- * @brief 获取 CAN 消息（阻塞方式）
+ * @brief 获取 CAN 消息
+ * @param can CAN 枚举
  * @param can_id 解析后的CAN ID
  * @param msg 存储消息的结构体指针
  * @param timeout 超时时间（毫秒），0为立即返回，osWaitForever为永久等待
  * @return BSP_OK 成功，其他值失败
  */
-int8_t BSP_CAN_GetMessage(uint32_t can_id, BSP_CAN_Message_t *msg, uint32_t timeout);
+int8_t BSP_CAN_GetMessage(BSP_CAN_t can, uint32_t can_id, BSP_CAN_Message_t *msg, uint32_t timeout);
 
 /**
  * @brief 获取指定ID队列中的消息数量
+ * @param can CAN 枚举
  * @param can_id 解析后的CAN ID
  * @return 消息数量，-1表示队列不存在
  */
-int32_t BSP_CAN_GetQueueCount(uint32_t can_id);
+int32_t BSP_CAN_GetQueueCount(BSP_CAN_t can, uint32_t can_id);
 
 /**
  * @brief 清空指定ID队列中的所有消息
+ * @param can CAN 枚举
  * @param can_id 解析后的CAN ID
  * @return BSP_OK 成功，其他值失败
  */
-int8_t BSP_CAN_FlushQueue(uint32_t can_id);
+int8_t BSP_CAN_FlushQueue(BSP_CAN_t can, uint32_t can_id);
 
 /**
  * @brief 注册ID解析器

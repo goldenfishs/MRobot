@@ -474,8 +474,8 @@ class bsp_can(BspPeripheralBase):
                 "    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);  // 激活 FIFO0 中断",
                 "",
                 "    // 注册回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_CAN1, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_CAN2, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
             ])
         else:
             # 只有单个CAN的情况
