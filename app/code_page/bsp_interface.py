@@ -7,6 +7,7 @@ from app.tools.code_generator import CodeGenerator
 import os
 import csv
 import shutil
+import re
 
 def preserve_all_user_regions(new_code, old_code):
     """ Preserves all user-defined regions in the new code based on the old code.
@@ -543,6 +544,54 @@ class bsp_spi(BspPeripheralBase):
             get_available_spi
         )
 
+
+def patch_uart_interrupts(project_path, uart_instances):
+    """自动修改 stm32f4xx_it.c，插入 UART BSP 相关代码"""
+    it_path = os.path.join(project_path, "Core/Src/stm32f4xx_it.c")
+    if not os.path.exists(it_path):
+        return
+    with open(it_path, "r", encoding="utf-8") as f:
+        code = f.read()
+
+    # 1. 插入 #include "bsp/uart.h"
+    include_pattern = r"(/\* USER CODE BEGIN Includes \*/)(.*?)(/\* USER CODE END Includes \*/)"
+    if '#include "bsp/uart.h"' not in code:
+        code = re.sub(
+            include_pattern,
+            lambda m: f'{m.group(1)}\n#include "bsp/uart.h"{m.group(2)}{m.group(3)}',
+            code,
+            flags=re.DOTALL
+        )
+
+    # 2. 插入 BSP_UART_IRQHandler(&huartx);
+    for instance in uart_instances:
+        num = ''.join(filter(str.isdigit, instance))
+        irq_pattern = (
+            rf"(void\s+USART{num}_IRQHandler\s*\(\s*void\s*\)\s*\{{.*?/\* USER CODE BEGIN USART{num}_IRQn 1 \*/)(.*?)(/\* USER CODE END USART{num}_IRQn 1 \*/)"
+        )
+        if f"BSP_UART_IRQHandler(&huart{num});" not in code:
+            code = re.sub(
+                irq_pattern,
+                lambda m: f"{m.group(1)}\n  BSP_UART_IRQHandler(&huart{num});{m.group(2)}{m.group(3)}",
+                code,
+                flags=re.DOTALL
+            )
+        # 兼容 UARTx 命名
+        irq_pattern_uart = (
+            rf"(void\s+UART{num}_IRQHandler\s*\(\s*void\s*\)\s*\{{.*?/\* USER CODE BEGIN UART{num}_IRQn 1 \*/)(.*?)(/\* USER CODE END UART{num}_IRQn 1 \*/)"
+        )
+        if f"BSP_UART_IRQHandler(&huart{num});" not in code:
+            code = re.sub(
+                irq_pattern_uart,
+                lambda m: f"{m.group(1)}\n  BSP_UART_IRQHandler(&huart{num});{m.group(2)}{m.group(3)}",
+                code,
+                flags=re.DOTALL
+            )
+
+    with open(it_path, "w", encoding="utf-8") as f:
+        f.write(code)
+
+
 class bsp_uart(BspPeripheralBase):
     def __init__(self, project_path):
         super().__init__(
@@ -554,7 +603,22 @@ class bsp_uart(BspPeripheralBase):
             "uart",
             get_available_uart
         )
-
+    def _generate_bsp_code_internal(self):
+        if not self.is_need_generate():
+            return False
+        configs = self._collect_configs()
+        if not configs:
+            return False
+        template_dir = CodeGenerator.get_template_dir()
+        if not self._generate_header_file(configs, template_dir):
+            return False
+        if not self._generate_source_file(configs, template_dir):
+            return False
+        self._save_config(configs)
+        # 自动补充 stm32f4xx_it.c
+        uart_instances = [instance for _, instance in configs]
+        patch_uart_interrupts(self.project_path, uart_instances)
+        return True
 class bsp_gpio(QWidget):
     def __init__(self, project_path):
         super().__init__()

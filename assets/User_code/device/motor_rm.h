@@ -10,7 +10,7 @@ extern "C" {
 #include "bsp/can.h"
 
 /* Exported constants ------------------------------------------------------- */
-#define MOTOR_RM_MAX_MOTORS 11 /* 最大电机数量 */
+#define MOTOR_RM_MAX_MOTORS 11
 
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
@@ -37,91 +37,87 @@ typedef union {
     int16_t gm6020_id20B;
   } named;
 } MOTOR_RM_MsgOutput_t;
-/*注册电机时候每个电机需要的参数*/
+
+/*每个电机需要的参数*/
 typedef struct {
     BSP_CAN_t can;
-    uint16_t id;  // 实际CAN ID，如0x201, 0x205等
+    uint16_t id;
     MOTOR_RM_Module_t module;
     bool reverse;
 } MOTOR_RM_Param_t;
 
+/*电机实例*/
 typedef struct MOTOR_RM_t {
     MOTOR_RM_Param_t param;
     MOTOR_t motor;
 } MOTOR_RM_t;
 
+/*CAN管理器，管理一个CAN总线上所有的电机*/
 typedef struct {
     BSP_CAN_t can;
     MOTOR_RM_MsgOutput_t output_msg;
-    MOTOR_RM_t *motors[MOTOR_RM_MAX_MOTORS];  // 最多15个电机
+    MOTOR_RM_t *motors[MOTOR_RM_MAX_MOTORS];
     uint8_t motor_count;
 } MOTOR_RM_CANManager_t;
 
-
-
-
 /* Exported functions prototypes -------------------------------------------- */
+
 /**
  * @brief 注册一个RM电机
  * @param param 电机参数
- * @return 0 成功，其他值失败
+ * @return 
  */
 int8_t MOTOR_RM_Register(MOTOR_RM_Param_t *param);
 
 /**
- * @brief 更新单个电机数据
- * @param can CAN通道
- * @param id 电机实际CAN ID
- * @return 0 成功，其他值失败
+ * @brief 更新指定电机数据
+ * @param param 电机参数
+ * @return 
  */
-int8_t MOTOR_RM_Update(BSP_CAN_t can, uint16_t id);
+int8_t MOTOR_RM_Update(MOTOR_RM_Param_t *param);
 
 /**
- * @brief 更新所有注册了的电机数据
- * @return 0 成功，其他值失败
+ * @brief 设置一个电机的输出
+ * @param param 电机参数
+ * @param value 输出值，范围[-1.0, 1.0]
+ * @return 
  */
-int8_t MOTOR_RM_UpdateAll(void);
+int8_t MOTOR_RM_SetOutput(MOTOR_RM_Param_t *param, float value);
 
 /**
- * @brief 设置电机输出值
- * @param can CAN通道
- * @param id 电机实际CAN ID
- * @param value 输出值（归一化，-1.0到1.0）
- * @return 0 成功，其他值失败
+ * @brief 发送控制命令到电机，注意一个CAN可以控制多个电机，所以只需要发送一次即可
+ * @param param 电机参数
+ * @return 
  */
-int8_t MOTOR_RM_SetOutput(BSP_CAN_t can, uint16_t id, float value);
+int8_t MOTOR_RM_Ctrl(MOTOR_RM_Param_t *param);
 
 /**
- * @brief 发送电机控制命令
- * @param can CAN通道
- * @param ctrl_id 控制帧ID（0x200, 0x1ff, 0x2ff）
- * @return 0 成功，其他值失败
+ * @brief 获取指定电机的实例指针
+ * @param param 电机参数
+ * @return 
  */
-int8_t MOTOR_RM_Ctrl(BSP_CAN_t can, uint16_t ctrl_id);
-
-/**
- * @brief 获取电机实例
- * @param can CAN通道
- * @param id 电机实际CAN ID
- * @return 电机实例指针，失败返回NULL
- */
-MOTOR_RM_t* MOTOR_RM_GetMotor(BSP_CAN_t can, uint16_t id);
+MOTOR_RM_t* MOTOR_RM_GetMotor(MOTOR_RM_Param_t *param);
 
 /**
  * @brief 使电机松弛（设置输出为0）
- * @param can CAN通道
- * @param id 电机实际CAN ID
- * @return 0 成功，其他值失败
+ * @param param 
+ * @return 
  */
-int8_t MOTOR_RM_Relax(BSP_CAN_t can, uint16_t id);
+int8_t MOTOR_RM_Relax(MOTOR_RM_Param_t *param);
 
 /**
- * @brief 使电机离线（输出为0并标记为不在线）
- * @param can CAN通道
- * @param id 电机实际CAN ID
- * @return 0 成功，其他值失败
+ * @brief 使电机离线（设置在线状态为false）
+ * @param param 
+ * @return 
  */
-int8_t MOTOR_RM_Offine(BSP_CAN_t can, uint16_t id);
+int8_t MOTOR_RM_Offine(MOTOR_RM_Param_t *param);
+
+/**
+ * @brief 
+ * @param  
+ * @return 
+ */
+int8_t MOTOR_RM_UpdateAll(void);
 
 #ifdef __cplusplus
 }

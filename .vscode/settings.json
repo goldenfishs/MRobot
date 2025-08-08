@@ -10,6 +10,7 @@
         "can.h": "c",
         "device.h": "c",
         "gpio.h": "c",
-        "uart.h": "c"
+        "uart.h": "c",
+        "motor_rm.h": "c"
     }
 }
