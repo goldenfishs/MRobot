@@ -6,6 +6,7 @@ import os
 import shutil
 import yaml
 import re
+import sys
 
 def load_device_config(config_path):
     """加载设备配置"""
@@ -274,16 +275,25 @@ class DeviceSimple(QWidget):
 
     def _get_device_template_dir(self):
         """获取设备模板目录"""
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 向上找到 MRobot 根目录
-        while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
-            current_dir = os.path.dirname(current_dir)
-        
-        if os.path.basename(current_dir) == 'MRobot':
-            return os.path.join(current_dir, "assets/User_code/device")
-        else:
-            # 如果找不到，使用相对路径作为备选
-            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets/User_code/device")
+        try:
+            if getattr(sys, 'frozen', False):
+                # 打包环境
+                if hasattr(sys, '_MEIPASS'):
+                    return os.path.join(sys._MEIPASS, "assets", "User_code", "device")
+                else:
+                    return os.path.join(os.path.dirname(sys.executable), "assets", "User_code", "device")
+            else:
+                # 开发环境
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                while current_dir != os.path.dirname(current_dir):
+                    if os.path.basename(current_dir) == 'MRobot':
+                        break
+                    current_dir = os.path.dirname(current_dir)
+                return os.path.join(current_dir, "assets", "User_code", "device")
+        except Exception as e:
+            print(f"获取设备模板目录失败: {e}")
+            # 备用方案
+            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets", "User_code", "device")
     
     def _save_config(self):
         """保存配置"""

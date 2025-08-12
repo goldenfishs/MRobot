@@ -63,19 +63,35 @@ class CodeGenerator:
     @staticmethod
     def get_template_dir():
         """获取模板目录路径，兼容打包环境"""
-        if getattr(sys, 'frozen', False):
-            # 打包后的环境
-            base_path = sys._MEIPASS
-            template_dir = os.path.join(base_path, "assets", "User_code", "bsp")
-        else:
-            # 开发环境
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
-                current_dir = os.path.dirname(current_dir)
-            template_dir = os.path.join(current_dir, "assets", "User_code", "bsp")
-        
-        print(f"模板目录路径: {template_dir}")
-        if not os.path.exists(template_dir):
-            print(f"警告：模板目录不存在: {template_dir}")
-        
-        return template_dir
+        try:
+            if getattr(sys, 'frozen', False):
+                # 打包后的环境
+                if hasattr(sys, '_MEIPASS'):
+                    base_path = sys._MEIPASS
+                else:
+                    base_path = os.path.dirname(sys.executable)
+                template_dir = os.path.join(base_path, "assets", "User_code", "bsp")
+            else:
+                # 开发环境
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                while current_dir != os.path.dirname(current_dir):
+                    if os.path.basename(current_dir) == 'MRobot':
+                        break
+                    current_dir = os.path.dirname(current_dir)
+                template_dir = os.path.join(current_dir, "assets", "User_code", "bsp")
+            
+            print(f"模板目录路径: {template_dir}")
+            if not os.path.exists(template_dir):
+                print(f"警告：模板目录不存在: {template_dir}")
+                # 尝试备用路径
+                alt_template_dir = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "User_code", "bsp")
+                alt_template_dir = os.path.abspath(alt_template_dir)
+                if os.path.exists(alt_template_dir):
+                    print(f"使用备用模板目录: {alt_template_dir}")
+                    return alt_template_dir
+            
+            return template_dir
+        except Exception as e:
+            print(f"获取模板目录失败: {e}")
+            # 最后的备用方案
+            return os.path.join(os.path.dirname(__file__), "..", "..", "assets", "User_code", "bsp")
