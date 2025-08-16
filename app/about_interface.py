@@ -8,7 +8,7 @@ from qfluentwidgets import InfoBar, InfoBarPosition, SubtitleLabel
 from .function_fit_interface import FunctionFitInterface
 from app.tools.check_update import check_update
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 class AboutInterface(QWidget):
     def __init__(self, parent=None):
