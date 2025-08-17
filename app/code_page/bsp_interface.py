@@ -390,6 +390,7 @@ class bsp_i2c(BspPeripheralBase):
             get_available_i2c
         )
 
+
 class bsp_can(BspPeripheralBase):
     def __init__(self, project_path):
         super().__init__(
@@ -401,7 +402,6 @@ class bsp_can(BspPeripheralBase):
             "can",
             get_available_can
         )
-
 
     def _generate_source_file(self, configs, template_dir):
         template_path = os.path.join(template_dir, self.template_names['source'])
@@ -438,90 +438,20 @@ class bsp_can(BspPeripheralBase):
         init_lines.append("    inited = true;")
         init_lines.append("")
         
-        # 检查是否同时有CAN1和CAN2
-        has_can1 = any(instance == 'CAN1' for _, instance in configs)
-        has_can2 = any(instance == 'CAN2' for _, instance in configs)
+        # 按照新的FIFO分配策略
+        can_instances = [instance for _, instance in configs]
+        can_count = len(can_instances)
         
-        if has_can1 and has_can2:
-            # 同时配置CAN1和CAN2的情况 - 统一使用FIFO0
-            init_lines.extend([
-                "    // 初始化 CAN1 - 使用 FIFO0",
-                "    CAN_FilterTypeDef can1_filter = {0};",
-                "    can1_filter.FilterBank = 0;",
-                "    can1_filter.FilterIdHigh = 0;",
-                "    can1_filter.FilterIdLow = 0;",
-                "    can1_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
-                "    can1_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
-                "    can1_filter.FilterMaskIdHigh = 0;",
-                "    can1_filter.FilterMaskIdLow = 0;",
-                "    can1_filter.FilterActivation = ENABLE;",
-                "    can1_filter.SlaveStartFilterBank = 14;  // 重要：设置从过滤器起始组",
-                "    can1_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
-                "    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);",
-                "    HAL_CAN_Start(&hcan1);",
-                "    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
-                "",
-                "    // 初始化 CAN2 - 使用 FIFO0（注意：通过 CAN1 配置 CAN2 的过滤器）",
-                "    CAN_FilterTypeDef can2_filter = {0};",
-                "    can2_filter.FilterBank = 14;  // CAN2 使用过滤器组 14",
-                "    can2_filter.FilterIdHigh = 0;",
-                "    can2_filter.FilterIdLow = 0;",
-                "    can2_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
-                "    can2_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
-                "    can2_filter.FilterMaskIdHigh = 0;",
-                "    can2_filter.FilterMaskIdLow = 0;",
-                "    can2_filter.FilterActivation = ENABLE;",
-                "    can2_filter.FilterFIFOAssignment = CAN_RX_FIFO0;  // 改为 FIFO0",
-                "    HAL_CAN_ConfigFilter(&hcan1, &can2_filter);  // 通过 CAN1 配置",
-                "    HAL_CAN_Start(&hcan2);",
-                "    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);  // 激活 FIFO0 中断",
-                "",
-                "    // 注册回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
-            ])
-        else:
-            # 只有单个CAN的情况
-            for idx, (name, instance) in enumerate(configs):
-                can_num = instance[-1]  # CAN1 -> 1, CAN2 -> 2
-                
-                init_lines.append(f"    // 初始化 {instance}")
-                init_lines.append(f"    CAN_FilterTypeDef can{can_num}_filter = {{0}};")
-                
-                if instance == 'CAN1':
-                    init_lines.extend([
-                        f"    can{can_num}_filter.FilterBank = 0;",
-                        f"    can{can_num}_filter.SlaveStartFilterBank = 14;",
-                        f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
-                    ])
-                else:  # CAN2
-                    init_lines.extend([
-                        f"    can{can_num}_filter.FilterBank = 14;",
-                        f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
-                    ])
-                
-                init_lines.extend([
-                    f"    can{can_num}_filter.FilterIdHigh = 0;",
-                    f"    can{can_num}_filter.FilterIdLow = 0;",
-                    f"    can{can_num}_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
-                    f"    can{can_num}_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
-                    f"    can{can_num}_filter.FilterMaskIdHigh = 0;",
-                    f"    can{can_num}_filter.FilterMaskIdLow = 0;",
-                    f"    can{can_num}_filter.FilterActivation = ENABLE;",
-                ])
-                
-                if instance == 'CAN2':
-                    init_lines.append(f"    HAL_CAN_ConfigFilter(&hcan1, &can{can_num}_filter);  // 通过 CAN1 配置")
-                else:
-                    init_lines.append(f"    HAL_CAN_ConfigFilter(&hcan{can_num}, &can{can_num}_filter);")
-                
-                init_lines.extend([
-                    f"    HAL_CAN_Start(&hcan{can_num});",
-                    f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING);",
-                    "",
-                    f"    // 注册回调函数",
-                    f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
-                    ""
-                ])
+        # 根据CAN数量分配FIFO
+        if can_count == 1:
+            # 只有CAN1 -> 用FIFO0
+            self._generate_single_can_init(init_lines, configs, "CAN_RX_FIFO0")
+        elif can_count == 2:
+            # CAN1和CAN2 -> CAN1用FIFO0，CAN2用FIFO1
+            self._generate_dual_can_init(init_lines, configs)
+        elif can_count >= 3:
+            # CAN1,2,3+ -> CAN1和CAN2用FIFO0，CAN3用FIFO1
+            self._generate_multi_can_init(init_lines, configs)
         
         content = CodeGenerator.replace_auto_generated(
             content, "AUTO GENERATED CAN_INIT", "\n".join(init_lines)
@@ -531,7 +461,167 @@ class bsp_can(BspPeripheralBase):
         save_with_preserve(output_path, content)
         return True
 
+    def _generate_single_can_init(self, init_lines, configs, fifo_assignment):
+        """单个CAN的初始化（使用FIFO0）"""
+        name, instance = configs[0]
+        can_num = instance[-1]  # CAN1 -> 1
+        
+        init_lines.extend([
+            f"    // 初始化 {instance} - 使用 FIFO0",
+            f"    CAN_FilterTypeDef can{can_num}_filter = {{0}};",
+            f"    can{can_num}_filter.FilterBank = 0;",
+            f"    can{can_num}_filter.FilterIdHigh = 0;",
+            f"    can{can_num}_filter.FilterIdLow = 0;",
+            f"    can{can_num}_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+            f"    can{can_num}_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+            f"    can{can_num}_filter.FilterMaskIdHigh = 0;",
+            f"    can{can_num}_filter.FilterMaskIdLow = 0;",
+            f"    can{can_num}_filter.FilterActivation = ENABLE;",
+            f"    can{can_num}_filter.SlaveStartFilterBank = 14;",
+            f"    can{can_num}_filter.FilterFIFOAssignment = {fifo_assignment};",
+            f"    HAL_CAN_ConfigFilter(&hcan{can_num}, &can{can_num}_filter);",
+            f"    HAL_CAN_Start(&hcan{can_num});",
+            f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING);",
+            "",
+            f"    // 注册回调函数",
+            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+            ""
+        ])
 
+    def _generate_dual_can_init(self, init_lines, configs):
+        """双CAN初始化（CAN1用FIFO0，CAN2用FIFO1）"""
+        # 找到CAN1和CAN2
+        can1_config = next((cfg for cfg in configs if cfg[1] == 'CAN1'), None)
+        can2_config = next((cfg for cfg in configs if cfg[1] == 'CAN2'), None)
+        
+        if can1_config:
+            name, instance = can1_config
+            init_lines.extend([
+                f"    // 初始化 CAN1 - 使用 FIFO0",
+                f"    CAN_FilterTypeDef can1_filter = {{0}};",
+                f"    can1_filter.FilterBank = 0;",
+                f"    can1_filter.FilterIdHigh = 0;",
+                f"    can1_filter.FilterIdLow = 0;",
+                f"    can1_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                f"    can1_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                f"    can1_filter.FilterMaskIdHigh = 0;",
+                f"    can1_filter.FilterMaskIdLow = 0;",
+                f"    can1_filter.FilterActivation = ENABLE;",
+                f"    can1_filter.SlaveStartFilterBank = 14;",
+                f"    can1_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
+                f"    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);",
+                f"    HAL_CAN_Start(&hcan1);",
+                f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
+                "",
+                f"    // 注册CAN1回调函数",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                ""
+            ])
+        
+        if can2_config:
+            name, instance = can2_config
+            init_lines.extend([
+                f"    // 初始化 CAN2 - 使用 FIFO1",
+                f"    CAN_FilterTypeDef can2_filter = {{0}};",
+                f"    can2_filter.FilterBank = 14;",
+                f"    can2_filter.FilterIdHigh = 0;",
+                f"    can2_filter.FilterIdLow = 0;",
+                f"    can2_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                f"    can2_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                f"    can2_filter.FilterMaskIdHigh = 0;",
+                f"    can2_filter.FilterMaskIdLow = 0;",
+                f"    can2_filter.FilterActivation = ENABLE;",
+                f"    can2_filter.FilterFIFOAssignment = CAN_RX_FIFO1;",
+                f"    HAL_CAN_ConfigFilter(&hcan1, &can2_filter);  // 通过 CAN1 配置",
+                f"    HAL_CAN_Start(&hcan2);",
+                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);",
+                "",
+                f"    // 注册CAN2回调函数",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                ""
+            ])
+
+    def _generate_multi_can_init(self, init_lines, configs):
+        """多CAN初始化（CAN1和CAN2用FIFO0，CAN3+用FIFO1）"""
+        can1_config = next((cfg for cfg in configs if cfg[1] == 'CAN1'), None)
+        can2_config = next((cfg for cfg in configs if cfg[1] == 'CAN2'), None)
+        other_configs = [cfg for cfg in configs if cfg[1] not in ['CAN1', 'CAN2']]
+        
+        # CAN1 - FIFO0
+        if can1_config:
+            name, instance = can1_config
+            init_lines.extend([
+                f"    // 初始化 CAN1 - 使用 FIFO0",
+                f"    CAN_FilterTypeDef can1_filter = {{0}};",
+                f"    can1_filter.FilterBank = 0;",
+                f"    can1_filter.FilterIdHigh = 0;",
+                f"    can1_filter.FilterIdLow = 0;",
+                f"    can1_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                f"    can1_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                f"    can1_filter.FilterMaskIdHigh = 0;",
+                f"    can1_filter.FilterMaskIdLow = 0;",
+                f"    can1_filter.FilterActivation = ENABLE;",
+                f"    can1_filter.SlaveStartFilterBank = 14;",
+                f"    can1_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
+                f"    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);",
+                f"    HAL_CAN_Start(&hcan1);",
+                f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
+                "",
+                f"    // 注册CAN1回调函数",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                ""
+            ])
+        
+        # CAN2 - FIFO0
+        if can2_config:
+            name, instance = can2_config
+            init_lines.extend([
+                f"    // 初始化 CAN2 - 使用 FIFO0",
+                f"    CAN_FilterTypeDef can2_filter = {{0}};",
+                f"    can2_filter.FilterBank = 14;",
+                f"    can2_filter.FilterIdHigh = 0;",
+                f"    can2_filter.FilterIdLow = 0;",
+                f"    can2_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                f"    can2_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                f"    can2_filter.FilterMaskIdHigh = 0;",
+                f"    can2_filter.FilterMaskIdLow = 0;",
+                f"    can2_filter.FilterActivation = ENABLE;",
+                f"    can2_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
+                f"    HAL_CAN_ConfigFilter(&hcan1, &can2_filter);  // 通过 CAN1 配置",
+                f"    HAL_CAN_Start(&hcan2);",
+                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);",
+                "",
+                f"    // 注册CAN2回调函数",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                ""
+            ])
+        
+        # CAN3+ - FIFO1
+        filter_bank = 20  # 从过滤器组20开始分配给CAN3+
+        for config in other_configs:
+            name, instance = config
+            can_num = ''.join(filter(str.isdigit, instance))
+            init_lines.extend([
+                f"    // 初始化 {instance} - 使用 FIFO1",
+                f"    CAN_FilterTypeDef can{can_num}_filter = {{0}};",
+                f"    can{can_num}_filter.FilterBank = {filter_bank};",
+                f"    can{can_num}_filter.FilterIdHigh = 0;",
+                f"    can{can_num}_filter.FilterIdLow = 0;",
+                f"    can{can_num}_filter.FilterMode = CAN_FILTERMODE_IDMASK;",
+                f"    can{can_num}_filter.FilterScale = CAN_FILTERSCALE_32BIT;",
+                f"    can{can_num}_filter.FilterMaskIdHigh = 0;",
+                f"    can{can_num}_filter.FilterMaskIdLow = 0;",
+                f"    can{can_num}_filter.FilterActivation = ENABLE;",
+                f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO1;",
+                f"    HAL_CAN_ConfigFilter(&hcan1, &can{can_num}_filter);  // 通过 CAN1 配置",
+                f"    HAL_CAN_Start(&hcan{can_num});",
+                f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO1_MSG_PENDING);",
+                "",
+                f"    // 注册{instance}回调函数",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                ""
+            ])
+            filter_bank += 1  # 为下一个CAN分配不同的过滤器组
 
 class bsp_spi(BspPeripheralBase):
     def __init__(self, project_path):
