@@ -74,3 +74,37 @@ devices:
     files:
       header: "ist8310.h"
       source: "ist8310.c"
+
+  motor_vesc:
+    name: "VESC 电调"
+    description: "VESC 电调驱动"
+    dependencies:
+      bsp: ["can", "time"]
+    files:
+      header: "motor_vesc.h"
+      source: "motor_vesc.c"
+  
+  motor_odrive:
+    name: "ODrive 电机"
+    description: "ODrive 电机驱动"
+    dependencies:
+      bsp: ["can", "time"]
+    files:
+      header: "motor_odrive.h"
+      source: "motor_odrive.c"
+
+  motor_rm:
+    name: "RM 电机" 
+    description: "RM 电机驱动"
+    dependencies:
+      bsp: ["can", "time"]
+    files:
+      header: "motor_rm.h"
+      source: "motor_rm.c"
+
+  motor:
+    name: "通用电机"
+    description: "通用电机驱动"
+    files:
+      header: "motor.h"
+      source: "motor.c"
