@@ -111,7 +111,7 @@ int8_t BSP_I2C_Transmit(BSP_I2C_t i2c, uint16_t devAddr, uint8_t *data,
   if (dma) {
     return HAL_I2C_Master_Transmit_DMA(hi2c, devAddr, data, size);
   } else {
-    return HAL_I2C_Master_Transmit_IT(hi2c, devAddr, data, size);
+    return HAL_I2C_Master_Transmit(hi2c, devAddr, data, size);
   }
 }
 
@@ -124,7 +124,7 @@ int8_t BSP_I2C_Receive(BSP_I2C_t i2c, uint16_t devAddr, uint8_t *data,
   if (dma) {
     return HAL_I2C_Master_Receive_DMA(hi2c, devAddr, data, size);
   } else {
-    return HAL_I2C_Master_Receive_IT(hi2c, devAddr, data, size);
+    return HAL_I2C_Master_Receive(hi2c, devAddr, data, size);
   }
 }
 
