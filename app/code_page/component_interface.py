@@ -105,7 +105,7 @@ class ComponentSimple(QWidget):
         self.component_manager = component_manager
         
         # 加载描述和依赖信息
-        component_dir = os.path.dirname(__file__) + "/../../assets/User_code/component"
+        component_dir = CodeGenerator.get_assets_dir("User_code/component")
         describe_path = os.path.join(component_dir, "describe.csv")
         dependencies_path = os.path.join(component_dir, "dependencies.csv")
         self.descriptions = load_descriptions(describe_path)
@@ -172,13 +172,7 @@ class ComponentSimple(QWidget):
         return True
     
     def _get_component_template_dir(self):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
-            current_dir = os.path.dirname(current_dir)
-        if os.path.basename(current_dir) == 'MRobot':
-            return os.path.join(current_dir, "assets/User_code/component")
-        else:
-            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets/User_code/component")
+        return CodeGenerator.get_assets_dir("User_code/component")
     
     def _save_config(self):
         config_path = os.path.join(self.project_path, "User/component/component_config.yaml")
@@ -286,7 +280,7 @@ class component(QWidget):
     def generate_component(project_path, pages):
         """生成所有组件代码，处理依赖关系"""
         # 自动添加 component.h
-        src_component_h = os.path.join(os.path.dirname(__file__), "../../assets/User_code/component/component.h")
+        src_component_h = os.path.join(CodeGenerator.get_assets_dir("User_code/component"), "component.h")
         dst_component_h = os.path.join(project_path, "User/component/component.h")
         os.makedirs(os.path.dirname(dst_component_h), exist_ok=True)
         if os.path.exists(src_component_h):

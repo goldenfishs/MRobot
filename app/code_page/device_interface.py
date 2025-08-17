@@ -37,7 +37,7 @@ def get_available_bsp_devices(project_path, bsp_type, gpio_type=None):
 
 def generate_device_header(project_path, enabled_devices):
     """生成device.h文件"""
-    device_dir = os.path.join(os.path.dirname(__file__), "../../assets/User_code/device")
+    device_dir = CodeGenerator.get_assets_dir("User_code/device")
     template_path = os.path.join(device_dir, "device.h")
     
     # 读取模板文件
@@ -274,16 +274,7 @@ class DeviceSimple(QWidget):
 
     def _get_device_template_dir(self):
         """获取设备模板目录"""
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # 向上找到 MRobot 根目录
-        while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
-            current_dir = os.path.dirname(current_dir)
-        
-        if os.path.basename(current_dir) == 'MRobot':
-            return os.path.join(current_dir, "assets/User_code/device")
-        else:
-            # 如果找不到，使用相对路径作为备选
-            return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets/User_code/device")
+        return CodeGenerator.get_assets_dir("User_code/device")
     
     def _save_config(self):
         """保存配置"""
@@ -316,7 +307,7 @@ class DeviceSimple(QWidget):
 def get_device_page(device_name, project_path):
     """根据设备名返回对应的页面类"""
     # 加载设备配置
-    device_dir = os.path.join(os.path.dirname(__file__), "../../assets/User_code/device")
+    device_dir = CodeGenerator.get_assets_dir("User_code/device")
     config_path = os.path.join(device_dir, "config.yaml")
     device_configs = load_device_config(config_path)
     

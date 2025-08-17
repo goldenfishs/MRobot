@@ -4,6 +4,7 @@ from qfluentwidgets import TitleLabel, BodyLabel, PushButton, TreeWidget, Fluent
 from app.tools.analyzing_ioc import analyzing_ioc
 from app.code_page.bsp_interface import bsp
 from app.data_interface import DataInterface
+from app.tools.code_generator import CodeGenerator
 
 import os
 import csv
@@ -159,9 +160,7 @@ class CodeGenerateInterface(QWidget):
         """生成所有代码，包括未加载页面"""
         try:
             # 先收集所有页面名（从CSV配置文件读取）
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            csv_path = os.path.join(script_dir, "../assets/User_code/config.csv")
-            csv_path = os.path.abspath(csv_path)
+            csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
             all_class_names = []
             if os.path.exists(csv_path):
                 with open(csv_path, newline='', encoding='utf-8') as f:
@@ -238,9 +237,7 @@ class CodeGenerateInterface(QWidget):
         return "未找到.ioc文件"
 
     def _load_csv_and_build_tree(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        csv_path = os.path.join(script_dir, "../assets/User_code/config.csv")
-        csv_path = os.path.abspath(csv_path)
+        csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
         print(f"加载CSV路径: {csv_path}")
         if not os.path.exists(csv_path):
             print(f"配置文件未找到: {csv_path}")

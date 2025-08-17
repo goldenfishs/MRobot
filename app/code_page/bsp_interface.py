@@ -37,6 +37,8 @@ def save_with_preserve(path, new_code):
         with open(path, "r", encoding="utf-8") as f:
             old_code = f.read()
         new_code = preserve_all_user_regions(new_code, old_code)
+    # 确保目录存在
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(new_code)
 
@@ -47,7 +49,7 @@ class BspSimplePeripheral(QWidget):
         self.peripheral_name = peripheral_name
         self.template_names = template_names
         # 加载描述
-        describe_path = os.path.join(os.path.dirname(__file__), "../../assets/User_code/bsp/describe.csv")
+        describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
         self.descriptions = load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
@@ -123,7 +125,7 @@ class BspPeripheralBase(QWidget):
         self.get_available_func = get_available_func
         self.available_list = []
         # 新增：加载描述
-        describe_path = os.path.join(os.path.dirname(__file__), "../../assets/User_code/bsp/describe.csv")
+        describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
         self.descriptions = load_descriptions(describe_path)
         self._init_ui()
         self._load_config()

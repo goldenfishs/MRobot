@@ -79,3 +79,32 @@ class CodeGenerator:
             print(f"警告：模板目录不存在: {template_dir}")
         
         return template_dir
+    
+    @staticmethod
+    def get_assets_dir(sub_path=""):
+        """获取assets目录路径，兼容打包环境
+        Args:
+            sub_path: 子路径，如 "User_code/component" 或 "User_code/device"
+        Returns:
+            str: 完整的assets路径
+        """
+        if getattr(sys, 'frozen', False):
+            # 打包后的环境
+            base_path = sys._MEIPASS
+            assets_dir = os.path.join(base_path, "assets")
+        else:
+            # 开发环境
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
+                current_dir = os.path.dirname(current_dir)
+            assets_dir = os.path.join(current_dir, "assets")
+        
+        if sub_path:
+            full_path = os.path.join(assets_dir, sub_path)
+        else:
+            full_path = assets_dir
+            
+        if not os.path.exists(full_path):
+            print(f"警告：资源目录不存在: {full_path}")
+        
+        return full_path
