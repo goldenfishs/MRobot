@@ -514,7 +514,7 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 "",
                 f"    // 注册CAN1回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 ""
             ])
         
@@ -531,13 +531,13 @@ class bsp_can(BspPeripheralBase):
                 f"    can2_filter.FilterMaskIdHigh = 0;",
                 f"    can2_filter.FilterMaskIdLow = 0;",
                 f"    can2_filter.FilterActivation = ENABLE;",
-                f"    can2_filter.FilterFIFOAssignment = CAN_RX_FIFO1;",
+                f"    can2_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
                 f"    HAL_CAN_ConfigFilter(&hcan1, &can2_filter);  // 通过 CAN1 配置",
                 f"    HAL_CAN_Start(&hcan2);",
-                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);",
+                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 "",
                 f"    // 注册CAN2回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 ""
             ])
 
@@ -568,7 +568,7 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 "",
                 f"    // 注册CAN1回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 ""
             ])
         
@@ -592,7 +592,7 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 "",
                 f"    // 注册CAN2回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 ""
             ])
         
@@ -612,13 +612,13 @@ class bsp_can(BspPeripheralBase):
                 f"    can{can_num}_filter.FilterMaskIdHigh = 0;",
                 f"    can{can_num}_filter.FilterMaskIdLow = 0;",
                 f"    can{can_num}_filter.FilterActivation = ENABLE;",
-                f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO1;",
+                f"    can{can_num}_filter.FilterFIFOAssignment = CAN_RX_FIFO0;",
                 f"    HAL_CAN_ConfigFilter(&hcan1, &can{can_num}_filter);  // 通过 CAN1 配置",
                 f"    HAL_CAN_Start(&hcan{can_num});",
-                f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO1_MSG_PENDING);",
+                f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 "",
                 f"    // 注册{instance}回调函数",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifoCallback);",
+                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 ""
             ])
             filter_bank += 1  # 为下一个CAN分配不同的过滤器组

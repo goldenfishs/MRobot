@@ -30,7 +30,8 @@ static BSP_CAN_t CAN_Get(CAN_HandleTypeDef *hcan);
 static osMessageQueueId_t BSP_CAN_FindQueue(BSP_CAN_t can, uint32_t can_id);
 static int8_t BSP_CAN_CreateIdQueue(BSP_CAN_t can, uint32_t can_id, uint8_t queue_size);
 static int8_t BSP_CAN_DeleteIdQueue(BSP_CAN_t can, uint32_t can_id);
-static void BSP_CAN_RxFifoCallback(void);
+static void BSP_CAN_RxFifo0Callback(void);
+static void BSP_CAN_RxFifo1Callback(void);
 static BSP_CAN_FrameType_t BSP_CAN_GetFrameType(CAN_RxHeaderTypeDef *header);
 static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
 
@@ -144,9 +145,9 @@ static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_
 }
 
 /**
- * @brief FIFO接收处理函数
+ * @brief FIFO0接收处理函数
  */
-static void BSP_CAN_RxFifoCallback(void) {
+static void BSP_CAN_RxFifo0Callback(void) {
     CAN_RxHeaderTypeDef rx_header;
     uint8_t rx_data[BSP_CAN_MAX_DLC];
     for (int can_idx = 0; can_idx < BSP_CAN_NUM; can_idx++) {
