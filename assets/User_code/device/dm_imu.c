@@ -7,6 +7,7 @@
 
 #include "bsp/can.h"
 #include "bsp/time.h"
+#include "component/user_math.h"
 #include <string.h>
 
 /* Private define ----------------------------------------------------------- */
@@ -86,12 +87,11 @@ static int8_t DM_IMU_ParseEulerData(DM_IMU_t *imu, uint8_t *data, uint8_t len) {
     uint16_t pit_raw = (data[3] << 8) | data[2];
     uint16_t yaw_raw = (data[5] << 8) | data[4];
     uint16_t rol_raw = (data[7] << 8) | data[6];
-    imu->data.euler.pit = uint_to_float(pit_raw, PITCH_CAN_MIN, PITCH_CAN_MAX, 16);
-    imu->data.euler.yaw = uint_to_float(yaw_raw, YAW_CAN_MIN, YAW_CAN_MAX, 16);
-    imu->data.euler.rol = uint_to_float(rol_raw, ROLL_CAN_MIN, ROLL_CAN_MAX, 16);
+    imu->data.euler.pit = uint_to_float(pit_raw, PITCH_CAN_MIN, PITCH_CAN_MAX, 16) * M_DEG2RAD_MULT;
+    imu->data.euler.yaw = uint_to_float(yaw_raw, YAW_CAN_MIN, YAW_CAN_MAX, 16) * M_DEG2RAD_MULT;
+    imu->data.euler.rol = uint_to_float(rol_raw, ROLL_CAN_MIN, ROLL_CAN_MAX, 16) * M_DEG2RAD_MULT;
     return DEVICE_OK;
 }
-
 
 /**
  * @brief 解析四元数数据
