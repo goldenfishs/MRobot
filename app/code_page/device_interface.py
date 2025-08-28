@@ -28,6 +28,10 @@ def get_available_bsp_devices(project_path, bsp_type, gpio_type=None):
             if gpio_type:
                 configs = [cfg for cfg in configs if cfg.get('type', '').lower() == gpio_type.lower()]
             return [f"BSP_GPIO_{cfg['custom_name']}" for cfg in configs]
+        elif bsp_type == "pwm" and bsp_config.get("pwm", {}).get("enabled", False):
+            # PWM使用configs结构
+            configs = bsp_config["pwm"].get("configs", [])
+            return [f"BSP_PWM_{cfg['custom_name']}" for cfg in configs]
         elif bsp_type in bsp_config and bsp_config[bsp_type].get('enabled', False):
             devices = bsp_config[bsp_type].get('devices', [])
             return [f"BSP_{bsp_type.upper()}_{device['name']}" for device in devices]

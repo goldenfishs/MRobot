@@ -7,14 +7,14 @@ extern "C" {
 /* Includes ----------------------------------------------------------------- */
 #include <cmsis_os2.h>
 	
-#include "bsp\pwm.h"
+#include "bsp/pwm.h"
 	
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
 
 /**
- * @brief ???????
+ * @brief 
  */
 typedef struct {
    BSP_PWM_Channel_t pwm_ch;  
