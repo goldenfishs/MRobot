@@ -68,3 +68,32 @@ int8_t BSP_PWM_Stop(BSP_PWM_Channel_t ch) {
   HAL_TIM_PWM_Stop(PWM_Map[ch].tim, PWM_Map[ch].channel);
   return BSP_OK;
 }
+
+uint32_t BSP_PWM_GetAutoReloadPreload(BSP_PWM_Channel_t ch) {
+    if (ch >= BSP_PWM_NUM) return BSP_ERR;
+    return PWM_Map[ch].tim->Init.AutoReloadPreload;  
+}
+
+TIM_HandleTypeDef* BSP_PWM_GetHandle(BSP_PWM_Channel_t ch) {
+  return PWM_Map[ch].tim;
+}
+
+
+uint16_t BSP_PWM_GetChannel(BSP_PWM_Channel_t ch) {
+  if (ch >= BSP_PWM_NUM) return BSP_ERR;
+  return PWM_Map[ch].channel;
+}
+
+int8_t BSP_PWM_Start_DMA(BSP_PWM_Channel_t ch, uint32_t *pData, uint16_t Length) {
+  if (ch >= BSP_PWM_NUM) return BSP_ERR;
+  
+  HAL_TIM_PWM_Start_DMA(PWM_Map[ch].tim, PWM_Map[ch].channel, pData, Length);
+  return BSP_OK;
+}
+
+int8_t BSP_PWM_Stop_DMA(BSP_PWM_Channel_t ch) {
+  if (ch >= BSP_PWM_NUM) return BSP_ERR;
+  
+  HAL_TIM_PWM_Stop_DMA(PWM_Map[ch].tim, PWM_Map[ch].channel);
+  return BSP_OK;
+}

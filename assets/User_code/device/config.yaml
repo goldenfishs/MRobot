@@ -108,3 +108,18 @@ devices:
     files:
       header: "motor.h"
       source: "motor.c"
+
+  ws2812:
+    name: "WS2812 LED 灯"
+    description: "WS2812 RGB LED 灯驱动"
+    dependencies:
+      bsp: ["pwm", "time"]
+      component: []
+    bsp_requirements:
+      - type: "pwm"
+        var_name: "BSP_PWM_WS2812"
+        description: "用于WS2812数据传输的PWM通道"
+    thread_signals: []
+    files:
+      header: "ws2812.h"
+      source: "ws2812.c"
