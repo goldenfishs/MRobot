@@ -176,6 +176,38 @@ static void BSP_CAN_RxFifo0Callback(void) {
     }
 }
 
+/**
+ * @brief FIFO1接收处理函数
+ */
+static void BSP_CAN_RxFifo1Callback(void) {
+    CAN_RxHeaderTypeDef rx_header;
+    uint8_t rx_data[BSP_CAN_MAX_DLC];
+    for (int can_idx = 0; can_idx < BSP_CAN_NUM; can_idx++) {
+        CAN_HandleTypeDef *hcan = BSP_CAN_GetHandle((BSP_CAN_t)can_idx);
+        if (hcan == NULL) continue;
+        while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO1) > 0) {
+            if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO1, &rx_header, rx_data) == HAL_OK) {
+                uint32_t original_id = (rx_header.IDE == CAN_ID_STD) ? rx_header.StdId : rx_header.ExtId;
+                BSP_CAN_FrameType_t frame_type = BSP_CAN_GetFrameType(&rx_header);
+                uint32_t parsed_id = BSP_CAN_ParseId(original_id, frame_type);
+                osMessageQueueId_t queue = BSP_CAN_FindQueue((BSP_CAN_t)can_idx, parsed_id);
+                if (queue != NULL) {
+                    BSP_CAN_Message_t msg = {0};
+                    msg.frame_type = frame_type;
+                    msg.original_id = original_id;
+                    msg.parsed_id = parsed_id;
+                    msg.dlc = rx_header.DLC;
+                    if (rx_header.RTR == CAN_RTR_DATA) {
+                        memcpy(msg.data, rx_data, rx_header.DLC);
+                    }
+                    msg.timestamp = HAL_GetTick();
+                    osMessageQueuePut(queue, &msg, 0, BSP_CAN_TIMEOUT_IMMEDIATE);
+                }
+            }
+        }
+    }
+}
+
 /* HAL Callback Functions --------------------------------------------------- */
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
   BSP_CAN_t bsp_can = CAN_Get(hcan);
