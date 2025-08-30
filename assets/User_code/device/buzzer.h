@@ -19,7 +19,6 @@ typedef struct {
 
 /* Exported functions prototypes -------------------------------------------- */
 
-
 int8_t BUZZER_Init(BUZZER_t *buzzer, BSP_PWM_Channel_t channel);
 
 

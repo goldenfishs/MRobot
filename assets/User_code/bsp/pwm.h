@@ -6,15 +6,13 @@ extern "C" {
 
 /* Includes ----------------------------------------------------------------- */
 #include <stdint.h>
-
+#include "tim.h"
 #include "bsp.h"
+
 
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
-/* Forward declarations */
-typedef struct __TIM_HandleTypeDef TIM_HandleTypeDef;
-
 /* PWM通道 */
 typedef enum {
 /* AUTO GENERATED BSP_PWM_ENUM */
