@@ -1,5 +1,5 @@
 /*
-   led控制
+   led鎺у埗
 */
 /*Includes   -----------------------------------------*/
 #include "device/led.h"
@@ -23,7 +23,7 @@ int8_t BSP_LED_Set(char sign,DEVICE_LED_t ch,bool value,float duty_cycle)
 		case 'p':
 		case 'P':
 			    if (duty_cycle < 0.0f || duty_cycle > 1.0f) {
-                return DEVICE_ERR_NULL; // 错误：占空比超出范围
+                return DEVICE_ERR_NULL; // 閿欒锛氬崰绌烘瘮瓒呭嚭鑼冨洿
             }
 				uint16_t pulse = (uint16_t)(duty_cycle * (float)UINT16_MAX);
 		BSP_PWM_Start(LED_Map.channel);
@@ -35,7 +35,7 @@ int8_t BSP_LED_Set(char sign,DEVICE_LED_t ch,bool value,float duty_cycle)
 		BSP_GPIO_WritePin(LED_Map.gpio,value);
 		break;
 	default:
-            return DEVICE_ERR_INITED; // 错误：无效的控制方式
+            return DEVICE_ERR_INITED; // 閿欒锛氭棤鏁堢殑鎺у埗鏂瑰紡
 	}
 	return DEVICE_OK;
 }

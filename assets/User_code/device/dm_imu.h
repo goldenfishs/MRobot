@@ -10,12 +10,19 @@ extern "C" {
 #include "bsp/can.h"
 /* Exported constants ------------------------------------------------------- */
 
-#define DM_IMU_CAN_ID 0x6FF
-#define DM_IMU_ID 0x42
-#define DM_IMU_MST_ID 0x43
+#define DM_IMU_CAN_ID_DEFAULT 0x6FF
+#define DM_IMU_ID_DEFAULT 0x42
+#define DM_IMU_MST_ID_DEFAULT 0x43
 
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
+
+typedef struct {
+  BSP_CAN_t can;       // CAN总线句柄
+  uint16_t can_id;     // CAN通信ID
+  uint8_t device_id;   // 设备ID
+  uint8_t master_id;   // 主机ID
+} DM_IMU_Param_t;
 typedef enum {
   RID_ACCL = 0x01, // 加速度计
   RID_GYRO = 0x02, // 陀螺仪
@@ -33,7 +40,7 @@ typedef struct {
 
 typedef struct {
   DEVICE_Header_t header;
-  BSP_CAN_t can;
+  DM_IMU_Param_t param; // IMU参数配置
   DM_IMU_Data_t data; // IMU数据
 } DM_IMU_t;
 
@@ -42,9 +49,10 @@ typedef struct {
 /**
  * @brief 初始化DM IMU设备
  * @param imu DM IMU设备结构体指针
+ * @param param IMU参数配置指针
  * @return DEVICE_OK 成功，其他值失败
  */
-int8_t DM_IMU_Init(DM_IMU_t *imu, BSP_CAN_t can);
+int8_t DM_IMU_Init(DM_IMU_t *imu, DM_IMU_Param_t *param);
 
 /**
  * @brief 请求IMU数据

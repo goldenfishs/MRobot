@@ -187,20 +187,20 @@ static void MOTOR_LZ_Decode(MOTOR_LZ_t *motor, BSP_CAN_Message_t *msg) {
     motor->lz_feedback.state = (MOTOR_LZ_State_t)mode_state;
     
     // 解析数据区
-    // Byte0~1: 当前角度
-    uint16_t raw_angle = (uint16_t)((msg->data[1] << 8) | msg->data[0]);
+    // Byte0~1: 当前角度 (高字节在前，低字节在后)
+    uint16_t raw_angle = (uint16_t)((msg->data[0] << 8) | msg->data[1]);
     motor->lz_feedback.current_angle = MOTOR_LZ_RawToFloat(raw_angle, LZ_ANGLE_RANGE_RAD);
     
-    // Byte2~3: 当前角速度
-    uint16_t raw_velocity = (uint16_t)((msg->data[3] << 8) | msg->data[2]);
+    // Byte2~3: 当前角速度 (高字节在前，低字节在后)
+    uint16_t raw_velocity = (uint16_t)((msg->data[2] << 8) | msg->data[3]);
     motor->lz_feedback.current_velocity = MOTOR_LZ_RawToFloat(raw_velocity, LZ_VELOCITY_RANGE_RAD_S);
     
-    // Byte4~5: 当前力矩
-    uint16_t raw_torque = (uint16_t)((msg->data[5] << 8) | msg->data[4]);
+    // Byte4~5: 当前力矩 (高字节在前，低字节在后)
+    uint16_t raw_torque = (uint16_t)((msg->data[4] << 8) | msg->data[5]);
     motor->lz_feedback.current_torque = MOTOR_LZ_RawToFloat(raw_torque, LZ_TORQUE_RANGE_NM);
     
-    // Byte6~7: 当前温度 (温度*10)
-    uint16_t raw_temp = (uint16_t)((msg->data[7] << 8) | msg->data[6]);
+    // Byte6~7: 当前温度 (温度*10) (高字节在前，低字节在后)
+    uint16_t raw_temp = (uint16_t)((msg->data[6] << 8) | msg->data[7]);
     motor->lz_feedback.temperature = (float)raw_temp / LZ_TEMP_SCALE;
     
     // 更新通用电机反馈信息
@@ -334,25 +334,25 @@ int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *m
     // 准备数据
     uint8_t data[8];
     
-    // Byte0~1: 目标角度
+    // Byte0~1: 目标角度 (高字节在前，低字节在后)
     uint16_t raw_angle = MOTOR_LZ_FloatToRaw(motion_param->target_angle, LZ_ANGLE_RANGE_RAD);
-    data[0] = raw_angle & 0xFF;
-    data[1] = (raw_angle >> 8) & 0xFF;
+    data[0] = (raw_angle >> 8) & 0xFF;  // 高字节
+    data[1] = raw_angle & 0xFF;         // 低字节
     
-    // Byte2~3: 目标角速度  
+    // Byte2~3: 目标角速度 (高字节在前，低字节在后)
     uint16_t raw_velocity = MOTOR_LZ_FloatToRaw(motion_param->target_velocity, LZ_VELOCITY_RANGE_RAD_S);
-    data[2] = raw_velocity & 0xFF;
-    data[3] = (raw_velocity >> 8) & 0xFF;
+    data[2] = (raw_velocity >> 8) & 0xFF;  // 高字节
+    data[3] = raw_velocity & 0xFF;         // 低字节
     
-    // Byte4~5: Kp
+    // Byte4~5: Kp (高字节在前，低字节在后)
     uint16_t raw_kp = MOTOR_LZ_FloatToRaw(motion_param->kp, LZ_KP_MAX);
-    data[4] = raw_kp & 0xFF;
-    data[5] = (raw_kp >> 8) & 0xFF;
+    data[4] = (raw_kp >> 8) & 0xFF;     // 高字节
+    data[5] = raw_kp & 0xFF;            // 低字节
     
-    // Byte6~7: Kd
+    // Byte6~7: Kd (高字节在前，低字节在后)
     uint16_t raw_kd = MOTOR_LZ_FloatToRaw(motion_param->kd, LZ_KD_MAX);
-    data[6] = raw_kd & 0xFF;
-    data[7] = (raw_kd >> 8) & 0xFF;
+    data[6] = (raw_kd >> 8) & 0xFF;     // 高字节
+    data[7] = raw_kd & 0xFF;            // 低字节
     
     return MOTOR_LZ_SendExtFrame(param->can, ext_id, data, 8);
 }
@@ -422,4 +422,12 @@ int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param) {
         return DEVICE_OK;
     }
     return DEVICE_ERR_NO_DEV;
+}
+
+MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param) {
+    MOTOR_LZ_t *motor = MOTOR_LZ_GetMotor(param);
+    if (motor && motor->motor.header.online) {
+        return &motor->lz_feedback;
+    }
+    return NULL;
 }

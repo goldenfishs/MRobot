@@ -15,8 +15,8 @@ extern "C" {
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
 typedef enum {
-    MOTOR_MF9025,
-    MOTOR_MF9035,
+    MOTOR_LK_MF9025,
+    MOTOR_LK_MF9035,
 } MOTOR_LK_Module_t;
 
 

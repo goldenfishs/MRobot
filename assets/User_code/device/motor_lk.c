@@ -44,8 +44,8 @@ static MOTOR_LK_CANManager_t *can_managers[BSP_CAN_NUM] = {NULL};
 /* Private functions -------------------------------------------------------- */
 static float MOTOR_LK_GetCurrentLSB(MOTOR_LK_Module_t module) {
     switch (module) {
-        case MOTOR_MF9025:
-        case MOTOR_MF9035:
+        case MOTOR_LK_MF9025:
+        case MOTOR_LK_MF9035:
             return LK_CURR_LSB_MF;
         default:
             return LK_CURR_LSB_MG;  // 默认使用MG的分辨率
@@ -89,8 +89,8 @@ static void MOTOR_LK_Decode(MOTOR_LK_t *motor, BSP_CAN_Message_t *msg) {
     
     // 根据电机类型解析电流或功率
     switch (motor->param.module) {
-        case MOTOR_MF9025:
-        case MOTOR_MF9035:
+        case MOTOR_LK_MF9025:
+        case MOTOR_LK_MF9035:
             // MF/MG电机：转矩电流值
             motor->motor.feedback.torque_current = raw_current_or_power * MOTOR_LK_GetCurrentLSB(motor->param.module);
             break;

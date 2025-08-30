@@ -117,21 +117,26 @@ static int8_t DM_IMU_ParseQuaternionData(DM_IMU_t *imu, uint8_t *data, uint8_t l
 /**
  * @brief 初始化DM IMU设备
  */
-int8_t DM_IMU_Init(DM_IMU_t *imu, BSP_CAN_t can) {
-    if (imu == NULL) {
+int8_t DM_IMU_Init(DM_IMU_t *imu, DM_IMU_Param_t *param) {
+    if (imu == NULL || param == NULL) {
         return DEVICE_ERR_NULL;
     }
     
     // 初始化设备头部
     imu->header.online = false;
     imu->header.last_online_time = 0;
-    imu->can = can;
+    
+    // 配置参数
+    imu->param.can = param->can;
+    imu->param.can_id = param->can_id;
+    imu->param.device_id = param->device_id;
+    imu->param.master_id = param->master_id;
     
     // 清零数据
     memset(&imu->data, 0, sizeof(DM_IMU_Data_t));
     
     // 注册CAN接收队列，用于接收回复报文
-    int8_t result = BSP_CAN_RegisterId(imu->can, DM_IMU_MST_ID, 10);
+    int8_t result = BSP_CAN_RegisterId(imu->param.can, imu->param.master_id, 10);
     if (result != BSP_OK) {
         return DEVICE_ERR;
     }
@@ -149,20 +154,20 @@ int8_t DM_IMU_Request(DM_IMU_t *imu, DM_IMU_RID_t rid) {
     
     // 构造发送数据：id_L, id_H(DM_IMU_ID), RID, 0xcc
     uint8_t tx_data[4] = {
-        DM_IMU_ID & 0xFF,        // id_L
-        (DM_IMU_ID >> 8) & 0xFF, // id_H
-        (uint8_t)rid,            // RID
-        0xCC                     // 固定值
+        imu->param.device_id & 0xFF,        // id_L
+        (imu->param.device_id >> 8) & 0xFF, // id_H
+        (uint8_t)rid,                       // RID
+        0xCC                                // 固定值
     };
     
     // 发送标准数据帧
     BSP_CAN_StdDataFrame_t frame = {
-        .id = DM_IMU_CAN_ID,
+        .id = imu->param.can_id,
         .dlc = 4,
     };
     memcpy(frame.data, tx_data, 4);
     
-    int8_t result = BSP_CAN_TransmitStdDataFrame(imu->can, &frame);
+    int8_t result = BSP_CAN_TransmitStdDataFrame(imu->param.can, &frame);
     return (result == BSP_OK) ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -179,7 +184,7 @@ int8_t DM_IMU_Update(DM_IMU_t *imu) {
     bool data_received = false;
     
     // 持续接收所有可用消息
-    while ((result = BSP_CAN_GetMessage(imu->can, DM_IMU_MST_ID, &msg, BSP_CAN_TIMEOUT_IMMEDIATE)) == BSP_OK) {
+    while ((result = BSP_CAN_GetMessage(imu->param.can, imu->param.master_id, &msg, BSP_CAN_TIMEOUT_IMMEDIATE)) == BSP_OK) {
         // 验证回复数据格式（至少检查数据长度）
         if (msg.dlc < 3) {
             continue; // 跳过无效消息
