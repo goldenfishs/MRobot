@@ -27,10 +27,19 @@
 #define LZ_RAW_VALUE_MAX            (65535)         /* 16位原始值最大值 */
 #define LZ_TEMP_SCALE               (10.0f)         /* 温度缩放因子 */
 
+#define LZ_MAX_RECOVER_DIFF_RAD    (0.4f)
 #define MOTOR_TX_BUF_SIZE           (8)
 #define MOTOR_RX_BUF_SIZE           (8)
 
 /* Private macro ------------------------------------------------------------ */
+
+MOTOR_LZ_MotionParam_t lz_recover_param = {
+    .target_angle = 0.0f,
+    .target_velocity = 0.0f,
+    .kp = 20.0f,
+    .kd = 1.0f,
+    .torque = 0.0f,
+};
 /* Private typedef ---------------------------------------------------------- */
 /* Private variables -------------------------------------------------------- */
 static MOTOR_LZ_CANManager_t *can_managers[BSP_CAN_NUM] = {NULL};
@@ -445,7 +454,7 @@ int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param) {
     return DEVICE_ERR_NO_DEV;
 }
 
-MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param) {
+static MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param) {
     MOTOR_LZ_t *motor = MOTOR_LZ_GetMotor(param);
     if (motor && motor->motor.header.online) {
         return &motor->lz_feedback;
@@ -492,5 +501,32 @@ int8_t MOTOR_LZ_VelocityControl(MOTOR_LZ_Param_t *param, float target_velocity) 
     motion_param.kp = 0.0f;
     motion_param.kd = 1.0f;    // 少量阻尼
     
+    return MOTOR_LZ_MotionControl(param, &motion_param);
+}
+
+int8_t MOTOR_LZ_RecoverToZero(MOTOR_LZ_Param_t *param) {
+    if (param == NULL) return DEVICE_ERR_NULL;
+    
+    MOTOR_LZ_t *motor = MOTOR_LZ_GetMotor(param);
+    if (motor == NULL) return DEVICE_ERR_NO_DEV;
+    
+    // 获取当前角度
+    MOTOR_LZ_Feedback_t *feedback = MOTOR_LZ_GetFeedback(param);
+    if (feedback == NULL) return DEVICE_ERR_NO_DEV;
+    
+    float current_angle = feedback->current_angle;
+    
+    // 计算目标角度为0时的最短路径
+    float angle_diff = -current_angle; // 目标是0，所以差值就是-current_angle
+    // 限制最大差值，防止过大跳变
+    if (angle_diff > LZ_MAX_RECOVER_DIFF_RAD) angle_diff = LZ_MAX_RECOVER_DIFF_RAD;
+    if (angle_diff < -LZ_MAX_RECOVER_DIFF_RAD) angle_diff = -LZ_MAX_RECOVER_DIFF_RAD;
+    
+    float target_angle = current_angle + angle_diff;
+    
+    // 创建运控参数，设置位置和速度限制
+    MOTOR_LZ_MotionParam_t motion_param = lz_recover_param; // 使用预设的恢复参数
+    motion_param.target_angle = target_angle;
+
     return MOTOR_LZ_MotionControl(param, &motion_param);
 }

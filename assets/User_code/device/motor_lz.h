@@ -213,12 +213,7 @@ int8_t MOTOR_LZ_Relax(MOTOR_LZ_Param_t *param);
  */
 int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param);
 
-/**
- * @brief 获取指定电机的反馈信息
- * @param param 电机参数
- * @return 电机反馈信息指针，失败返回NULL
- */
-MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param);
+int8_t MOTOR_LZ_RecoverToZero(MOTOR_LZ_Param_t *param);
 
 #ifdef __cplusplus
 }

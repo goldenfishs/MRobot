@@ -76,9 +76,16 @@ static int8_t MOTOR_LK_CreateCANManager(BSP_CAN_t can) {
 }
 
 static void MOTOR_LK_Decode(MOTOR_LK_t *motor, BSP_CAN_Message_t *msg) {
+    // 调试信息：打印接收到的数据
+    // printf("LK Motor ID:%d, CMD:0x%02X, Data: %02X %02X %02X %02X %02X %02X %02X %02X\n", 
+    //        motor->param.id, msg->data[0], msg->data[0], msg->data[1], msg->data[2], 
+    //        msg->data[3], msg->data[4], msg->data[5], msg->data[6], msg->data[7]);
+    
     // 检查命令字节是否为反馈命令
     if (msg->data[0] != LK_CMD_FEEDBACK) {
-        return;
+        // 如果不是标准反馈命令，可能是其他格式的数据
+        // 临时跳过命令字节检查，直接解析数据
+        // return;
     }
     
     // 解析温度 (DATA[1])
@@ -138,8 +145,9 @@ int8_t MOTOR_LK_Register(MOTOR_LK_Param_t *param) {
     memset(&new_motor->motor, 0, sizeof(MOTOR_t));
     new_motor->motor.reverse = param->reverse;
     
-    // 计算反馈ID（假设为控制ID + 0x40）
-    uint16_t feedback_id = param->id + 0x40;
+    // 对于某些LK电机，反馈数据可能通过命令ID发送
+    // 根据实际测试，使用命令ID接收反馈数据
+    uint16_t feedback_id = 0x140 + param->id;  // 使用命令ID作为反馈ID
     
     // 注册CAN接收ID
     if (BSP_CAN_RegisterId(param->can, feedback_id, 3) != BSP_OK) {
@@ -161,8 +169,8 @@ int8_t MOTOR_LK_Update(MOTOR_LK_Param_t *param) {
     for (int i = 0; i < manager->motor_count; i++) {
         MOTOR_LK_t *motor = manager->motors[i];
         if (motor && motor->param.id == param->id) {
-            // 计算反馈ID
-            uint16_t feedback_id = param->id + 0x100;
+            // 对于某些LK电机，反馈数据通过命令ID发送
+            uint16_t feedback_id = 0x140 + param->id;
             
             BSP_CAN_Message_t rx_msg;
             if (BSP_CAN_GetMessage(param->can, feedback_id, &rx_msg, BSP_CAN_TIMEOUT_IMMEDIATE) != BSP_OK) {
@@ -217,9 +225,9 @@ int8_t MOTOR_LK_SetOutput(MOTOR_LK_Param_t *param, float value) {
     // 转矩闭环控制命令 - 将输出值转换为转矩控制值
     int16_t torque_control = (int16_t)(value * (float)LK_TORQUE_RANGE);
     
-    // 构建CAN帧
+    // 构建CAN帧（根据协议：命令报文标识符 = 0x140 + ID）
     BSP_CAN_StdDataFrame_t tx_frame;
-    tx_frame.id = param->id;
+    tx_frame.id = 0x140 + param->id;
     tx_frame.dlc = MOTOR_TX_BUF_SIZE;
     
     // 设置转矩闭环控制命令数据
@@ -245,7 +253,7 @@ int8_t MOTOR_LK_MotorOn(MOTOR_LK_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
     
     BSP_CAN_StdDataFrame_t tx_frame;
-    tx_frame.id = param->id;
+    tx_frame.id = 0x140 + param->id;
     tx_frame.dlc = MOTOR_TX_BUF_SIZE;
     
     // 电机运行命令
@@ -265,7 +273,7 @@ int8_t MOTOR_LK_MotorOff(MOTOR_LK_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
     
     BSP_CAN_StdDataFrame_t tx_frame;
-    tx_frame.id = param->id;
+    tx_frame.id = 0x140 + param->id;
     tx_frame.dlc = MOTOR_TX_BUF_SIZE;
     
     // 电机关闭命令
