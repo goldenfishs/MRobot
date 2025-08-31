@@ -82,7 +82,7 @@ static uint32_t MOTOR_LZ_BuildExtID(MOTOR_LZ_CmdType_t cmd_type, uint16_t data2,
 }
 
 /**
- * @brief 浮点值转换为原始值
+ * @brief 浮点值转换为原始值（对称范围：-max_value ~ +max_value）
  */
 static uint16_t MOTOR_LZ_FloatToRaw(float value, float max_value) {
     // 限制范围
@@ -91,6 +91,18 @@ static uint16_t MOTOR_LZ_FloatToRaw(float value, float max_value) {
     
     // 转换为0~65535范围，对应-max_value~max_value
     return (uint16_t)((value + max_value) / (2.0f * max_value) * (float)LZ_RAW_VALUE_MAX);
+}
+
+/**
+ * @brief 浮点值转换为原始值（单向范围：0 ~ +max_value）
+ */
+static uint16_t MOTOR_LZ_FloatToRawPositive(float value, float max_value) {
+    // 限制范围
+    if (value > max_value) value = max_value;
+    if (value < 0.0f) value = 0.0f;
+    
+    // 转换为0~65535范围，对应0~max_value
+    return (uint16_t)(value / max_value * (float)LZ_RAW_VALUE_MAX);
 }
 
 /**
@@ -137,7 +149,7 @@ static uint32_t MOTOR_LZ_IdParser(uint32_t original_id, BSP_CAN_FrameType_t fram
     // 解析扩展ID各个字段
     uint8_t cmd_type = (original_id >> 24) & 0x1F;    // Bit28~24: 通信类型
     uint16_t data2 = (original_id >> 8) & 0xFFFF;     // Bit23~8: 数据区2
-    uint8_t target_id = original_id & 0xFF;           // Bit7~0: 目标地址
+    uint8_t host_id = (uint8_t)(original_id & 0xFF);  // Bit7~0: 主机CAN ID
     
     // 对于反馈数据帧，我们使用特殊的解析规则
     if (cmd_type == MOTOR_LZ_CMD_FEEDBACK) {
@@ -145,11 +157,11 @@ static uint32_t MOTOR_LZ_IdParser(uint32_t original_id, BSP_CAN_FrameType_t fram
         // Bit8~15: 当前电机CAN ID
         // Bit16~21: 故障信息
         // Bit22~23: 模式状态
-        uint8_t motor_can_id = data2 & 0xFF;
+        uint8_t motor_can_id = data2 & 0xFF;          // bit8~15: 当前电机CAN ID
         
         // 返回格式化的ID，便于匹配
-        // 格式：0x02HHMMTT (02=反馈命令, HH=主机ID, MM=电机ID, TT=目标ID)
-        return (0x02000000) | ((data2 & 0xFF00) << 8) | (motor_can_id << 8) | target_id;
+        // 格式：0x02HHMMTT (02=反馈命令, HH=主机ID, MM=电机ID, TT=主机ID)
+        return (0x02000000) | (host_id << 16) | (motor_can_id << 8) | host_id;
     }
     
     // 对于其他命令类型，直接返回原始ID
@@ -163,11 +175,12 @@ static void MOTOR_LZ_Decode(MOTOR_LZ_t *motor, BSP_CAN_Message_t *msg) {
     if (motor == NULL || msg == NULL) return;
     
     // 检查是否为反馈数据帧 (通信类型2)
-    uint8_t cmd_type = (msg->parsed_id >> 24) & 0x1F;
+    // 需要使用原始ID来解析，因为parsed_id已经被IdParser处理过了
+    uint8_t cmd_type = (msg->original_id >> 24) & 0x1F;
     if (cmd_type != MOTOR_LZ_CMD_FEEDBACK) return;
     
-    // 解析ID中的信息
-    uint16_t id_data2 = (msg->parsed_id >> 8) & 0xFFFF;
+    // 解析原始ID中的数据区2 (bit23~8)
+    uint16_t id_data2 = (msg->original_id >> 8) & 0xFFFF;
     uint8_t motor_can_id = id_data2 & 0xFF;          // Bit8~15: 当前电机CAN ID
     uint8_t fault_info = (id_data2 >> 8) & 0x3F;     // Bit16~21: 故障信息
     uint8_t mode_state = (id_data2 >> 14) & 0x03;    // Bit22~23: 模式状态
@@ -263,8 +276,9 @@ int8_t MOTOR_LZ_Register(MOTOR_LZ_Param_t *param) {
     new_motor->motor.reverse = param->reverse;
     
     // 注册CAN接收ID - 使用解析后的反馈数据ID
-    // 构建原始扩展ID
-    uint32_t original_feedback_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_FEEDBACK, param->host_id, param->motor_id);
+    // 构建反馈数据的原始扩展ID
+    // 反馈数据：data2包含电机ID(bit8~15)，target_id是主机ID
+    uint32_t original_feedback_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_FEEDBACK, param->motor_id, param->host_id);
     // 通过ID解析器得到解析后的ID
     uint32_t parsed_feedback_id = MOTOR_LZ_IdParser(original_feedback_id, BSP_CAN_FRAME_EXT_DATA);
     
@@ -288,7 +302,7 @@ int8_t MOTOR_LZ_Update(MOTOR_LZ_Param_t *param) {
         MOTOR_LZ_t *motor = manager->motors[i];
         if (motor && motor->param.motor_id == param->motor_id) {
             // 获取反馈数据 - 使用解析后的ID
-            uint32_t original_feedback_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_FEEDBACK, param->host_id, param->motor_id);
+            uint32_t original_feedback_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_FEEDBACK, param->motor_id, param->host_id);
             uint32_t parsed_feedback_id = MOTOR_LZ_IdParser(original_feedback_id, BSP_CAN_FRAME_EXT_DATA);
             BSP_CAN_Message_t msg;
             
@@ -328,29 +342,36 @@ int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *m
     // 更新运控参数
     memcpy(&motor->motion_param, motion_param, sizeof(MOTOR_LZ_MotionParam_t));
     
-    // 构建扩展ID
-    uint32_t ext_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_MOTION, 0, param->motor_id);
+    // 根据协议，bit23~8数据区2包含力矩信息
+    // 力矩范围：-60Nm~60Nm 对应 0~65535
+    uint16_t raw_torque = MOTOR_LZ_FloatToRaw(motion_param->torque, LZ_TORQUE_RANGE_NM);
     
-    // 准备数据
+    // 构建扩展ID - 运控模式控制指令
+    // bit28~24: 0x1 (运控模式)
+    // bit23~8:  力矩数据 (0~65535)，协议中描述为"Byte2:力矩"
+    // bit7~0:   目标电机CAN_ID
+    uint32_t ext_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_MOTION, raw_torque, param->motor_id);
+    
+    // 准备8字节数据区
     uint8_t data[8];
     
-    // Byte0~1: 目标角度 (高字节在前，低字节在后)
+    // Byte0~1: 目标角度 [0~65535] 对应 (-12.57f~12.57f rad) (高字节在前，低字节在后)
     uint16_t raw_angle = MOTOR_LZ_FloatToRaw(motion_param->target_angle, LZ_ANGLE_RANGE_RAD);
     data[0] = (raw_angle >> 8) & 0xFF;  // 高字节
     data[1] = raw_angle & 0xFF;         // 低字节
     
-    // Byte2~3: 目标角速度 (高字节在前，低字节在后)
+    // Byte2~3: 目标角速度 [0~65535] 对应 (-20rad/s~20rad/s) (高字节在前，低字节在后)
     uint16_t raw_velocity = MOTOR_LZ_FloatToRaw(motion_param->target_velocity, LZ_VELOCITY_RANGE_RAD_S);
     data[2] = (raw_velocity >> 8) & 0xFF;  // 高字节
     data[3] = raw_velocity & 0xFF;         // 低字节
     
-    // Byte4~5: Kp (高字节在前，低字节在后)
-    uint16_t raw_kp = MOTOR_LZ_FloatToRaw(motion_param->kp, LZ_KP_MAX);
+    // Byte4~5: Kp [0~65535] 对应 (0.0~5000.0) (高字节在前，低字节在后)
+    uint16_t raw_kp = MOTOR_LZ_FloatToRawPositive(motion_param->kp, LZ_KP_MAX);
     data[4] = (raw_kp >> 8) & 0xFF;     // 高字节
     data[5] = raw_kp & 0xFF;            // 低字节
     
-    // Byte6~7: Kd (高字节在前，低字节在后)
-    uint16_t raw_kd = MOTOR_LZ_FloatToRaw(motion_param->kd, LZ_KD_MAX);
+    // Byte6~7: Kd [0~65535] 对应 (0.0~100.0) (高字节在前，低字节在后)
+    uint16_t raw_kd = MOTOR_LZ_FloatToRawPositive(motion_param->kd, LZ_KD_MAX);
     data[6] = (raw_kd >> 8) & 0xFF;     // 高字节
     data[7] = raw_kd & 0xFF;            // 低字节
     
@@ -430,4 +451,46 @@ MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param) {
         return &motor->lz_feedback;
     }
     return NULL;
+}
+
+int8_t MOTOR_LZ_TorqueControl(MOTOR_LZ_Param_t *param, float torque) {
+    if (param == NULL) return DEVICE_ERR_NULL;
+    
+    // 创建运控参数，只设置力矩，其他参数为0
+    MOTOR_LZ_MotionParam_t motion_param = {0};
+    motion_param.torque = torque;
+    motion_param.target_angle = 0.0f;
+    motion_param.target_velocity = 0.0f;
+    motion_param.kp = 0.0f;
+    motion_param.kd = 0.0f;
+    
+    return MOTOR_LZ_MotionControl(param, &motion_param);
+}
+
+int8_t MOTOR_LZ_PositionControl(MOTOR_LZ_Param_t *param, float target_angle, float max_velocity) {
+    if (param == NULL) return DEVICE_ERR_NULL;
+    
+    // 创建运控参数，设置位置和速度限制
+    MOTOR_LZ_MotionParam_t motion_param = {0};
+    motion_param.target_angle = target_angle;
+    motion_param.target_velocity = max_velocity;
+    motion_param.torque = 0.0f;
+    motion_param.kp = 100.0f;  // 默认位置增益
+    motion_param.kd = 5.0f;    // 默认微分增益
+    
+    return MOTOR_LZ_MotionControl(param, &motion_param);
+}
+
+int8_t MOTOR_LZ_VelocityControl(MOTOR_LZ_Param_t *param, float target_velocity) {
+    if (param == NULL) return DEVICE_ERR_NULL;
+    
+    // 创建运控参数，只设置速度
+    MOTOR_LZ_MotionParam_t motion_param = {0};
+    motion_param.target_angle = 0.0f;
+    motion_param.target_velocity = target_velocity;
+    motion_param.torque = 0.0f;
+    motion_param.kp = 0.0f;
+    motion_param.kd = 1.0f;    // 少量阻尼
+    
+    return MOTOR_LZ_MotionControl(param, &motion_param);
 }

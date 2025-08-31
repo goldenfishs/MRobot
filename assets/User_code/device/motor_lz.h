@@ -146,6 +146,31 @@ int8_t MOTOR_LZ_UpdateAll(void);
 int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *motion_param);
 
 /**
+ * @brief 电流(力矩)模式控制电机
+ * @param param 电机参数
+ * @param torque 目标力矩 (-60~60 Nm)
+ * @return 设备状态码
+ */
+int8_t MOTOR_LZ_TorqueControl(MOTOR_LZ_Param_t *param, float torque);
+
+/**
+ * @brief 位置模式控制电机
+ * @param param 电机参数
+ * @param target_angle 目标角度 (-12.57~12.57 rad)
+ * @param max_velocity 最大速度 (0~20 rad/s)
+ * @return 设备状态码
+ */
+int8_t MOTOR_LZ_PositionControl(MOTOR_LZ_Param_t *param, float target_angle, float max_velocity);
+
+/**
+ * @brief 速度模式控制电机
+ * @param param 电机参数
+ * @param target_velocity 目标速度 (-20~20 rad/s)
+ * @return 设备状态码
+ */
+int8_t MOTOR_LZ_VelocityControl(MOTOR_LZ_Param_t *param, float target_velocity);
+
+/**
  * @brief 电机使能运行
  * @param param 电机参数
  * @return 设备状态码
@@ -187,6 +212,13 @@ int8_t MOTOR_LZ_Relax(MOTOR_LZ_Param_t *param);
  * @return 设备状态码
  */
 int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param);
+
+/**
+ * @brief 获取指定电机的反馈信息
+ * @param param 电机参数
+ * @return 电机反馈信息指针，失败返回NULL
+ */
+MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param);
 
 #ifdef __cplusplus
 }
