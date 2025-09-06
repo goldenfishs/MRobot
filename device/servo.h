@@ -5,37 +5,48 @@ extern "C" {
 #endif
 
 /* Includes ----------------------------------------------------------------- */
-#include <stdint.h>
-#include "tim.h"
-#include "bsp/bsp.h"
-#include "bsp/servo_pwm.h"
+#include <cmsis_os2.h>
+	
+#include "bsp/pwm.h"
+	
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
-	
-	
-	
-extern int serve_Init(BSP_PWM_Channel_t ch);
-extern int set_servo_angle(BSP_PWM_Channel_t ch,float angle);
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+/**
+ * @brief 
+ */
+typedef struct {
+   BSP_PWM_Channel_t pwm_ch;  
+   float min_duty;         
+   float max_duty;      
+} SERVO_t;
+
+/**
+ * @brief  
+ * @param  servo 
+ * @retval BSP_OK / BSP_ERR
+ */
+
+int8_t SERVO_Init(SERVO_t *servo);
+
+/**
+ * @brief 
+ * @param  servo
+ * @param  angle 
+ * @retval BSP_OK / BSP_ERR
+ */
+int8_t SERVO_SetAngle(SERVO_t *servo, float angle);
+
+/**
+ * @brief 
+ * @param  servo 
+ * @retval BSP_OK / BSP_ERR
+ */
+ 
+int8_t SERVO_Stop(SERVO_t *servo);
+
 	
 #ifdef __cplusplus
 }
 #endif
-
-
-
-
-

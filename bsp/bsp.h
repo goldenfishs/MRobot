@@ -9,6 +9,7 @@ extern "C" {
 #define BSP_ERR_NULL (-2)
 #define BSP_ERR_INITED (-3)
 #define BSP_ERR_NO_DEV (-4)
+#define BSP_ERR_TIMEOUT (-5)
 
 #ifdef __cplusplus
 }

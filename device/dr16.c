@@ -1,0 +1,85 @@
+/*
+    DR16接收机
+*/
+
+/* Includes ----------------------------------------------------------------- */
+#include "dr16.h"
+
+#include <string.h>
+
+#include "bsp/uart.h"
+#include "bsp/time.h"
+/* Private define ----------------------------------------------------------- */
+#define DR16_CH_VALUE_MIN (364u)
+#define DR16_CH_VALUE_MID (1024u)
+#define DR16_CH_VALUE_MAX (1684u)
+
+/* Private macro ------------------------------------------------------------ */
+/* Private typedef ---------------------------------------------------------- */
+/* Private variables -------------------------------------------------------- */
+
+static osThreadId_t thread_alert;
+static bool inited = false;
+
+/* Private function  -------------------------------------------------------- */
+static void DR16_RxCpltCallback(void) {
+  osThreadFlagsSet(thread_alert, SIGNAL_DR16_RAW_REDY);
+}
+
+static bool DR16_DataCorrupted(const DR16_t *dr16) {
+  if (dr16 == NULL) return DEVICE_ERR_NULL;
+
+  if ((dr16->data.ch_r_x < DR16_CH_VALUE_MIN) ||
+      (dr16->data.ch_r_x > DR16_CH_VALUE_MAX))
+    return true;
+
+  if ((dr16->data.ch_r_y < DR16_CH_VALUE_MIN) ||
+      (dr16->data.ch_r_y > DR16_CH_VALUE_MAX))
+    return true;
+
+  if ((dr16->data.ch_l_x < DR16_CH_VALUE_MIN) ||
+      (dr16->data.ch_l_x > DR16_CH_VALUE_MAX))
+    return true;
+
+  if ((dr16->data.ch_l_y < DR16_CH_VALUE_MIN) ||
+      (dr16->data.ch_l_y > DR16_CH_VALUE_MAX))
+    return true;
+
+  if (dr16->data.sw_l == 0) return true;
+
+  if (dr16->data.sw_r == 0) return true;
+
+  return false;
+}
+
+/* Exported functions ------------------------------------------------------- */
+int8_t DR16_Init(DR16_t *dr16) {
+  if (dr16 == NULL) return DEVICE_ERR_NULL;
+  if (inited) return DEVICE_ERR_INITED;
+  if ((thread_alert = osThreadGetId()) == NULL) return DEVICE_ERR_NULL;
+
+  BSP_UART_RegisterCallback(BSP_UART_DR16, BSP_UART_RX_CPLT_CB,
+                            DR16_RxCpltCallback);
+
+  inited = true;
+  return DEVICE_OK;
+}
+
+int8_t DR16_Restart(void) {
+  __HAL_UART_DISABLE(BSP_UART_GetHandle(BSP_UART_DR16));
+  __HAL_UART_ENABLE(BSP_UART_GetHandle(BSP_UART_DR16));
+  return DEVICE_OK;
+}
+
+int8_t DR16_StartDmaRecv(DR16_t *dr16) {
+  if (HAL_UART_Receive_DMA(BSP_UART_GetHandle(BSP_UART_DR16),
+                           (uint8_t *)&(dr16->data),
+                           sizeof(dr16->data)) == HAL_OK)
+    return DEVICE_OK;
+  return DEVICE_ERR;
+}
+
+bool DR16_WaitDmaCplt(uint32_t timeout) {
+  return (osThreadFlagsWait(SIGNAL_DR16_RAW_REDY, osFlagsWaitAll, timeout) ==
+          SIGNAL_DR16_RAW_REDY);
+}

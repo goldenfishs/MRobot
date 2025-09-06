@@ -12,6 +12,7 @@ extern "C" {
 #include <stdint.h>
 
 #include "filter.h"
+#include "user_math.h"
 
 /* PID模式 */
 typedef enum {

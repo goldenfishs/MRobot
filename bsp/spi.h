@@ -6,6 +6,8 @@ extern "C" {
 
 /* Includes ----------------------------------------------------------------- */
 #include <spi.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "bsp/bsp.h"
 
@@ -17,8 +19,7 @@ extern "C" {
 
 /* SPI实体枚举，与设备对应 */
 typedef enum {
-  BSP_SPI_EXAMPLE,
-  /* BSP_SPI_XXX,*/
+/* AUTO GENERATED BSP_SPI_NAME */
   BSP_SPI_NUM,
   BSP_SPI_ERR,
 } BSP_SPI_t;
@@ -40,6 +41,17 @@ typedef enum {
 SPI_HandleTypeDef *BSP_SPI_GetHandle(BSP_SPI_t spi);
 int8_t BSP_SPI_RegisterCallback(BSP_SPI_t spi, BSP_SPI_Callback_t type,
                                 void (*callback)(void));
+
+
+int8_t BSP_SPI_Transmit(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma);
+int8_t BSP_SPI_Receive(BSP_SPI_t spi, uint8_t *data, uint16_t size, bool dma);
+int8_t BSP_SPI_TransmitReceive(BSP_SPI_t spi, uint8_t *txData, uint8_t *rxData,
+                               uint16_t size, bool dma);
+
+uint8_t BSP_SPI_MemReadByte(BSP_SPI_t spi, uint8_t reg);
+int8_t BSP_SPI_MemWriteByte(BSP_SPI_t spi, uint8_t reg, uint8_t data);
+int8_t BSP_SPI_MemRead(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size);
+int8_t BSP_SPI_MemWrite(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size);
 
 #ifdef __cplusplus
 }

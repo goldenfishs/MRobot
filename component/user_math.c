@@ -5,7 +5,7 @@
 #include "user_math.h"
 
 #include <string.h>
-#include <stdint.h>
+
 inline float InvSqrt(float x) {
 //#if 0
   /* Fast inverse square-root */
@@ -37,6 +37,13 @@ inline void Clip(float *origin, float min, float max) {
 }
 
 inline float Sign(float in) { return (in > 0) ? 1.0f : 0.0f; }
+
+/**
+ * \brief 将运动向量置零
+ *
+ * \param mv 被操作的值
+ */
+inline void ResetMoveVector(MoveVector_t *mv) { memset(mv, 0, sizeof(*mv)); }
 
 /**
  * \brief 计算循环值的误差，用于没有负数值，并在一定范围内变化的值
@@ -86,3 +93,40 @@ inline void CircleAdd(float *origin, float delta, float range) {
  * @param origin 被操作的值
  */
 inline void CircleReverse(float *origin) { *origin = -(*origin) + M_2PI; }
+
+/**
+ * @brief 根据目标弹丸速度计算摩擦轮转速
+ *
+ * @param bullet_speed 弹丸速度
+ * @param fric_radius 摩擦轮半径
+ * @param is17mm 是否为17mm
+ * @return 摩擦轮转速
+ */
+inline float CalculateRpm(float bullet_speed, float fric_radius, bool is17mm) {
+  if (bullet_speed == 0.0f) return 0.f;
+  if (is17mm) {
+    if (bullet_speed == 15.0f) return 4670.f;
+    if (bullet_speed == 18.0f) return 5200.f;
+    if (bullet_speed == 30.0f) return 7350.f;
+  } else {
+    if (bullet_speed == 10.0f) return 4450.f;
+    if (bullet_speed == 16.0f) return 5800.f;
+  }
+
+  /* 不为裁判系统设定值时,计算转速 */
+  return 60.0f * (float)bullet_speed / (M_2PI * fric_radius);
+}
+
+// /**
+//  * @brief 断言失败处理
+//  *
+//  * @param file 文件名
+//  * @param line 行号
+//  */
+// void VerifyFailed(const char *file, uint32_t line) {
+//   UNUSED(file);
+//   UNUSED(line);
+//   while (1) {
+//     __NOP();
+//   }
+// }

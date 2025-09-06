@@ -11,7 +11,7 @@ extern "C" {
 #include <stdint.h>
 #include <string.h>
 
-#include "component\user_math.h"
+#include "component/user_math.h"
 
 #define UI_DEL_OPERATION_NOTHING (0)
 #define UI_DEL_OPERATION_DEL (1)

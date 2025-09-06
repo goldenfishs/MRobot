@@ -6,6 +6,8 @@ extern "C" {
 
 /* Includes ----------------------------------------------------------------- */
 #include <i2c.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "bsp/bsp.h"
 
@@ -17,8 +19,10 @@ extern "C" {
 
 /* I2C实体枚举，与设备对应 */
 typedef enum {
-  BSP_I2C_EXAMPLE,
-  /* BSP_I2C_XXX,*/
+/* AUTO GENERATED BSP_I2C_NAME */
+  /* USER BSP_I2C BEGIN*/
+  /* USER_I2C_XXX */
+  /* USER BSP_I2C END */
   BSP_I2C_NUM,
   BSP_I2C_ERR,
 } BSP_I2C_t;
@@ -41,6 +45,22 @@ typedef enum {
 I2C_HandleTypeDef *BSP_I2C_GetHandle(BSP_I2C_t i2c);
 int8_t BSP_I2C_RegisterCallback(BSP_I2C_t i2c, BSP_I2C_Callback_t type,
                                 void (*callback)(void));
+
+int8_t BSP_I2C_Transmit(BSP_I2C_t i2c, uint16_t devAddr, uint8_t *data,
+                        uint16_t size, bool dma);
+int8_t BSP_I2C_Receive(BSP_I2C_t i2c, uint16_t devAddr, uint8_t *data,
+                       uint16_t size, bool dma);
+
+
+uint8_t BSP_I2C_MemReadByte(BSP_I2C_t i2c, uint16_t devAddr, uint16_t memAddr);
+int8_t BSP_I2C_MemWriteByte(BSP_I2C_t i2c, uint16_t devAddr, uint16_t memAddr,
+                            uint8_t data);
+
+int8_t BSP_I2C_MemRead(BSP_I2C_t i2c, uint16_t devAddr, uint16_t memAddr,
+                       uint8_t *data, uint16_t size, bool dma);
+int8_t BSP_I2C_MemWrite(BSP_I2C_t i2c, uint16_t devAddr, uint16_t memAddr,
+                        uint8_t *data, uint16_t size, bool dma);
+
 
 #ifdef __cplusplus
 }
