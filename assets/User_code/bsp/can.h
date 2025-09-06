@@ -17,6 +17,7 @@ extern "C" {
 #define BSP_CAN_DEFAULT_QUEUE_SIZE      10
 #define BSP_CAN_TIMEOUT_IMMEDIATE       0
 #define BSP_CAN_TIMEOUT_FOREVER         osWaitForever
+#define CAN_TX_SEMAPHORE_TIMEOUT        1000  /* 发送信号量超时时间(ms) */
 
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
@@ -223,9 +224,6 @@ int8_t BSP_CAN_UnregisterIdParser(void);
  * @return 解析后的ID
  */
 uint32_t BSP_CAN_ParseId(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
-
-/* USER CAN FUNCTIONS BEGIN */
-/* USER CAN FUNCTIONS END */
 
 #ifdef __cplusplus
 }

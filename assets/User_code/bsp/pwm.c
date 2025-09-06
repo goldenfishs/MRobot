@@ -35,7 +35,6 @@ int8_t BSP_PWM_SetComp(BSP_PWM_Channel_t ch, float duty_cycle) {
   if (duty_cycle < 0.0f) {
     duty_cycle = 0.0f;
   }
-  
   // 获取ARR值（周期值）
   uint32_t arr = __HAL_TIM_GET_AUTORELOAD(PWM_Map[ch].tim);
   
@@ -43,6 +42,7 @@ int8_t BSP_PWM_SetComp(BSP_PWM_Channel_t ch, float duty_cycle) {
   uint32_t ccr = (uint32_t)(duty_cycle * (arr + 1));
   
   __HAL_TIM_SET_COMPARE(PWM_Map[ch].tim, PWM_Map[ch].channel, ccr);
+
   return BSP_OK;
 }
 
