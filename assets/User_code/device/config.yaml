@@ -79,7 +79,10 @@ devices:
     name: "VESC 电调"
     description: "VESC 电调驱动"
     dependencies:
-      bsp: ["can", "time"]
+      bsp: ["can", "time", "mm"]
+      component: ["user_math"]
+    thread_signals:
+      - name: "SIGNAL_VESC_DATA_REDY"
     files:
       header: "motor_vesc.h"
       source: "motor_vesc.c"
@@ -88,7 +91,10 @@ devices:
     name: "ODrive 电机"
     description: "ODrive 电机驱动"
     dependencies:
-      bsp: ["can", "time"]
+      bsp: ["can", "time", "mm"]
+      component: ["user_math"]
+    thread_signals:
+      - name: "SIGNAL_ODRIVE_DATA_REDY"
     files:
       header: "motor_odrive.h"
       source: "motor_odrive.c"
@@ -97,7 +103,10 @@ devices:
     name: "RM 电机" 
     description: "RM 电机驱动"
     dependencies:
-      bsp: ["can", "time"]
+      bsp: ["can", "time", "mm"]
+      component: ["user_math"]
+    thread_signals:
+      - name: "SIGNAL_RM_MOTOR_DATA_REDY"
     files:
       header: "motor_rm.h"
       source: "motor_rm.c"
@@ -105,6 +114,11 @@ devices:
   motor:
     name: "通用电机"
     description: "通用电机驱动"
+    dependencies:
+      bsp: []
+      component: []
+    bsp_requirements: []
+    thread_signals: []
     files:
       header: "motor.h"
       source: "motor.c"
@@ -115,11 +129,91 @@ devices:
     dependencies:
       bsp: ["pwm", "time"]
       component: []
-    bsp_requirements:
-      - type: "pwm"
-        var_name: "BSP_PWM_WS2812"
-        description: "用于WS2812数据传输的PWM通道"
     thread_signals: []
     files:
       header: "ws2812.h"
       source: "ws2812.c"
+
+  buzzer:
+    name: "蜂鸣器"
+    description: "蜂鸣器驱动"
+    dependencies:
+      bsp: ["pwm"]
+      component: []
+    bsp_requirements:
+      - type: "pwm"
+        var_name: "BSP_PWM_BUZZER"
+        description: "用于蜂鸣器的PWM通道"
+    thread_signals: []
+    files:
+      header: "buzzer.h"
+      source: "buzzer.c"
+
+  dm_imu:
+    name: "DM IMU"
+    description: "DM IMU 传感器"
+    dependencies:
+      bsp: ["can", "time"]
+      component: ["user_math"]
+    thread_signals:
+      - name: "SIGNAL_DM_IMU_DATA_REDY"
+    files:
+      header: "dm_imu.h"
+      source: "dm_imu.c"
+
+  led:
+    name: "LED 灯"
+    description: "LED 灯驱动"
+    dependencies:
+      bsp: ["gpio", "pwm"]
+      component: []
+    thread_signals: []
+    files:
+      header: "led.h"
+      source: "led.c"
+
+  motor_lk:
+    name: "LK 电机"
+    description: "LK 电机驱动"
+    dependencies:
+      bsp: ["can", "time", "mm"]
+      component: ["user_math"]
+    thread_signals:
+      - name: "SIGNAL_LK_MOTOR_DATA_REDY"
+    files:
+      header: "motor_lk.h"
+      source: "motor_lk.c"
+
+  motor_lz:
+    name: "LZ 电机"
+    description: "LZ 电机驱动"
+    dependencies:
+      bsp: ["can", "time", "mm"]
+      component: ["user_math"]
+    thread_signals:
+      - name: "SIGNAL_LZ_MOTOR_DATA_REDY"
+    files:
+      header: "motor_lz.h"
+      source: "motor_lz.c"
+
+  servo:
+    name: "舵机"
+    description: "舵机驱动"
+    dependencies:
+      bsp: ["pwm"]
+      component: []
+    thread_signals: []
+    files:
+      header: "servo.h"
+      source: "servo.c"
+
+  vofa:
+    name: "VOFA"
+    description: "VOFA 数据传输协议"
+    dependencies:
+      bsp: ["uart"]
+      component: []
+    thread_signals: []
+    files:
+      header: "vofa.h"
+      source: "vofa.c"

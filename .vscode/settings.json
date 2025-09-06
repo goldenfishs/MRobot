@@ -11,6 +11,12 @@
         "device.h": "c",
         "gpio.h": "c",
         "uart.h": "c",
-        "motor_rm.h": "c"
+        "motor_rm.h": "c",
+        "mm.h": "c",
+        "capacity.h": "c",
+        "error_detect.h": "c",
+        "bmi088.h": "c",
+        "time.h": "c",
+        "motor.h": "c"
     }
 }

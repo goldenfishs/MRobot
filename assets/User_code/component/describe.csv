@@ -1,2 +1,14 @@
 pid,好用的
-ahrs,开源的
+ahrs,开源的AHRS算法，MadgwickAHRS
+capacity,电池容量计算
+cmd,通用控制命令
+crc8,CRC8校验rm
+crc16,CRC16校验rm
+error_detect,错误检测
+filter,各类滤波器
+FreeRTOS_CLI,FreeRTOS命令行接口
+limiter,限幅器
+mixer,混控器
+ui,用户交互
+user_math,用户自定义数学函数
+pid,PID控制器

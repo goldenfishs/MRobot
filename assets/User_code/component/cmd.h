@@ -11,7 +11,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "ahrs.h"
+#include "component/ahrs.h"
 
 #define CMD_REFEREE_MAX_NUM (3) /* 发送命令限定的最大数量 */
 

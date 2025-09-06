@@ -1,13 +1,9 @@
 /* Includes ----------------------------------------------------------------- */
 #include <stdio.h>
 #include <string.h>
-#include "vofa.h"
+#include "device/vofa.h"
 #include "bsp/uart.h"
 /* Private define ----------------------------------------------------------- */
-
-//#define PROTOCOL_RAWDATA
-#define PROTOCOL_FIREWATER
-//#define PROTOCOL_JUSTFLOAT
 
 #define MAX_CHANNEL  64u   		// 根据实际最大通道数调整
 
@@ -16,6 +12,7 @@
 /* Private typedef ---------------------------------------------------------- */
 /* Private variables -------------------------------------------------------- */
 static uint8_t vofa_tx_buf[sizeof(float) * MAX_CHANNEL + sizeof(uint32_t)];
+static VOFA_Protocol_t current_protocol = VOFA_PROTOCOL_FIREWATER;  // 默认协议
 
 /* Private function  -------------------------------------------------------- */
 
@@ -59,19 +56,34 @@ void VOFA_JustFloat_Send(float *channels, uint8_t channel_count, bool dma)
 }
 
 /* Exported functions ------------------------------------------------------- */
-init8_t VOFA_Send(float* channels, uint8_t channel_count, bool dma) {
-#ifdef PROTOCOL_RAWDATA
-    sprintf(vofa_tx_buf, "Channel1:%.2f,Channel2:%.2f\n", channels[0],channels[1]);
-    VOFA_RawData_Send(vofa_tx_buf, dma);
-#elif defined(PROTOCOL_FIREWATER)
-    VOFA_FireWater_Send(channels, channel_count, dma);
-#elif defined(PROTOCOL_JUSTFLOAT)
-    VOFA_JustFloat_Send(channels, channel_count, dma);
-#else
-    // 默认使用RawData协议
-    char data[256];
-    sprintf(data, "Channel1: %.2f, Channel2: %.2f\n", channels[0], channels[1]);
-    VOFA_RawData_Send(data, dma);
-#endif
+int8_t VOFA_init(VOFA_Protocol_t protocol) {
+    current_protocol = protocol;
+    return DEVICE_OK;
+}
+
+int8_t VOFA_Send(float* channels, uint8_t channel_count, bool dma) {
+    switch (current_protocol) {
+        case VOFA_PROTOCOL_RAWDATA:
+            {
+                char data[256];
+                if (channel_count >= 1) {
+                    sprintf(data, "Channel1: %.2f", channels[0]);
+                    if (channel_count >= 2) {
+                        sprintf(data + strlen(data), ", Channel2: %.2f", channels[1]);
+                    }
+                    strcat(data, "\n");
+                    VOFA_RawData_Send(data, dma);
+                }
+            }
+            break;
+        case VOFA_PROTOCOL_FIREWATER:
+            VOFA_FireWater_Send(channels, channel_count, dma);
+            break;
+        case VOFA_PROTOCOL_JUSTFLOAT:
+            VOFA_JustFloat_Send(channels, channel_count, dma);
+            break;
+        default:
+            return DEVICE_ERR;
+    }
     return DEVICE_OK;
 }
