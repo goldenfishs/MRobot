@@ -433,26 +433,6 @@ class bsp_can(BspPeripheralBase):
         
         # 生成CAN初始化代码
         init_lines = []
-        # 初始化发送信号量
-        init_lines.append("    // 创建发送信号量，每个CAN通道有3个发送邮箱")
-        init_lines.append("    for (int i = 0; i < BSP_CAN_NUM; i++) {")
-        init_lines.append("        tx_semaphore[i] = osSemaphoreNew(CAN_TX_MAILBOX_NUM, CAN_TX_MAILBOX_NUM, NULL);")
-        init_lines.append("        if (tx_semaphore[i] == NULL) {")
-        init_lines.append("            // 清理已创建的信号量")
-        init_lines.append("            for (int j = 0; j < i; j++) {")
-        init_lines.append("                if (tx_semaphore[j] != NULL) {")
-        init_lines.append("                    osSemaphoreDelete(tx_semaphore[j]);")
-        init_lines.append("                    tx_semaphore[j] = NULL;")
-        init_lines.append("                }")
-        init_lines.append("            }")
-        init_lines.append("            if (queue_mutex != NULL) {")
-        init_lines.append("                osMutexDelete(queue_mutex);")
-        init_lines.append("                queue_mutex = NULL;")
-        init_lines.append("            }")
-        init_lines.append("            return BSP_ERR;")
-        init_lines.append("        }")
-        init_lines.append("    }")
-        init_lines.append("")
         
         # 先设置初始化标志
         init_lines.append("    // 先设置初始化标志，以便后续回调注册能通过检查")
@@ -503,17 +483,10 @@ class bsp_can(BspPeripheralBase):
             f"    HAL_CAN_ConfigFilter(&hcan{can_num}, &can{can_num}_filter);",
             f"    HAL_CAN_Start(&hcan{can_num});",
             "",
-            f"    // 注册{instance}发送完成回调（用于释放信号量）",
-            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_ABORT_CB, BSP_CAN_TxAbortCallback);",
-            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_ABORT_CB, BSP_CAN_TxAbortCallback);",
-            f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_ABORT_CB, BSP_CAN_TxAbortCallback);",
-            "",
-            f"    // 注册{instance}接收回调函数",
+            f"    // 自动注册{instance}接收回调函数",
             f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
             "",
+            f"    // 激活{instance}中断",
             f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING | ",
             f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
             ""
@@ -543,17 +516,10 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);",
                 f"    HAL_CAN_Start(&hcan1);",
                 "",
-                f"    // 注册CAN1发送完成回调（用于释放信号量）",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                "",
-                f"    // 注册CAN1接收回调函数",
+                f"    // 自动注册CAN1接收回调函数",
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 "",
+                f"    // 激活CAN1中断",
                 f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING | ",
                 f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
                 ""
@@ -568,16 +534,10 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ConfigFilter(&hcan2, &can1_filter);  // 通过 CAN1 配置",
                 f"    HAL_CAN_Start(&hcan2);",
                 "",
-                f"    // 注册CAN2发送完成回调（用于释放信号量）",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                "",
-                f"    // 注册CAN2接收回调函数",
+                f"    // 自动注册CAN2接收回调函数",
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifo1Callback);",
+                "",
+                f"    // 激活CAN2中断", 
                 f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING | ",
                 f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
                 ""
@@ -608,17 +568,10 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);",
                 f"    HAL_CAN_Start(&hcan1);",
                 "",
-                f"    // 注册CAN1发送完成回调（用于释放信号量）",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                "",
-                f"    // 注册CAN1接收回调函数",
+                f"    // 自动注册CAN1接收回调函数",
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 "",
+                f"    // 激活CAN1中断",
                 f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING | ",
                 f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
                 ""
@@ -634,16 +587,10 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ConfigFilter(&hcan2, &can1_filter);  // 通过 CAN1 配置",
                 f"    HAL_CAN_Start(&hcan2);",
                 "",
-                f"    // 注册CAN2发送完成回调（用于释放信号量）",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                "",
-                f"    // 注册CAN2接收回调函数",
+                f"    // 自动注册CAN2接收回调函数",
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
+                "",
+                f"    // 激活CAN2中断",
                 f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING | ",
                 f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
                 ""
@@ -661,16 +608,10 @@ class bsp_can(BspPeripheralBase):
                 f"    HAL_CAN_ConfigFilter(&hcan1, &can1_filter);  // 通过 CAN1 配置",
                 f"    HAL_CAN_Start(&hcan{can_num});",
                 "",
-                f"    // 注册{instance}发送完成回调（用于释放信号量）",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_CPLT_CB, BSP_CAN_TxCompleteCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX0_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX1_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_TX_MAILBOX2_ABORT_CB, BSP_CAN_TxAbortCallback);",
-                "",
-                f"    // 注册{instance}接收回调函数",
+                f"    // 自动注册{instance}接收回调函数",
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifo1Callback);",
+                "",
+                f"    // 激活{instance}中断",
                 f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO1_MSG_PENDING | ",
                 f"                                            CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
                 ""
