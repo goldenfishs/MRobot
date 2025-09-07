@@ -37,6 +37,13 @@ typedef struct {
 
 /* Exported functions prototypes -------------------------------------------- */
 
+int8_t OPS9_init(OPS9_t *ops9);
+int8_t OPS9_Restart(void);
+int8_t OPS9_StartDmaRecv(OPS9_t *ops9);
+bool OPS9_WaitDmaCplt(uint32_t timeout);
+
+
+
 #ifdef __cplusplus
 }
 #endif
