@@ -18,7 +18,7 @@
 /* Exported functions ------------------------------------------------------- */
 float MOTOR_GetRotorAbsAngle(const MOTOR_t *motor) {
   if (motor == NULL) return DEVICE_ERR_NULL;
-  motor->feedback.rotor_abs_angle;
+  return motor->feedback.rotor_abs_angle;
 }
 
 float MOTOR_GetRotorSpeed(const MOTOR_t *motor) {

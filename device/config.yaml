@@ -213,6 +213,10 @@ devices:
     dependencies:
       bsp: ["uart"]
       component: []
+    bsp_requirements:
+      - type: "uart"
+        var_name: "BSP_UART_VOFA"  # 需要替换的变量名
+        description: "用于VOFA数据传输"
     thread_signals: []
     files:
       header: "vofa.h"

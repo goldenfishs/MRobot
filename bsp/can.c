@@ -243,6 +243,9 @@ static void BSP_CAN_TxAbortCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
+        // 自动释放发送信号量
+        BSP_CAN_TxCompleteCallback(hcan);
+        // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_CPLT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_CPLT_CB]();
     }
@@ -251,6 +254,9 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
+        // 自动释放发送信号量
+        BSP_CAN_TxCompleteCallback(hcan);
+        // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_CPLT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_CPLT_CB]();
     }
@@ -259,6 +265,9 @@ void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
+        // 自动释放发送信号量
+        BSP_CAN_TxCompleteCallback(hcan);
+        // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_CPLT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_CPLT_CB]();
     }
@@ -267,6 +276,9 @@ void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
+        // 自动释放发送信号量
+        BSP_CAN_TxAbortCallback(hcan);
+        // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_ABORT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_ABORT_CB]();
     }
@@ -275,6 +287,9 @@ void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
+        // 自动释放发送信号量
+        BSP_CAN_TxAbortCallback(hcan);
+        // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_ABORT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_ABORT_CB]();
     }
@@ -283,6 +298,9 @@ void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
+        // 自动释放发送信号量
+        BSP_CAN_TxAbortCallback(hcan);
+        // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_ABORT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_ABORT_CB]();
     }
