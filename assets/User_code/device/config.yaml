@@ -15,6 +15,22 @@ devices:
       header: "dr16.h"
       source: "dr16.c"
   
+  ops9:
+    name: "OPS9"
+    description: "ACTION OPS9 码盘"
+    dependencies:
+      bsp: ["uart"]
+      component: ["user_math"]
+    bsp_requirements:
+      - type: "uart"
+        var_name: "BSP_UART_OPS9"  # 需要替换的变量名
+        description: "用于接收码盘"
+    thread_signals:
+      - name: "SIGNAL_OPS9_RAW_REDY"
+    files:
+      header: "ops9.h"
+      source: "ops9.c"
+
   bmi088:
     name: "BMI088"
     description: "BMI088 陀螺仪+加速度计传感器"
@@ -81,8 +97,6 @@ devices:
     dependencies:
       bsp: ["can", "time", "mm"]
       component: ["user_math"]
-    thread_signals:
-      - name: "SIGNAL_VESC_DATA_REDY"
     files:
       header: "motor_vesc.h"
       source: "motor_vesc.c"
@@ -93,8 +107,6 @@ devices:
     dependencies:
       bsp: ["can", "time", "mm"]
       component: ["user_math"]
-    thread_signals:
-      - name: "SIGNAL_ODRIVE_DATA_REDY"
     files:
       header: "motor_odrive.h"
       source: "motor_odrive.c"
@@ -105,8 +117,6 @@ devices:
     dependencies:
       bsp: ["can", "time", "mm"]
       component: ["user_math"]
-    thread_signals:
-      - name: "SIGNAL_RM_MOTOR_DATA_REDY"
     files:
       header: "motor_rm.h"
       source: "motor_rm.c"
@@ -155,8 +165,6 @@ devices:
     dependencies:
       bsp: ["can", "time"]
       component: ["user_math"]
-    thread_signals:
-      - name: "SIGNAL_DM_IMU_DATA_REDY"
     files:
       header: "dm_imu.h"
       source: "dm_imu.c"
@@ -178,8 +186,6 @@ devices:
     dependencies:
       bsp: ["can", "time", "mm"]
       component: ["user_math"]
-    thread_signals:
-      - name: "SIGNAL_LK_MOTOR_DATA_REDY"
     files:
       header: "motor_lk.h"
       source: "motor_lk.c"
@@ -190,8 +196,6 @@ devices:
     dependencies:
       bsp: ["can", "time", "mm"]
       component: ["user_math"]
-    thread_signals:
-      - name: "SIGNAL_LZ_MOTOR_DATA_REDY"
     files:
       header: "motor_lz.h"
       source: "motor_lz.c"

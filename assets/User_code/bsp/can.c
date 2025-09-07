@@ -2,7 +2,7 @@
 #include "bsp/can.h"
 #include "bsp/bsp.h"
 #include <can.h>
-#include <cmsis_os.h>
+#include <cmsis_os2.h>
 #include <string.h>
 
 /* Private define ----------------------------------------------------------- */
