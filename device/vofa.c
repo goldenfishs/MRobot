@@ -5,14 +5,14 @@
 #include "bsp/uart.h"
 /* Private define ----------------------------------------------------------- */
 
-#define MAX_CHANNEL  64u   		// ¸ù¾ÝÊµ¼Ê×î´óÍ¨µÀÊýµ÷Õû
+#define MAX_CHANNEL  64u   		// ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
 #define JUSTFLOAT_TAIL 0x7F800000
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
 /* Private variables -------------------------------------------------------- */
 static uint8_t vofa_tx_buf[sizeof(float) * MAX_CHANNEL + sizeof(uint32_t)];
-static VOFA_Protocol_t current_protocol = VOFA_PROTOCOL_FIREWATER;  // Ä¬ÈÏÐ­Òé
+static VOFA_Protocol_t current_protocol = VOFA_PROTOCOL_FIREWATER;  // Ä¬ï¿½ï¿½Ð­ï¿½ï¿½
 
 /* Private function  -------------------------------------------------------- */
 
