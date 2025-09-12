@@ -301,9 +301,14 @@ class component(QWidget):
                     # 添加依赖组件，依赖格式是路径形式如 "component/filter"
                     deps = page.get_enabled_dependencies()
                     for dep_path in deps:
+                        # 跳过BSP层依赖
+                        if dep_path.startswith('bsp/'):
+                            continue
                         # 从路径中提取组件名，如 "component/filter" -> "filter"
                         dep_name = os.path.basename(dep_path)
-                        components_to_generate.add(dep_name)
+                        # 只有不包含文件扩展名的才是组件，有扩展名的是文件依赖
+                        if not dep_name.endswith(('.h', '.c', '.hpp', '.cpp')):
+                            components_to_generate.add(dep_name)
         
         # 为没有对应页面但需要生成的依赖组件创建临时页面
         user_code_dir = os.path.join(os.path.dirname(__file__), "../../assets/User_code")
@@ -335,28 +340,41 @@ class component(QWidget):
         # 复制依赖文件
         for dep_path in all_deps:
             try:
-                # dep_path 格式如 "component/filter"
-                src_dir = os.path.join(user_code_dir, dep_path)
-                if os.path.isdir(src_dir):
+                # 检查是否是 bsp 层依赖
+                if dep_path.startswith('bsp/'):
+                    # 对于 bsp 层依赖，跳过复制，因为这些由 BSP 代码生成负责
+                    print(f"跳过 BSP 层依赖: {dep_path} (由 BSP 代码生成负责)")
+                    continue
+                
+                # dep_path 格式如 "component/filter" 或 "component/user_math.h"
+                src_path = os.path.join(user_code_dir, dep_path)
+                dst_path = os.path.join(project_path, "User", dep_path)
+                
+                if os.path.isdir(src_path):
                     # 如果是目录，复制整个目录
-                    dst_dir = os.path.join(project_path, "User", dep_path)
-                    os.makedirs(os.path.dirname(dst_dir), exist_ok=True)
-                    if os.path.exists(dst_dir):
-                        shutil.rmtree(dst_dir)
-                    shutil.copytree(src_dir, dst_dir)
-                else:
+                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                    if os.path.exists(dst_path):
+                        shutil.rmtree(dst_path)
+                    shutil.copytree(src_path, dst_path)
+                elif os.path.isfile(src_path):
                     # 如果是文件，复制单个文件
-                    src_file = src_dir
-                    dst_file = os.path.join(project_path, "User", dep_path)
-                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-                    if os.path.exists(src_file):
-                        shutil.copyfile(src_file, dst_file)
+                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                    shutil.copyfile(src_path, dst_path)
+                else:
+                    # 如果既不是文件也不是目录，跳过
+                    print(f"跳过不存在的依赖: {dep_path}")
+                    continue
+                    
                 success_count += 1
                 print(f"成功复制依赖: {dep_path}")
             except Exception as e:
-                fail_count += 1
-                fail_list.append(f"{dep_path} (依赖复制异常: {e})")
-                print(f"复制依赖失败: {dep_path}, 错误: {e}")
+                # 对于 bsp 层依赖的错误，只记录但不计入失败
+                if dep_path.startswith('bsp/'):
+                    print(f"BSP 层依赖 {dep_path} 复制失败，但忽略此错误: {e}")
+                else:
+                    fail_count += 1
+                    fail_list.append(f"{dep_path} (依赖复制异常: {e})")
+                    print(f"复制依赖失败: {dep_path}, 错误: {e}")
         
         # 生成组件代码
         for comp_name in components_to_generate:
