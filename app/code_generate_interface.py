@@ -66,16 +66,22 @@ class CodeGenerateInterface(QWidget):
         top_layout.addWidget(freertos_label)
 
         # 自动生成FreeRTOS任务按钮
-        auto_task_btn = PushButton(FluentIcon.SEND, "自动生成FreeRTOS任务")
+        auto_task_btn = PushButton(FluentIcon.SEND, "配置FreeRTOS")
         auto_task_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         auto_task_btn.clicked.connect(self.on_freertos_task_btn_clicked)
         top_layout.addWidget(auto_task_btn, alignment=Qt.AlignRight)
 
         # 配置并生成FreeRTOS任务按钮
-        freertos_task_btn = PushButton(FluentIcon.SETTING, "配置并生成FreeRTOS任务")
+        freertos_task_btn = PushButton(FluentIcon.SETTING, "创建任务")
         freertos_task_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         freertos_task_btn.clicked.connect(self.on_task_code_btn_clicked)
         top_layout.addWidget(freertos_task_btn, alignment=Qt.AlignRight)
+
+        # 配置cmake按钮
+        cmake_btn = PushButton(FluentIcon.FOLDER, "配置cmake")
+        cmake_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        cmake_btn.clicked.connect(self.on_cmake_config_btn_clicked)
+        top_layout.addWidget(cmake_btn, alignment=Qt.AlignRight)
 
         # 生成代码按钮
         generate_btn = PushButton(FluentIcon.PROJECTOR,"生成代码")
@@ -153,6 +159,81 @@ class CodeGenerateInterface(QWidget):
             parent=self,
             duration=2000
         )
+
+    def on_cmake_config_btn_clicked(self):
+        """配置cmake，自动更新CMakeLists.txt中的源文件列表"""
+        try:
+            from app.tools.update_cmake_sources import find_user_c_files, update_cmake_sources
+            from pathlib import Path
+            
+            # 构建User目录和CMakeLists.txt路径
+            user_dir = os.path.join(self.project_path, "User")
+            cmake_file = os.path.join(self.project_path, "CMakeLists.txt")
+            
+            # 检查User目录是否存在
+            if not os.path.exists(user_dir):
+                InfoBar.error(
+                    title="错误",
+                    content=f"User目录不存在: {user_dir}",
+                    parent=self,
+                    duration=3000
+                )
+                return
+            
+            # 检查CMakeLists.txt是否存在
+            if not os.path.exists(cmake_file):
+                InfoBar.error(
+                    title="错误", 
+                    content=f"CMakeLists.txt文件不存在: {cmake_file}",
+                    parent=self,
+                    duration=3000
+                )
+                return
+            
+            # 查找User目录下的所有.c文件
+            c_files = find_user_c_files(user_dir)
+            
+            if not c_files:
+                InfoBar.warning(
+                    title="警告",
+                    content="在User目录下没有找到.c文件",
+                    parent=self,
+                    duration=3000
+                )
+                return
+            
+            # 更新CMakeLists.txt
+            success = update_cmake_sources(cmake_file, c_files)
+            
+            if success:
+                InfoBar.success(
+                    title="配置成功",
+                    content=f"已成功更新CMakeLists.txt，共添加了 {len(c_files)} 个源文件",
+                    parent=self,
+                    duration=3000
+                )
+            else:
+                InfoBar.error(
+                    title="配置失败",
+                    content="更新CMakeLists.txt失败，请检查文件格式",
+                    parent=self,
+                    duration=3000
+                )
+                
+        except ImportError as e:
+            InfoBar.error(
+                title="导入错误",
+                content=f"无法导入cmake配置模块: {str(e)}",
+                parent=self,
+                duration=3000
+            )
+        except Exception as e:
+            InfoBar.error(
+                title="配置失败",
+                content=f"cmake配置过程中出现错误: {str(e)}",
+                parent=self,
+                duration=3000
+            )
 
 
 
