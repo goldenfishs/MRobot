@@ -369,7 +369,7 @@ int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *m
     uint16_t raw_kd = MOTOR_LZ_FloatToRawPositive(send_param.kd, LZ_KD_MAX);
     data[6] = (raw_kd >> 8) & 0xFF;
     data[7] = raw_kd & 0xFF;
-    BSP_CAN_WaitForEmptyMailbox(param->can, 1);
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return MOTOR_LZ_SendExtFrame(param->can, ext_id, data, 8);
 }
 
