@@ -12,12 +12,19 @@ extern "C" {
 #include <stdbool.h>
 #include <cmsis_os.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Exported constants ------------------------------------------------------- */
 #define BSP_CAN_MAX_DLC                 8
 #define BSP_CAN_DEFAULT_QUEUE_SIZE      10
 #define BSP_CAN_TIMEOUT_IMMEDIATE       0
 #define BSP_CAN_TIMEOUT_FOREVER         osWaitForever
-#define CAN_TX_SEMAPHORE_TIMEOUT        1000  /* 发送信号量超时时间(ms) */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
@@ -94,6 +101,10 @@ typedef struct {
 /* ID解析回调函数类型 */
 typedef uint32_t (*BSP_CAN_IdParser_t)(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Exported functions prototypes -------------------------------------------- */
 
 /**
@@ -162,6 +173,14 @@ int8_t BSP_CAN_TransmitExtDataFrame(BSP_CAN_t can, BSP_CAN_ExtDataFrame_t *frame
 int8_t BSP_CAN_TransmitRemoteFrame(BSP_CAN_t can, BSP_CAN_RemoteFrame_t *frame);
 
 /**
+ * @brief 等待CAN发送邮箱空闲
+ * @param can CAN 枚举
+ * @param timeout 超时时间（毫秒），0为立即返回，osWaitForever为永久等待
+ * @return BSP_OK 成功，其他值失败
+ */
+int8_t BSP_CAN_WaitTxMailboxEmpty(BSP_CAN_t can, uint32_t timeout);
+
+/**
  * @brief 注册 CAN ID 接收队列
  * @param can CAN 枚举
  * @param can_id 解析后的CAN ID
@@ -224,6 +243,11 @@ int8_t BSP_CAN_UnregisterIdParser(void);
  * @return 解析后的ID
  */
 uint32_t BSP_CAN_ParseId(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 
 #ifdef __cplusplus
 }

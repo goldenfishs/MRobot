@@ -13,6 +13,10 @@ extern "C" {
 
 #include "component/user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 #define UI_DEL_OPERATION_NOTHING (0)
 #define UI_DEL_OPERATION_DEL (1)
 #define UI_DEL_OPERATION_DEL_ALL (2)
@@ -31,6 +35,10 @@ extern "C" {
 #define UI_GRAPIC_LAYER_CMD (6)
 
 #define UI_DEFAULT_WIDTH (0x01)
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 #define UI_CHAR_DEFAULT_WIDTH (0x02)
 
 typedef enum {

@@ -14,6 +14,10 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 #define M_DEG2RAD_MULT (0.01745329251f)
 #define M_RAD2DEG_MULT (57.2957795131f)
 
@@ -43,12 +47,22 @@ extern "C" {
     _a < _b ? _a : _b;      \
   })
 
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
+
+
 /* 移动向量 */
 typedef struct {
   float vx; /* 前后平移 */
   float vy; /* 左右平移 */
   float wz; /* 转动 */
 } MoveVector_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
 
 float InvSqrt(float x);
 
@@ -159,3 +173,7 @@ float CalculateRpm(float bullet_speed, float fric_radius, bool is17mm);
 //  * @param line 行号
 //  */
 // void VerifyFailed(const char *file, uint32_t line);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

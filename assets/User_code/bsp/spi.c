@@ -2,9 +2,21 @@
 #include <spi.h>
 #include "bsp/spi.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static void (*SPI_Callback[BSP_SPI_NUM][BSP_SPI_CB_NUM])(void);
 
@@ -163,3 +175,7 @@ int8_t BSP_SPI_MemWrite(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size
   BSP_SPI_Transmit(spi, &reg, 1u, true);
   return BSP_SPI_Transmit(spi, data, size, true);
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

@@ -1,5 +1,13 @@
 #include "crc8.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 static const uint8_t crc8_tab[256] = {
     0x00, 0x5e, 0xbc, 0xe2, 0x61, 0x3f, 0xdd, 0x83, 0xc2, 0x9c, 0x7e, 0x20,
     0xa3, 0xfd, 0x1f, 0x41, 0x9d, 0xc3, 0x21, 0x7f, 0xfc, 0xa2, 0x40, 0x1e,
@@ -38,3 +46,7 @@ bool CRC8_Verify(const uint8_t *buf, size_t len) {
   uint8_t expected = CRC8_Calc(buf, len - sizeof(uint8_t), CRC8_INIT);
   return expected == buf[len - sizeof(uint8_t)];
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

@@ -4,13 +4,25 @@
 #include <gpio.h>
 #include <main.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
 typedef struct {
   uint16_t pin;
   GPIO_TypeDef *gpio;
 } BSP_GPIO_MAP_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
 
 /* Private variables -------------------------------------------------------- */
 static const BSP_GPIO_MAP_t GPIO_Map[BSP_GPIO_NUM] = {
@@ -20,6 +32,10 @@ static const BSP_GPIO_MAP_t GPIO_Map[BSP_GPIO_NUM] = {
 static void (*GPIO_Callback[16])(void);
 
 /* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
   for (uint8_t i = 0; i < 16; i++) {
     if (GPIO_Pin & (1 << i)) {

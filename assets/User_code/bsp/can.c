@@ -5,10 +5,17 @@
 #include <cmsis_os2.h>
 #include <string.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 #define CAN_QUEUE_MUTEX_TIMEOUT         100   /* 队列互斥锁超时时间(ms) */
-#define CAN_TX_SEMAPHORE_TIMEOUT        1000  /* 发送信号量超时时间(ms) */
 #define CAN_TX_MAILBOX_NUM              3     /* CAN发送邮箱数量 */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
@@ -20,10 +27,13 @@ typedef struct BSP_CAN_QueueNode {
     struct BSP_CAN_QueueNode *next; /* 指向下一个节点的指针 */
 } BSP_CAN_QueueNode_t;
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static BSP_CAN_QueueNode_t *queue_list = NULL;
 static osMutexId_t queue_mutex = NULL;
-static osSemaphoreId_t tx_semaphore[BSP_CAN_NUM] = {NULL}; /* 发送信号量，用于控制发送邮箱访问 */
 static void (*CAN_Callback[BSP_CAN_NUM][BSP_CAN_CB_NUM])(void);
 static bool inited = false;
 static BSP_CAN_IdParser_t id_parser = NULL; /* ID解析器 */
@@ -35,12 +45,13 @@ static int8_t BSP_CAN_CreateIdQueue(BSP_CAN_t can, uint32_t can_id, uint8_t queu
 static int8_t BSP_CAN_DeleteIdQueue(BSP_CAN_t can, uint32_t can_id);
 static void BSP_CAN_RxFifo0Callback(void);
 static void BSP_CAN_RxFifo1Callback(void);
-static void BSP_CAN_TxCompleteCallback(CAN_HandleTypeDef *hcan);
-static void BSP_CAN_TxAbortCallback(CAN_HandleTypeDef *hcan);
 static BSP_CAN_FrameType_t BSP_CAN_GetFrameType(CAN_RxHeaderTypeDef *header);
 static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
 
 /* Private functions -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 /**
  * @brief 根据CAN句柄获取BSP_CAN实例
@@ -213,38 +224,10 @@ static void BSP_CAN_RxFifo1Callback(void) {
     }
 }
 
-/**
- * @brief 发送完成回调统一处理函数
- */
-static void BSP_CAN_TxCompleteCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = CAN_Get(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        // 释放发送信号量
-        if (tx_semaphore[bsp_can] != NULL) {
-            osSemaphoreRelease(tx_semaphore[bsp_can]);
-        }
-    }
-}
-
-/**
- * @brief 发送中止回调统一处理函数
- */
-static void BSP_CAN_TxAbortCallback(CAN_HandleTypeDef *hcan) {
-    BSP_CAN_t bsp_can = CAN_Get(hcan);
-    if (bsp_can != BSP_CAN_ERR) {
-        // 释放发送信号量（发送中止也要释放）
-        if (tx_semaphore[bsp_can] != NULL) {
-            osSemaphoreRelease(tx_semaphore[bsp_can]);
-        }
-    }
-}
-
 /* HAL Callback Functions --------------------------------------------------- */
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
-        // 自动释放发送信号量
-        BSP_CAN_TxCompleteCallback(hcan);
         // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_CPLT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_CPLT_CB]();
@@ -254,8 +237,6 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
-        // 自动释放发送信号量
-        BSP_CAN_TxCompleteCallback(hcan);
         // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_CPLT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_CPLT_CB]();
@@ -265,8 +246,6 @@ void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
-        // 自动释放发送信号量
-        BSP_CAN_TxCompleteCallback(hcan);
         // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_CPLT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_CPLT_CB]();
@@ -276,8 +255,6 @@ void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
-        // 自动释放发送信号量
-        BSP_CAN_TxAbortCallback(hcan);
         // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_ABORT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX0_ABORT_CB]();
@@ -287,8 +264,6 @@ void HAL_CAN_TxMailbox0AbortCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
-        // 自动释放发送信号量
-        BSP_CAN_TxAbortCallback(hcan);
         // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_ABORT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX1_ABORT_CB]();
@@ -298,8 +273,6 @@ void HAL_CAN_TxMailbox1AbortCallback(CAN_HandleTypeDef *hcan) {
 void HAL_CAN_TxMailbox2AbortCallback(CAN_HandleTypeDef *hcan) {
     BSP_CAN_t bsp_can = CAN_Get(hcan);
     if (bsp_can != BSP_CAN_ERR) {
-        // 自动释放发送信号量
-        BSP_CAN_TxAbortCallback(hcan);
         // 调用用户回调
         if (CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_ABORT_CB])
             CAN_Callback[bsp_can][HAL_CAN_TX_MAILBOX2_ABORT_CB]();
@@ -381,25 +354,6 @@ int8_t BSP_CAN_Init(void) {
         return BSP_ERR;
     }
     
-    // 创建发送信号量，每个CAN通道有3个发送邮箱
-    for (int i = 0; i < BSP_CAN_NUM; i++) {
-        tx_semaphore[i] = osSemaphoreNew(CAN_TX_MAILBOX_NUM, CAN_TX_MAILBOX_NUM, NULL);
-        if (tx_semaphore[i] == NULL) {
-            // 清理已创建的信号量
-            for (int j = 0; j < i; j++) {
-                if (tx_semaphore[j] != NULL) {
-                    osSemaphoreDelete(tx_semaphore[j]);
-                    tx_semaphore[j] = NULL;
-                }
-            }
-            if (queue_mutex != NULL) {
-                osMutexDelete(queue_mutex);
-                queue_mutex = NULL;
-            }
-            return BSP_ERR;
-        }
-    }
-    
 /* AUTO GENERATED CAN_INIT */
     
     inited = true;
@@ -422,14 +376,6 @@ int8_t BSP_CAN_DeInit(void) {
         }
         queue_list = NULL;
         osMutexRelease(queue_mutex);
-    }
-    
-    // 删除发送信号量
-    for (int i = 0; i < BSP_CAN_NUM; i++) {
-        if (tx_semaphore[i] != NULL) {
-            osSemaphoreDelete(tx_semaphore[i]);
-            tx_semaphore[i] = NULL;
-        }
     }
     
     // 删除互斥锁
@@ -494,20 +440,8 @@ int8_t BSP_CAN_Transmit(BSP_CAN_t can, BSP_CAN_Format_t format,
         return BSP_ERR;
     }
     
-    // 获取发送信号量，确保有可用的发送邮箱
-    if (tx_semaphore[can] == NULL) {
-        return BSP_ERR;
-    }
-    
-    osStatus_t sem_status = osSemaphoreAcquire(tx_semaphore[can], CAN_TX_SEMAPHORE_TIMEOUT);
-    if (sem_status != osOK) {
-        return BSP_ERR_TIMEOUT;  // 获取信号量超时，表示发送邮箱已满
-    }
-    
     CAN_HandleTypeDef *hcan = BSP_CAN_GetHandle(can);
     if (hcan == NULL) {
-        // 如果获取句柄失败，需要释放信号量
-        osSemaphoreRelease(tx_semaphore[can]);
         return BSP_ERR_NULL;
     }
     
@@ -536,8 +470,6 @@ int8_t BSP_CAN_Transmit(BSP_CAN_t can, BSP_CAN_Format_t format,
             header.RTR = CAN_RTR_REMOTE;
             break;
         default:
-            // 如果格式错误，需要释放信号量
-            osSemaphoreRelease(tx_semaphore[can]);
             return BSP_ERR;
     }
     
@@ -547,12 +479,9 @@ int8_t BSP_CAN_Transmit(BSP_CAN_t can, BSP_CAN_Format_t format,
     HAL_StatusTypeDef result = HAL_CAN_AddTxMessage(hcan, &header, data, &mailbox);
     
     if (result != HAL_OK) {
-        // 如果发送失败，需要释放信号量
-        osSemaphoreRelease(tx_semaphore[can]);
         return BSP_ERR;
     }
     
-    // 发送成功，信号量将在发送完成回调中释放
     return BSP_OK;
 }
 
@@ -671,4 +600,45 @@ uint32_t BSP_CAN_ParseId(uint32_t original_id, BSP_CAN_FrameType_t frame_type) {
         return id_parser(original_id, frame_type);
     }
     return BSP_CAN_DefaultIdParser(original_id, frame_type);
+}
+
+int8_t BSP_CAN_WaitTxMailboxEmpty(BSP_CAN_t can, uint32_t timeout) {
+    if (!inited) {
+        return BSP_ERR_INITED;
+    }
+    if (can >= BSP_CAN_NUM) {
+        return BSP_ERR;
+    }
+    
+    CAN_HandleTypeDef *hcan = BSP_CAN_GetHandle(can);
+    if (hcan == NULL) {
+        return BSP_ERR_NULL;
+    }
+    
+    uint32_t start_time = HAL_GetTick();
+    
+    // 如果超时时间为0，立即检查并返回
+    if (timeout == 0) {
+        uint32_t free_level = HAL_CAN_GetTxMailboxesFreeLevel(hcan);
+        return (free_level > 0) ? BSP_OK : BSP_ERR_TIMEOUT;
+    }
+    
+    // 等待至少有一个邮箱空闲
+    while (true) {
+        uint32_t free_level = HAL_CAN_GetTxMailboxesFreeLevel(hcan);
+        if (free_level > 0) {
+            return BSP_OK;
+        }
+        
+        // 检查超时
+        if (timeout != BSP_CAN_TIMEOUT_FOREVER) {
+            uint32_t elapsed = HAL_GetTick() - start_time;
+            if (elapsed >= timeout) {
+                return BSP_ERR_TIMEOUT;
+            }
+        }
+        
+        // 短暂延时，避免占用过多CPU
+        osDelay(1);
+    }
 }

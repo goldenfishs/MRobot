@@ -7,13 +7,28 @@
 
 #include <string.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 
 /* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 /* Exported functions ------------------------------------------------------- */
 float MOTOR_GetRotorAbsAngle(const MOTOR_t *motor) {

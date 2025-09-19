@@ -13,7 +13,15 @@ extern "C" {
 
 #include "component/ahrs.h"
 
-#define CMD_REFEREE_MAX_NUM (3) /* 发送命令限定的最大数量 */
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+#define CMD_REFEREE_MAX_NUM (3) /* Lines 16 omitted */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 
 /* 机器人型号 */
 typedef enum {
@@ -300,6 +308,10 @@ int8_t CMD_ParseHost(const CMD_Host_t *host, CMD_t *cmd, float dt_sec);
  * @return int8_t 0对应没有错误
  */
 int8_t CMD_RefereeAdd(CMD_RefereeCmd_t *ref, CMD_UI_t cmd);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

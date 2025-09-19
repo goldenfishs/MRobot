@@ -129,7 +129,8 @@ static int8_t MOTOR_LZ_SendExtFrame(BSP_CAN_t can, uint32_t ext_id, uint8_t *dat
     } else {
         memset(tx_frame.data, 0, dlc);
     }
-    
+    BSP_CAN_WaitTxMailboxEmpty(can, 1); // 等待发送邮箱空闲
+
     return BSP_CAN_TransmitExtDataFrame(can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 

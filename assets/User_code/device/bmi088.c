@@ -15,6 +15,11 @@
 #include "bsp/spi.h"
 #include "component/user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* Private define ----------------------------------------------------------- */
 /* Private define ----------------------------------------------------------- */
 #define BMI088_REG_ACCL_CHIP_ID (0x00)
 #define BMI088_REG_ACCL_ERR (0x02)
@@ -79,6 +84,10 @@ typedef enum {
   BMI_GYRO,
 } BMI_Device_t;
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static uint8_t buffer[2];
 static uint8_t bmi088_rxbuf[BMI088_LEN_RX_BUFF];
@@ -87,6 +96,10 @@ static osThreadId_t thread_alert;
 static bool inited = false;
 
 /* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 static void BMI_WriteSingle(BMI_Device_t dv, uint8_t reg, uint8_t data) {
   buffer[0] = (reg & 0x7f);
   buffer[1] = data;

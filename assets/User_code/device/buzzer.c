@@ -1,5 +1,13 @@
 #include "device/buzzer.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 
 int8_t BUZZER_Init(BUZZER_t *buzzer, BSP_PWM_Channel_t channel) {
     if (buzzer == NULL) return DEVICE_ERR;
@@ -42,3 +50,7 @@ int8_t BUZZER_Set(BUZZER_t *buzzer, float freq, float duty_cycle) {
     
     return result;
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

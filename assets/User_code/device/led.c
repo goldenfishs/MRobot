@@ -6,9 +6,26 @@
 #include "bsp/gpio.h"
 #include "bsp/pwm.h"
 #include "device.h"
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 int8_t LED_PWMSet(BSP_PWM_Channel_t channel,float duty_cycle)
 {
 

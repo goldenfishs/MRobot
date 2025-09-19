@@ -5,6 +5,14 @@
 
 #include "capacity.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /**
  * @brief 通过电压计算电池剩余电量
  *
@@ -56,3 +64,7 @@ float Capacity_GetCapacitorRemain(float vcap, float vbat, float v_cutoff) {
 
   return percentage;
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

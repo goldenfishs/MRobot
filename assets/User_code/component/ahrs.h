@@ -11,6 +11,14 @@ extern "C" {
 
 #include "user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* 欧拉角（Euler angle） */
 typedef struct {
   float yaw; /* 偏航角（Yaw angle） */
@@ -55,6 +63,10 @@ typedef struct {
   float inv_sample_freq; /* 采样频率的的倒数 */
 } AHRS_t;
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /**
  * @brief 初始化姿态解算
  *
@@ -92,6 +104,10 @@ int8_t AHRS_GetEulr(AHRS_Eulr_t *eulr, const AHRS_t *ahrs);
  * \param eulr 被操作的数据
  */
 void AHRS_ResetEulr(AHRS_Eulr_t *eulr);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

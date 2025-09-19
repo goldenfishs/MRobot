@@ -230,8 +230,15 @@ class DeviceSimple(QWidget):
     
     def _generate_device_code_internal(self):
         """生成设备代码"""
+        # 检查是否需要生成
         if not self.is_need_generate():
-            return False
+            # 如果未勾选，检查文件是否已存在，如果存在则跳过
+            files = self.device_config.get('files', {})
+            for filename in files.values():
+                output_path = os.path.join(self.project_path, f"User/device/{filename}")
+                if os.path.exists(output_path):
+                    return "skipped"  # 返回特殊值表示跳过
+            return "not_needed"  # 返回特殊值表示不需要生成
         
         # 获取BSP配置
         bsp_config = self.get_bsp_config()
@@ -349,18 +356,33 @@ class device(QWidget):
         """生成所有设备代码"""
         success_count = 0
         fail_count = 0
+        skipped_count = 0
         fail_list = []
+        skipped_list = []
         enabled_devices = []
         
         # 生成设备代码
         for page in pages:
             if hasattr(page, "device_name") and hasattr(page, "is_need_generate"):
-                if page.is_need_generate():
-                    enabled_devices.append(page.device_name)
+                # 先检查是否有文件存在但未勾选的情况
+                if not page.is_need_generate():
                     try:
                         result = page._generate_device_code_internal()
-                        if result:
+                        if result == "skipped":
+                            skipped_count += 1
+                            skipped_list.append(page.device_name)
+                    except Exception:
+                        pass  # 忽略未勾选页面的错误
+                else:
+                    # 勾选的页面，正常处理
+                    try:
+                        result = page._generate_device_code_internal()
+                        if result == "skipped":
+                            skipped_count += 1
+                            skipped_list.append(page.device_name)
+                        elif result:
                             success_count += 1
+                            enabled_devices.append(page.device_name)
                         else:
                             fail_count += 1
                             fail_list.append(page.device_name)
@@ -384,8 +406,10 @@ class device(QWidget):
                 except Exception as e:
                     print(f"刷新页面 {getattr(page, 'device_name', 'Unknown')} 的BSP选项失败: {e}")
         
-        total_items = success_count + fail_count
-        msg = f"设备代码生成完成：总共尝试生成 {total_items} 项，成功 {success_count} 项，失败 {fail_count} 项。"
+        total_items = success_count + fail_count + skipped_count
+        msg = f"设备代码生成完成：总共处理 {total_items} 项，成功生成 {success_count} 项，跳过 {skipped_count} 项，失败 {fail_count} 项。"
+        if skipped_list:
+            msg += f"\n跳过项（文件已存在且未勾选）：\n" + "\n".join(skipped_list)
         if fail_list:
             msg += "\n失败项：\n" + "\n".join(fail_list)
         

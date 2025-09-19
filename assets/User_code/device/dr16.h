@@ -10,6 +10,14 @@ extern "C" {
 #include "component/user_math.h"
 #include "device/device.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
@@ -41,6 +49,9 @@ int8_t DR16_Restart(void);
 int8_t DR16_StartDmaRecv(DR16_t *dr16);
 bool DR16_WaitDmaCplt(uint32_t timeout);
 
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

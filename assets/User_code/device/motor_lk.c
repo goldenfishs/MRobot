@@ -10,6 +10,10 @@
 #include "bsp/time.h"
 #include "component/user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 #define LK_CTRL_ID_BASE        (0x140)
 #define LK_FB_ID_BASE          (0x240)
@@ -36,12 +40,24 @@
 #define LK_ENC_15BIT_MAX       (32767)   // 15位编码器最大值  
 #define LK_ENC_16BIT_MAX       (65535)   // 16位编码器最大值
 
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static MOTOR_LK_CANManager_t *can_managers[BSP_CAN_NUM] = {NULL};
 
 /* Private functions -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 static float MOTOR_LK_GetCurrentLSB(MOTOR_LK_Module_t module) {
     switch (module) {
         case MOTOR_LK_MF9025:
@@ -239,7 +255,7 @@ int8_t MOTOR_LK_SetOutput(MOTOR_LK_Param_t *param, float value) {
     tx_frame.data[5] = (uint8_t)((torque_control >> 8) & 0xFF); // 转矩电流控制值高字节
     tx_frame.data[6] = 0x00;                // NULL
     tx_frame.data[7] = 0x00;                // NULL
-    
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -265,7 +281,7 @@ int8_t MOTOR_LK_MotorOn(MOTOR_LK_Param_t *param) {
     tx_frame.data[5] = 0x00;
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -285,7 +301,7 @@ int8_t MOTOR_LK_MotorOff(MOTOR_LK_Param_t *param) {
     tx_frame.data[5] = 0x00;
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 

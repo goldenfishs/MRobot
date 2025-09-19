@@ -3,9 +3,21 @@
 
 #include "bsp/uart.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static void (*UART_Callback[BSP_UART_NUM][BSP_UART_CB_NUM])(void);
 
@@ -135,3 +147,7 @@ int8_t BSP_UART_Receive(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma)
     return HAL_UART_Receive_IT(BSP_UART_GetHandle(uart), data, size);
   }
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

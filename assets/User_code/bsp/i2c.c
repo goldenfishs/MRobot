@@ -1,9 +1,21 @@
 /* Includes ----------------------------------------------------------------- */
 #include "bsp\i2c.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static void (*I2C_Callback[BSP_I2C_NUM][BSP_I2C_CB_NUM])(void);
 

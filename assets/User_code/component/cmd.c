@@ -6,6 +6,14 @@
 
 #include <string.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /**
  * @brief 行为转换为对应按键
  *
@@ -373,3 +381,7 @@ int8_t CMD_RefereeAdd(CMD_RefereeCmd_t *ref, CMD_UI_t cmd) {
   ref->counter++;
   return 0;
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

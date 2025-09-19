@@ -9,8 +9,16 @@ extern "C" {
 
 #include "bsp/bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported types ----------------------------------------------------------- */
 /* Exported functions prototypes -------------------------------------------- */
 uint32_t BSP_TIME_Get_ms();
@@ -25,6 +33,10 @@ int8_t BSP_TIME_Delay_ms(uint32_t ms);
 int8_t BSP_TIME_Delay_us(uint32_t us);
 
 int8_t BSP_TIME_Delay(uint32_t ms);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

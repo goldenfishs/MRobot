@@ -86,8 +86,15 @@ class BspSimplePeripheral(QWidget):
         return self.generate_checkbox.isChecked()
 
     def _generate_bsp_code_internal(self):
+        # 检查是否需要生成
         if not self.is_need_generate():
-            return False
+            # 如果未勾选，检查文件是否已存在，如果存在则跳过
+            for filename in self.template_names.values():
+                output_path = os.path.join(self.project_path, f"User/bsp/{filename}")
+                if os.path.exists(output_path):
+                    return "skipped"  # 返回特殊值表示跳过
+            return "not_needed"  # 返回特殊值表示不需要生成
+        
         template_dir = CodeGenerator.get_template_dir()
         for key, filename in self.template_names.items():
             template_path = os.path.join(template_dir, filename)
@@ -309,8 +316,16 @@ class BspPeripheralBase(QWidget):
                             sel_widget.setCurrentText(instance)
 
     def _generate_bsp_code_internal(self):
+        # 检查是否需要生成
         if not self.is_need_generate():
-            return False
+            # 如果未勾选，检查文件是否已存在，如果存在则跳过
+            header_file = f"{self.yaml_key}.h"
+            source_file = f"{self.yaml_key}.c"
+            header_path = os.path.join(self.project_path, f"User/bsp/{header_file}")
+            source_path = os.path.join(self.project_path, f"User/bsp/{source_file}")
+            if os.path.exists(header_path) or os.path.exists(source_path):
+                return "skipped"  # 返回特殊值表示跳过
+            return "not_needed"  # 返回特殊值表示不需要生成
         configs = self._collect_configs()
         if not configs:
             return False
@@ -487,8 +502,7 @@ class bsp_can(BspPeripheralBase):
             f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
             "",
             f"    // 激活{instance}中断",
-            f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING | ",
-            f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
+            f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO0_MSG_PENDING);",
             ""
         ])
 
@@ -538,8 +552,7 @@ class bsp_can(BspPeripheralBase):
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifo1Callback);",
                 "",
                 f"    // 激活CAN2中断", 
-                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING | ",
-                f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
+                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO1_MSG_PENDING);",
                 ""
             ])
 
@@ -572,8 +585,7 @@ class bsp_can(BspPeripheralBase):
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 "",
                 f"    // 激活CAN1中断",
-                f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING | ",
-                f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
+                f"    HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 ""
             ])
         
@@ -591,8 +603,7 @@ class bsp_can(BspPeripheralBase):
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO0_MSG_PENDING_CB, BSP_CAN_RxFifo0Callback);",
                 "",
                 f"    // 激活CAN2中断",
-                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING | ",
-                f"                                        CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
+                f"    HAL_CAN_ActivateNotification(&hcan2, CAN_IT_RX_FIFO0_MSG_PENDING);",
                 ""
             ])
         
@@ -612,8 +623,7 @@ class bsp_can(BspPeripheralBase):
                 f"    BSP_CAN_RegisterCallback({self.enum_prefix}_{name}, HAL_CAN_RX_FIFO1_MSG_PENDING_CB, BSP_CAN_RxFifo1Callback);",
                 "",
                 f"    // 激活{instance}中断",
-                f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO1_MSG_PENDING | ",
-                f"                                            CAN_IT_TX_MAILBOX_EMPTY);  // 激活发送邮箱空中断",
+                f"    HAL_CAN_ActivateNotification(&hcan{can_num}, CAN_IT_RX_FIFO1_MSG_PENDING);",
                 ""
             ])
             filter_bank += 1  # 为下一个CAN分配不同的过滤器组
@@ -822,8 +832,14 @@ class bsp_gpio(QWidget):
         return configs
 
     def _generate_bsp_code_internal(self):
+        # 检查是否需要生成
         if not self.is_need_generate():
-            return False
+            # 如果未勾选，检查文件是否已存在，如果存在则跳过
+            gpio_h_path = os.path.join(self.project_path, "User/bsp/gpio.h")
+            gpio_c_path = os.path.join(self.project_path, "User/bsp/gpio.c")
+            if os.path.exists(gpio_h_path) or os.path.exists(gpio_c_path):
+                return "skipped"  # 返回特殊值表示跳过
+            return "not_needed"  # 返回特殊值表示不需要生成
         
         configs = self._collect_configs()
         if not configs:
@@ -1073,8 +1089,14 @@ class bsp_pwm(QWidget):
         return configs
 
     def _generate_bsp_code_internal(self):
+        # 检查是否需要生成
         if not self.is_need_generate():
-            return False
+            # 如果未勾选，检查文件是否已存在，如果存在则跳过
+            pwm_h_path = os.path.join(self.project_path, "User/bsp/pwm.h")
+            pwm_c_path = os.path.join(self.project_path, "User/bsp/pwm.c")
+            if os.path.exists(pwm_h_path) or os.path.exists(pwm_c_path):
+                return "skipped"  # 返回特殊值表示跳过
+            return "not_needed"  # 返回特殊值表示不需要生成
         
         configs = self._collect_configs()
         if not configs:
@@ -1201,16 +1223,32 @@ class bsp(QWidget):
         total = 0
         success_count = 0
         fail_count = 0
+        skipped_count = 0
         fail_list = []
+        skipped_list = []
         
         for page in pages:
             # 只处理BSP页面：有 is_need_generate 方法但没有 component_name 属性的页面
             if hasattr(page, 'is_need_generate') and not hasattr(page, 'component_name'):
-                if page.is_need_generate():
+                # 先检查是否有文件存在但未勾选的情况
+                if not page.is_need_generate():
+                    try:
+                        result = page._generate_bsp_code_internal()
+                        if result == "skipped":
+                            total += 1
+                            skipped_count += 1
+                            skipped_list.append(page.__class__.__name__)
+                    except Exception:
+                        pass  # 忽略未勾选页面的错误
+                else:
+                    # 勾选的页面，正常处理
                     total += 1
                     try:
                         result = page._generate_bsp_code_internal()
-                        if result:
+                        if result == "skipped":
+                            skipped_count += 1
+                            skipped_list.append(page.__class__.__name__)
+                        elif result:
                             success_count += 1
                         else:
                             fail_count += 1
@@ -1219,7 +1257,9 @@ class bsp(QWidget):
                         fail_count += 1
                         fail_list.append(f"{page.__class__.__name__} (异常: {e})")
         
-        msg = f"总共尝试生成 {total} 项，成功 {success_count} 项，失败 {fail_count} 项。"
+        msg = f"总共处理 {total} 项，成功生成 {success_count} 项，跳过 {skipped_count} 项，失败 {fail_count} 项。"
+        if skipped_list:
+            msg += f"\n跳过项（文件已存在且未勾选）：\n" + "\n".join(skipped_list)
         if fail_list:
             msg += "\n失败项：\n" + "\n".join(fail_list)
         

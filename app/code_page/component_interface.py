@@ -157,8 +157,15 @@ class ComponentSimple(QWidget):
         return self.dependencies.get(self.component_name.lower(), [])
     
     def _generate_component_code_internal(self):
+        # 检查是否需要生成
         if not self.is_need_generate():
-            return False
+            # 如果未勾选，检查文件是否已存在，如果存在则跳过
+            for filename in self.template_names.values():
+                output_path = os.path.join(self.project_path, f"User/component/{filename}")
+                if os.path.exists(output_path):
+                    return "skipped"  # 返回特殊值表示跳过
+            return "not_needed"  # 返回特殊值表示不需要生成
+        
         template_dir = self._get_component_template_dir()
         for key, filename in self.template_names.items():
             template_path = os.path.join(template_dir, filename)
@@ -377,6 +384,9 @@ class component(QWidget):
                     print(f"复制依赖失败: {dep_path}, 错误: {e}")
         
         # 生成组件代码
+        skipped_count = 0
+        skipped_list = []
+        
         for comp_name in components_to_generate:
             if comp_name in component_pages:
                 page = component_pages[comp_name]
@@ -384,7 +394,11 @@ class component(QWidget):
                     # 确保调用正确的方法名
                     if hasattr(page, '_generate_component_code_internal'):
                         result = page._generate_component_code_internal()
-                        if result:
+                        if result == "skipped":
+                            skipped_count += 1
+                            skipped_list.append(comp_name)
+                            print(f"跳过组件生成: {comp_name}")
+                        elif result:
                             success_count += 1
                             print(f"成功生成组件: {comp_name}")
                         else:
@@ -401,7 +415,9 @@ class component(QWidget):
                     print(f"生成组件异常: {comp_name}, 错误: {e}")
         
         total_items = len(all_deps) + len(components_to_generate)
-        msg = f"组件代码生成完成：总共尝试生成 {total_items} 项，成功 {success_count} 项，失败 {fail_count} 项。"
+        msg = f"组件代码生成完成：总共处理 {total_items} 项，成功生成 {success_count} 项，跳过 {skipped_count} 项，失败 {fail_count} 项。"
+        if skipped_list:
+            msg += f"\n跳过项（文件已存在且未勾选）：\n" + "\n".join(skipped_list)
         if fail_list:
             msg += "\n失败项：\n" + "\n".join(fail_list)
         

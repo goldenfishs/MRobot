@@ -13,6 +13,10 @@
 #include "bsp/gpio.h"
 #include "bsp/i2c.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 #define IST8310_WAI (0x00)
 #define IST8310_STAT1 (0x02)
@@ -31,6 +35,11 @@
 #define IST8310_IIC_ADDRESS (0x0E << 1)
 
 #define IST8310_LEN_RX_BUFF (6)
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 #define IST8310_SET() \
   BSP_GPIO_WritePin(CMPS_RST_Pin, GPIO_PIN_SET)
@@ -38,6 +47,10 @@
   BSP_GPIO_WritePin(CMPS_RST_Pin, GPIO_PIN_RESET)
 
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 uint8_t ist8310_rxbuf[IST8310_LEN_RX_BUFF];
 
@@ -45,6 +58,10 @@ static osThreadId_t thread_alert;
 static bool inited = false;
 
 /* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 static void IST8310_WriteSingle(uint8_t reg, uint8_t data) {
   BSP_I2C_MemWriteByte(BSP_I2C_COMP, IST8310_IIC_ADDRESS, reg, data);
 }
