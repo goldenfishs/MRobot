@@ -1,5 +1,10 @@
 /*
   灵足电机驱动
+  
+  灵足电机通信协议：
+  - CAN 2.0通信接口，波特率1Mbps
+  - 采用扩展帧格式(29位ID)
+  - ID格式：Bit28~24(通信类型) + Bit23~8(数据区2) + Bit7~0(目标地址)
 */
 /* Includes ----------------------------------------------------------------- */
 #include "motor_lz.h"
@@ -22,17 +27,17 @@
 #define LZ_RAW_VALUE_MAX            (65535)         /* 16位原始值最大值 */
 #define LZ_TEMP_SCALE               (10.0f)         /* 温度缩放因子 */
 
-#define LZ_MAX_RECOVER_DIFF_RAD    (0.4f)
+#define LZ_MAX_RECOVER_DIFF_RAD    (0.28f)
 #define MOTOR_TX_BUF_SIZE           (8)
 #define MOTOR_RX_BUF_SIZE           (8)
 
 /* Private macro ------------------------------------------------------------ */
 
-MOTOR_LZ_MotionParam_t lz_recover_param = {
+MOTOR_LZ_MotionParam_t lz_relax_param = {
     .target_angle = 0.0f,
     .target_velocity = 0.0f,
-    .kp = 20.0f,
-    .kd = 1.0f,
+    .kp = 0.0f,
+    .kd = 0.0f,
     .torque = 0.0f,
 };
 /* Private typedef ---------------------------------------------------------- */
@@ -130,7 +135,6 @@ static int8_t MOTOR_LZ_SendExtFrame(BSP_CAN_t can, uint32_t ext_id, uint8_t *dat
         memset(tx_frame.data, 0, dlc);
     }
     BSP_CAN_WaitTxMailboxEmpty(can, 1); // 等待发送邮箱空闲
-
     return BSP_CAN_TransmitExtDataFrame(can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -178,56 +182,53 @@ static uint32_t MOTOR_LZ_IdParser(uint32_t original_id, BSP_CAN_FrameType_t fram
  */
 static void MOTOR_LZ_Decode(MOTOR_LZ_t *motor, BSP_CAN_Message_t *msg) {
     if (motor == NULL || msg == NULL) return;
-    
-    // 检查是否为反馈数据帧 (通信类型2)
-    // 需要使用原始ID来解析，因为parsed_id已经被IdParser处理过了
     uint8_t cmd_type = (msg->original_id >> 24) & 0x1F;
     if (cmd_type != MOTOR_LZ_CMD_FEEDBACK) return;
-    
-    // 解析原始ID中的数据区2 (bit23~8)
     uint16_t id_data2 = (msg->original_id >> 8) & 0xFFFF;
-    uint8_t motor_can_id = id_data2 & 0xFF;          // Bit8~15: 当前电机CAN ID
-    uint8_t fault_info = (id_data2 >> 8) & 0x3F;     // Bit16~21: 故障信息
-    uint8_t mode_state = (id_data2 >> 14) & 0x03;    // Bit22~23: 模式状态
-    
-    // 更新电机CAN ID
+    uint8_t motor_can_id = id_data2 & 0xFF;
+    uint8_t fault_info = (id_data2 >> 8) & 0x3F;
+    uint8_t mode_state = (id_data2 >> 14) & 0x03;
     motor->lz_feedback.motor_can_id = motor_can_id;
-    
-    // 解析故障信息
-    motor->lz_feedback.fault.under_voltage = (fault_info & 0x01) != 0;      // bit16
-    motor->lz_feedback.fault.driver_fault = (fault_info & 0x02) != 0;       // bit17
-    motor->lz_feedback.fault.over_temp = (fault_info & 0x04) != 0;          // bit18
-    motor->lz_feedback.fault.encoder_fault = (fault_info & 0x08) != 0;      // bit19
-    motor->lz_feedback.fault.stall_overload = (fault_info & 0x10) != 0;     // bit20
-    motor->lz_feedback.fault.uncalibrated = (fault_info & 0x20) != 0;       // bit21
-    
-    // 解析模式状态
+    motor->lz_feedback.fault.under_voltage = (fault_info & 0x01) != 0;
+    motor->lz_feedback.fault.driver_fault = (fault_info & 0x02) != 0;
+    motor->lz_feedback.fault.over_temp = (fault_info & 0x04) != 0;
+    motor->lz_feedback.fault.encoder_fault = (fault_info & 0x08) != 0;
+    motor->lz_feedback.fault.stall_overload = (fault_info & 0x10) != 0;
+    motor->lz_feedback.fault.uncalibrated = (fault_info & 0x20) != 0;
     motor->lz_feedback.state = (MOTOR_LZ_State_t)mode_state;
-    
-    // 解析数据区
-    // Byte0~1: 当前角度 (高字节在前，低字节在后)
+
+    // 反馈解码并自动反向
     uint16_t raw_angle = (uint16_t)((msg->data[0] << 8) | msg->data[1]);
-    motor->lz_feedback.current_angle = MOTOR_LZ_RawToFloat(raw_angle, LZ_ANGLE_RANGE_RAD);
-    
-    // Byte2~3: 当前角速度 (高字节在前，低字节在后)
+    float angle = MOTOR_LZ_RawToFloat(raw_angle, LZ_ANGLE_RANGE_RAD);
     uint16_t raw_velocity = (uint16_t)((msg->data[2] << 8) | msg->data[3]);
-    motor->lz_feedback.current_velocity = MOTOR_LZ_RawToFloat(raw_velocity, LZ_VELOCITY_RANGE_RAD_S);
-    
-    // Byte4~5: 当前力矩 (高字节在前，低字节在后)
+    float velocity = MOTOR_LZ_RawToFloat(raw_velocity, LZ_VELOCITY_RANGE_RAD_S);
     uint16_t raw_torque = (uint16_t)((msg->data[4] << 8) | msg->data[5]);
-    motor->lz_feedback.current_torque = MOTOR_LZ_RawToFloat(raw_torque, LZ_TORQUE_RANGE_NM);
-    
-    // Byte6~7: 当前温度 (温度*10) (高字节在前，低字节在后)
+    float torque = MOTOR_LZ_RawToFloat(raw_torque, LZ_TORQUE_RANGE_NM);
+
+    while (angle <0){
+        angle += M_2PI;
+    }
+    while (angle > M_2PI){
+        angle -= M_2PI;
+    }
+    // 自动反向
+    if (motor->param.reverse) {
+        angle = M_2PI - angle;
+        velocity = -velocity;
+        torque = -torque;
+    }
+
+    motor->lz_feedback.current_angle = angle;
+    motor->lz_feedback.current_velocity = velocity;
+    motor->lz_feedback.current_torque = torque;
+
     uint16_t raw_temp = (uint16_t)((msg->data[6] << 8) | msg->data[7]);
     motor->lz_feedback.temperature = (float)raw_temp / LZ_TEMP_SCALE;
-    
-    // 更新通用电机反馈信息
-    motor->motor.feedback.rotor_abs_angle = motor->lz_feedback.current_angle;
-    motor->motor.feedback.rotor_speed = motor->lz_feedback.current_velocity * 180.0f / M_PI * 6.0f; // 转换为RPM
-    motor->motor.feedback.torque_current = motor->lz_feedback.current_torque; // 使用力矩作为电流反馈
+
+    motor->motor.feedback.rotor_abs_angle = angle;
+    motor->motor.feedback.rotor_speed = velocity; 
+    motor->motor.feedback.torque_current = torque;
     motor->motor.feedback.temp = (int8_t)motor->lz_feedback.temperature;
-    
-    // 更新在线状态
     motor->motor.header.online = true;
     motor->motor.header.last_online_time = BSP_TIME_Get();
 }
@@ -340,48 +341,38 @@ int8_t MOTOR_LZ_UpdateAll(void) {
 
 int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *motion_param) {
     if (param == NULL || motion_param == NULL) return DEVICE_ERR_NULL;
-    
     MOTOR_LZ_t *motor = MOTOR_LZ_GetMotor(param);
     if (motor == NULL) return DEVICE_ERR_NO_DEV;
-    
-    // 更新运控参数
+
+    // 自动反向控制
+    MOTOR_LZ_MotionParam_t send_param = *motion_param;
+    if (param->reverse) {
+        send_param.target_angle = -send_param.target_angle;
+        send_param.target_velocity = -send_param.target_velocity;
+        send_param.torque = -send_param.torque;
+    }
+
     memcpy(&motor->motion_param, motion_param, sizeof(MOTOR_LZ_MotionParam_t));
-    
-    // 根据协议，bit23~8数据区2包含力矩信息
-    // 力矩范围：-60Nm~60Nm 对应 0~65535
-    uint16_t raw_torque = MOTOR_LZ_FloatToRaw(motion_param->torque, LZ_TORQUE_RANGE_NM);
-    
-    // 构建扩展ID - 运控模式控制指令
-    // bit28~24: 0x1 (运控模式)
-    // bit23~8:  力矩数据 (0~65535)，协议中描述为"Byte2:力矩"
-    // bit7~0:   目标电机CAN_ID
+
+    uint16_t raw_torque = MOTOR_LZ_FloatToRaw(send_param.torque, LZ_TORQUE_RANGE_NM);
     uint32_t ext_id = MOTOR_LZ_BuildExtID(MOTOR_LZ_CMD_MOTION, raw_torque, param->motor_id);
-    
-    // 准备8字节数据区
     uint8_t data[8];
-    
-    // Byte0~1: 目标角度 [0~65535] 对应 (-12.57f~12.57f rad) (高字节在前，低字节在后)
-    uint16_t raw_angle = MOTOR_LZ_FloatToRaw(motion_param->target_angle, LZ_ANGLE_RANGE_RAD);
-    data[0] = (raw_angle >> 8) & 0xFF;  // 高字节
-    data[1] = raw_angle & 0xFF;         // 低字节
-    
-    // Byte2~3: 目标角速度 [0~65535] 对应 (-20rad/s~20rad/s) (高字节在前，低字节在后)
-    uint16_t raw_velocity = MOTOR_LZ_FloatToRaw(motion_param->target_velocity, LZ_VELOCITY_RANGE_RAD_S);
-    data[2] = (raw_velocity >> 8) & 0xFF;  // 高字节
-    data[3] = raw_velocity & 0xFF;         // 低字节
-    
-    // Byte4~5: Kp [0~65535] 对应 (0.0~5000.0) (高字节在前，低字节在后)
-    uint16_t raw_kp = MOTOR_LZ_FloatToRawPositive(motion_param->kp, LZ_KP_MAX);
-    data[4] = (raw_kp >> 8) & 0xFF;     // 高字节
-    data[5] = raw_kp & 0xFF;            // 低字节
-    
-    // Byte6~7: Kd [0~65535] 对应 (0.0~100.0) (高字节在前，低字节在后)
-    uint16_t raw_kd = MOTOR_LZ_FloatToRawPositive(motion_param->kd, LZ_KD_MAX);
-    data[6] = (raw_kd >> 8) & 0xFF;     // 高字节
-    data[7] = raw_kd & 0xFF;            // 低字节
-    
+    uint16_t raw_angle = MOTOR_LZ_FloatToRaw(send_param.target_angle, LZ_ANGLE_RANGE_RAD);
+    data[0] = (raw_angle >> 8) & 0xFF;
+    data[1] = raw_angle & 0xFF;
+    uint16_t raw_velocity = MOTOR_LZ_FloatToRaw(send_param.target_velocity, LZ_VELOCITY_RANGE_RAD_S);
+    data[2] = (raw_velocity >> 8) & 0xFF;
+    data[3] = raw_velocity & 0xFF;
+    uint16_t raw_kp = MOTOR_LZ_FloatToRawPositive(send_param.kp, LZ_KP_MAX);
+    data[4] = (raw_kp >> 8) & 0xFF;
+    data[5] = raw_kp & 0xFF;
+    uint16_t raw_kd = MOTOR_LZ_FloatToRawPositive(send_param.kd, LZ_KD_MAX);
+    data[6] = (raw_kd >> 8) & 0xFF;
+    data[7] = raw_kd & 0xFF;
+    BSP_CAN_WaitForEmptyMailbox(param->can, 1);
     return MOTOR_LZ_SendExtFrame(param->can, ext_id, data, 8);
 }
+
 
 int8_t MOTOR_LZ_Enable(MOTOR_LZ_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
@@ -438,7 +429,7 @@ MOTOR_LZ_t* MOTOR_LZ_GetMotor(MOTOR_LZ_Param_t *param) {
 }
 
 int8_t MOTOR_LZ_Relax(MOTOR_LZ_Param_t *param) {
-    return MOTOR_LZ_Disable(param, false);
+    return MOTOR_LZ_MotionControl(param, &lz_relax_param);
 }
 
 int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param) {
@@ -456,73 +447,4 @@ static MOTOR_LZ_Feedback_t* MOTOR_LZ_GetFeedback(MOTOR_LZ_Param_t *param) {
         return &motor->lz_feedback;
     }
     return NULL;
-}
-
-int8_t MOTOR_LZ_TorqueControl(MOTOR_LZ_Param_t *param, float torque) {
-    if (param == NULL) return DEVICE_ERR_NULL;
-    
-    // 创建运控参数，只设置力矩，其他参数为0
-    MOTOR_LZ_MotionParam_t motion_param = {0};
-    motion_param.torque = torque;
-    motion_param.target_angle = 0.0f;
-    motion_param.target_velocity = 0.0f;
-    motion_param.kp = 0.0f;
-    motion_param.kd = 0.0f;
-    
-    return MOTOR_LZ_MotionControl(param, &motion_param);
-}
-
-int8_t MOTOR_LZ_PositionControl(MOTOR_LZ_Param_t *param, float target_angle, float max_velocity) {
-    if (param == NULL) return DEVICE_ERR_NULL;
-    
-    // 创建运控参数，设置位置和速度限制
-    MOTOR_LZ_MotionParam_t motion_param = {0};
-    motion_param.target_angle = target_angle;
-    motion_param.target_velocity = max_velocity;
-    motion_param.torque = 0.0f;
-    motion_param.kp = 100.0f;  // 默认位置增益
-    motion_param.kd = 5.0f;    // 默认微分增益
-    
-    return MOTOR_LZ_MotionControl(param, &motion_param);
-}
-
-int8_t MOTOR_LZ_VelocityControl(MOTOR_LZ_Param_t *param, float target_velocity) {
-    if (param == NULL) return DEVICE_ERR_NULL;
-    
-    // 创建运控参数，只设置速度
-    MOTOR_LZ_MotionParam_t motion_param = {0};
-    motion_param.target_angle = 0.0f;
-    motion_param.target_velocity = target_velocity;
-    motion_param.torque = 0.0f;
-    motion_param.kp = 0.0f;
-    motion_param.kd = 1.0f;    // 少量阻尼
-    
-    return MOTOR_LZ_MotionControl(param, &motion_param);
-}
-
-int8_t MOTOR_LZ_RecoverToZero(MOTOR_LZ_Param_t *param) {
-    if (param == NULL) return DEVICE_ERR_NULL;
-    
-    MOTOR_LZ_t *motor = MOTOR_LZ_GetMotor(param);
-    if (motor == NULL) return DEVICE_ERR_NO_DEV;
-    
-    // 获取当前角度
-    MOTOR_LZ_Feedback_t *feedback = MOTOR_LZ_GetFeedback(param);
-    if (feedback == NULL) return DEVICE_ERR_NO_DEV;
-    
-    float current_angle = feedback->current_angle;
-    
-    // 计算目标角度为0时的最短路径
-    float angle_diff = -current_angle; // 目标是0，所以差值就是-current_angle
-    // 限制最大差值，防止过大跳变
-    if (angle_diff > LZ_MAX_RECOVER_DIFF_RAD) angle_diff = LZ_MAX_RECOVER_DIFF_RAD;
-    if (angle_diff < -LZ_MAX_RECOVER_DIFF_RAD) angle_diff = -LZ_MAX_RECOVER_DIFF_RAD;
-    
-    float target_angle = current_angle + angle_diff;
-    
-    // 创建运控参数，设置位置和速度限制
-    MOTOR_LZ_MotionParam_t motion_param = lz_recover_param; // 使用预设的恢复参数
-    motion_param.target_angle = target_angle;
-
-    return MOTOR_LZ_MotionControl(param, &motion_param);
 }
