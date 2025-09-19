@@ -14,14 +14,18 @@ extern "C" {
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
 
+
 typedef struct {
 BSP_GPIO_t gpio;
 BSP_PWM_Channel_t channel;	
 } DEVICE_LED_t;
 
+
+ extern DEVICE_LED_t LED_Map;
 /* Exported functions prototypes -------------------------------------------- */
-int8_t LED_PWMSet(BSP_PWM_Channel_t channel,float duty_cycle);
-int8_t LED_GPIOSet(BSP_GPIO_t gpio,bool value);
+
+
+int8_t BSP_LED_Set(char sign,DEVICE_LED_t ch,bool value,float duty_cycle);
 
 #ifdef __cplusplus
 }
