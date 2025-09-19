@@ -10,8 +10,16 @@ extern "C" {
 
 #include "bsp/bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported types ----------------------------------------------------------- */
 typedef enum {
 /* AUTO GENERATED BSP_GPIO_ENUM */
@@ -29,6 +37,10 @@ int8_t BSP_GPIO_WritePin(BSP_GPIO_t gpio, bool value);
 int8_t BSP_GPIO_TogglePin(BSP_GPIO_t gpio);
 
 bool BSP_GPIO_ReadPin(BSP_GPIO_t gpio);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

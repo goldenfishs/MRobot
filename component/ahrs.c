@@ -9,8 +9,16 @@
 
 #include "user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 #define BETA_IMU (0.033f)
 #define BETA_AHRS (0.041f)
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 
 /* 2 * proportional gain (Kp) */
 static float beta = BETA_IMU;
@@ -403,3 +411,7 @@ int8_t AHRS_GetEulr(AHRS_Eulr_t *eulr, const AHRS_t *ahrs) {
  * \param eulr 被操作的数据
  */
 void AHRS_ResetEulr(AHRS_Eulr_t *eulr) { memset(eulr, 0, sizeof(*eulr)); }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

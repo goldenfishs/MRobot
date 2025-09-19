@@ -11,6 +11,14 @@ extern "C" {
 #include "component/ahrs.h"
 #include "device/device.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
@@ -31,6 +39,10 @@ typedef struct {
 
   const BMI088_Cali_t *cali;
 } BMI088_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
 
 /* Exported functions prototypes -------------------------------------------- */
 int8_t BMI088_Init(BMI088_t *bmi088, const BMI088_Cali_t *cali);
@@ -59,6 +71,10 @@ uint32_t BMI088_GyroWaitDmaCplt();
 int8_t BMI088_ParseAccl(BMI088_t *bmi088);
 int8_t BMI088_ParseGyro(BMI088_t *bmi088);
 float BMI088_GetUpdateFreq(BMI088_t *bmi088);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

@@ -3,18 +3,35 @@
 #include <string.h>
 #include "device/vofa.h"
 #include "bsp/uart.h"
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 
 #define MAX_CHANNEL  64u   		// 根据实际最大通道数调整
 
 #define JUSTFLOAT_TAIL 0x7F800000
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static uint8_t vofa_tx_buf[sizeof(float) * MAX_CHANNEL + sizeof(uint32_t)];
 static VOFA_Protocol_t current_protocol = VOFA_PROTOCOL_FIREWATER;  // 默认协议
 
 /* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 /************************  RawData  *************************/
 void VOFA_RawData_Send(const char* data, bool dma) {

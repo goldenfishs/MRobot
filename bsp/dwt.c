@@ -12,12 +12,28 @@
  */
 #include "bsp/dwt.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 DWT_Time_t SysTime;
 static uint32_t CPU_FREQ_Hz, CPU_FREQ_Hz_ms, CPU_FREQ_Hz_us;
 static uint32_t CYCCNT_RountCount;
 static uint32_t CYCCNT_LAST;
 uint64_t CYCCNT64;
 static void DWT_CNT_Update(void);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 void DWT_Init(uint32_t CPU_Freq_mHz)
 {

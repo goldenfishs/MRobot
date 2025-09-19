@@ -4,18 +4,36 @@
 
 #include "bsp/pwm.h"
 #include <stdlib.h>
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 #define DEVICE_WS2812_T1H            (uint16_t)(BSP_PWM_GetAutoReloadPreload(BSP_PWM_WS2812) * 0.56)   // High-level width of logic-1 pulse
 #define DEVICE_WS2812_T0H            (BSP_PWM_GetAutoReloadPreload(BSP_PWM_WS2812) * 0.29)             // High-level width of logic-0 pulse
 #define DEVICE_WS2812_WS_REST        40   // Number of reset pulses (low level) after data stream
 #define DEVICE_WS2812_DATA_LEN       24   // WS2812 data length: 24 bits (GRB) per LED
 #define DEVICE_WS2812_RST_NUM        50   // Extra reset pulses reserved at the end of the buffer
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static uint16_t DEVICE_WS2812_LED_NUM; 	       // Total number of LEDs
 static uint16_t *DEVICE_WS2812_RGB_Buff = NULL;// PWM duty buffer for DMA
 /* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 /* Exported functions ------------------------------------------------------- */
 /**
  * Set color of a single WS2812 LED

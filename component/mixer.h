@@ -10,6 +10,14 @@ extern "C" {
 
 #include "user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /** 四轮布局 */
 /* 前 */
 /* 2 1 */
@@ -33,6 +41,10 @@ typedef struct {
   Mixer_Mode_t mode;
 } Mixer_t; /* 混合器主结构体 */
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /**
  * @brief 初始化混合器
  *
@@ -54,6 +66,10 @@ int8_t Mixer_Init(Mixer_t *mixer, Mixer_Mode_t mode);
  */
 int8_t Mixer_Apply(Mixer_t *mixer, MoveVector_t *move_vec, float *out,
                    int8_t len, float scale);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

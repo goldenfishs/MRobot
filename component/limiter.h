@@ -11,6 +11,14 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /**
  * @brief 限制底盘功率不超过power_limit
  *

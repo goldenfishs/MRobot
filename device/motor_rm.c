@@ -10,6 +10,10 @@
 #include "bsp/time.h"
 #include "component/user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 #define GM6020_FB_ID_BASE        (0x205)
 #define GM6020_CTRL_ID_BASE      (0x1ff)
@@ -30,10 +34,23 @@
 #define MOTOR_ENC_RES            (8192)   /* 电机编码器分辨率 */
 #define MOTOR_CUR_RES            (16384)  /* 电机转矩电流分辨率 */
 
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static MOTOR_RM_CANManager_t *can_managers[BSP_CAN_NUM] = {NULL};
+
+/* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 static int8_t MOTOR_RM_GetLogicalIndex(uint16_t can_id, MOTOR_RM_Module_t module) {
     switch (module) {
@@ -223,6 +240,7 @@ int8_t MOTOR_RM_Ctrl(MOTOR_RM_Param_t *param) {
         default:
             return DEVICE_ERR;
     }
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 

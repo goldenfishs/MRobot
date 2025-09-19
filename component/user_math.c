@@ -3,8 +3,10 @@
 */
 
 #include "user_math.h"
-
 #include <string.h>
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
 
 inline float InvSqrt(float x) {
 //#if 0
@@ -130,3 +132,7 @@ inline float CalculateRpm(float bullet_speed, float fric_radius, bool is17mm) {
 //     __NOP();
 //   }
 // }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

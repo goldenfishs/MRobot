@@ -11,8 +11,16 @@ extern "C" {
 
 #include "bsp/bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported types ----------------------------------------------------------- */
 
 /* 要添加使用UART的新设备，需要先在此添加对应的枚举值 */
@@ -50,6 +58,10 @@ int8_t BSP_UART_RegisterCallback(BSP_UART_t uart, BSP_UART_Callback_t type,
 
 int8_t BSP_UART_Transmit(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma);
 int8_t BSP_UART_Receive(BSP_UART_t uart, uint8_t *data, uint16_t size, bool dma);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

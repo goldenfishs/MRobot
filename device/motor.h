@@ -7,6 +7,14 @@ extern "C" {
 /* Includes ----------------------------------------------------------------- */
 #include "device/device.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
@@ -41,11 +49,19 @@ typedef struct {
     MOTOR_Feedback_t feedback;
 } MOTOR_t;
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Exported functions prototypes -------------------------------------------- */
 float MOTOR_GetRotorAbsAngle(const MOTOR_t *motor);
 float MOTOR_GetRotorSpeed(const MOTOR_t *motor);
 float MOTOR_GetTorqueCurrent(const MOTOR_t *motor);
 float MOTOR_GetTemp(const MOTOR_t *motor);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

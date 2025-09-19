@@ -1,5 +1,5 @@
 /*
-	pwm¿ØÖÆ¶æ»ú
+	pwmï¿½ï¿½ï¿½Æ¶ï¿½ï¿½
 */
 
 /*Includes   -----------------------------------------*/ 
@@ -7,8 +7,16 @@
 #include "bsp/pwm.h"
 #include "servo.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 #define SERVO_MIN_DUTY  0.025f   
 #define SERVO_MAX_DUTY  0.125f   
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */   
 
 /**
  * @brief  
@@ -24,10 +32,10 @@ int8_t SERVO_Init(SERVO_t *servo) {
 int8_t SERVO_SetAngle(SERVO_t *servo, float angle) {
     if (servo == NULL) return BSP_ERR;
     
-	  /*ÏÞÖÆ½Ç¶È·¶Î§*/
+	  /*ï¿½ï¿½ï¿½Æ½Ç¶È·ï¿½Î§*/
     if (angle < 0.0f)   angle = 0.0f;
     if (angle > 180.0f) angle = 180.0f;
-    /*½Ç¶ÈÓ³Éäµ½Õ¼¿Õ±È*/
+    /*ï¿½Ç¶ï¿½Ó³ï¿½äµ½Õ¼ï¿½Õ±ï¿½*/
     float duty = servo->min_duty + (angle / 180.0f) * (servo->max_duty - servo->min_duty);
 
     return BSP_PWM_Set(servo->pwm_ch, duty);

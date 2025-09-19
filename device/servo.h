@@ -8,6 +8,14 @@ extern "C" {
 #include <cmsis_os2.h>
 	
 #include "bsp/pwm.h"
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 	
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
@@ -21,6 +29,10 @@ typedef struct {
    float min_duty;         
    float max_duty;      
 } SERVO_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
 
 /**
  * @brief  
@@ -45,6 +57,10 @@ int8_t SERVO_SetAngle(SERVO_t *servo, float angle);
  */
  
 int8_t SERVO_Stop(SERVO_t *servo);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 	
 #ifdef __cplusplus

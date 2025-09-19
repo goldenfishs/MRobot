@@ -10,6 +10,10 @@
 #include "bsp/time.h"
 #include "component/user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
 #define LK_CTRL_ID_BASE        (0x140)
 #define LK_FB_ID_BASE          (0x240)
@@ -36,12 +40,24 @@
 #define LK_ENC_15BIT_MAX       (32767)   // 15位编码器最大值  
 #define LK_ENC_16BIT_MAX       (65535)   // 16位编码器最大值
 
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 static MOTOR_LK_CANManager_t *can_managers[BSP_CAN_NUM] = {NULL};
 
 /* Private functions -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
 static float MOTOR_LK_GetCurrentLSB(MOTOR_LK_Module_t module) {
     switch (module) {
         case MOTOR_LK_MF9025:
@@ -76,11 +92,7 @@ static int8_t MOTOR_LK_CreateCANManager(BSP_CAN_t can) {
 }
 
 static void MOTOR_LK_Decode(MOTOR_LK_t *motor, BSP_CAN_Message_t *msg) {
-    // 调试信息：打印接收到的数据
-    // printf("LK Motor ID:%d, CMD:0x%02X, Data: %02X %02X %02X %02X %02X %02X %02X %02X\n", 
-    //        motor->param.id, msg->data[0], msg->data[0], msg->data[1], msg->data[2], 
-    //        msg->data[3], msg->data[4], msg->data[5], msg->data[6], msg->data[7]);
-    
+
     // 检查命令字节是否为反馈命令
     if (msg->data[0] != LK_CMD_FEEDBACK) {
         // 如果不是标准反馈命令，可能是其他格式的数据
@@ -90,32 +102,32 @@ static void MOTOR_LK_Decode(MOTOR_LK_t *motor, BSP_CAN_Message_t *msg) {
     
     // 解析温度 (DATA[1])
     motor->motor.feedback.temp = (int8_t)msg->data[1];
-    
+
     // 解析转矩电流值或功率值 (DATA[2], DATA[3])
     int16_t raw_current_or_power = (int16_t)((msg->data[3] << 8) | msg->data[2]);
-    
+
     // 根据电机类型解析电流或功率
     switch (motor->param.module) {
         case MOTOR_LK_MF9025:
         case MOTOR_LK_MF9035:
-            // MF/MG电机：转矩电流值
             motor->motor.feedback.torque_current = raw_current_or_power * MOTOR_LK_GetCurrentLSB(motor->param.module);
             break;
         default:
-            // MS电机：功率值（范围-1000~1000）
-            motor->motor.feedback.torque_current = (float)raw_current_or_power;  // 将功率存储在torque_current字段中
+            motor->motor.feedback.torque_current = (float)raw_current_or_power;
             break;
     }
-    
+
     // 解析转速 (DATA[4], DATA[5]) - 单位：1dps/LSB
-    motor->motor.feedback.rotor_speed = (int16_t)((msg->data[5] << 8) | msg->data[4]);
-    
+    int16_t raw_speed = (int16_t)((msg->data[5] << 8) | msg->data[4]);
+    motor->motor.feedback.rotor_speed = motor->param.reverse ? -raw_speed : raw_speed;
+
     // 解析编码器值 (DATA[6], DATA[7])
     uint16_t raw_encoder = (uint16_t)((msg->data[7] << 8) | msg->data[6]);
     uint16_t encoder_max = MOTOR_LK_GetEncoderMax(motor->param.module);
-    
+
     // 将编码器值转换为弧度 (0 ~ 2π)
-    motor->motor.feedback.rotor_abs_angle = (float)raw_encoder / (float)encoder_max * M_2PI;
+    float angle = (float)raw_encoder / (float)encoder_max * M_2PI;
+    motor->motor.feedback.rotor_abs_angle = motor->param.reverse ? (M_2PI - angle) : angle;
 }
 
 /* Exported functions ------------------------------------------------------- */
@@ -147,7 +159,7 @@ int8_t MOTOR_LK_Register(MOTOR_LK_Param_t *param) {
     
     // 对于某些LK电机，反馈数据可能通过命令ID发送
     // 根据实际测试，使用命令ID接收反馈数据
-    uint16_t feedback_id = 0x140 + param->id;  // 使用命令ID作为反馈ID
+    uint16_t feedback_id = param->id;  // 使用命令ID作为反馈ID
     
     // 注册CAN接收ID
     if (BSP_CAN_RegisterId(param->can, feedback_id, 3) != BSP_OK) {
@@ -170,7 +182,7 @@ int8_t MOTOR_LK_Update(MOTOR_LK_Param_t *param) {
         MOTOR_LK_t *motor = manager->motors[i];
         if (motor && motor->param.id == param->id) {
             // 对于某些LK电机，反馈数据通过命令ID发送
-            uint16_t feedback_id = 0x140 + param->id;
+            uint16_t feedback_id = param->id;
             
             BSP_CAN_Message_t rx_msg;
             if (BSP_CAN_GetMessage(param->can, feedback_id, &rx_msg, BSP_CAN_TIMEOUT_IMMEDIATE) != BSP_OK) {
@@ -211,35 +223,37 @@ int8_t MOTOR_LK_UpdateAll(void) {
 
 int8_t MOTOR_LK_SetOutput(MOTOR_LK_Param_t *param, float value) {
     if (param == NULL) return DEVICE_ERR_NULL;
-    
+
     MOTOR_LK_CANManager_t *manager = MOTOR_LK_GetCANManager(param->can);
     if (manager == NULL) return DEVICE_ERR_NO_DEV;
-    
+
     // 限制输出值范围
     if (value > 1.0f) value = 1.0f;
     if (value < -1.0f) value = -1.0f;
-    
+
     MOTOR_LK_t *motor = MOTOR_LK_GetMotor(param);
     if (motor == NULL) return DEVICE_ERR_NO_DEV;
-    
+
+    // 根据反转参数调整输出
+    float output = param->reverse ? -value : value;
+
     // 转矩闭环控制命令 - 将输出值转换为转矩控制值
-    int16_t torque_control = (int16_t)(value * (float)LK_TORQUE_RANGE);
-    
-    // 构建CAN帧（根据协议：命令报文标识符 = 0x140 + ID）
+    int16_t torque_control = (int16_t)(output * (float)LK_TORQUE_RANGE);
+
+    // 构建CAN帧
     BSP_CAN_StdDataFrame_t tx_frame;
-    tx_frame.id = 0x140 + param->id;
+    tx_frame.id = param->id;
     tx_frame.dlc = MOTOR_TX_BUF_SIZE;
-    
-    // 设置转矩闭环控制命令数据
-    tx_frame.data[0] = LK_CMD_TORQUE_CTRL;  // 命令字节
-    tx_frame.data[1] = 0x00;                // NULL
-    tx_frame.data[2] = 0x00;                // NULL
-    tx_frame.data[3] = 0x00;                // NULL
-    tx_frame.data[4] = (uint8_t)(torque_control & 0xFF);        // 转矩电流控制值低字节
-    tx_frame.data[5] = (uint8_t)((torque_control >> 8) & 0xFF); // 转矩电流控制值高字节
-    tx_frame.data[6] = 0x00;                // NULL
-    tx_frame.data[7] = 0x00;                // NULL
-    
+
+    tx_frame.data[0] = LK_CMD_TORQUE_CTRL;
+    tx_frame.data[1] = 0x00;
+    tx_frame.data[2] = 0x00;
+    tx_frame.data[3] = 0x00;
+    tx_frame.data[4] = (uint8_t)(torque_control & 0xFF);
+    tx_frame.data[5] = (uint8_t)((torque_control >> 8) & 0xFF);
+    tx_frame.data[6] = 0x00;
+    tx_frame.data[7] = 0x00;
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -253,7 +267,7 @@ int8_t MOTOR_LK_MotorOn(MOTOR_LK_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
     
     BSP_CAN_StdDataFrame_t tx_frame;
-    tx_frame.id = 0x140 + param->id;
+    tx_frame.id = param->id;
     tx_frame.dlc = MOTOR_TX_BUF_SIZE;
     
     // 电机运行命令
@@ -265,7 +279,7 @@ int8_t MOTOR_LK_MotorOn(MOTOR_LK_Param_t *param) {
     tx_frame.data[5] = 0x00;
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -273,7 +287,7 @@ int8_t MOTOR_LK_MotorOff(MOTOR_LK_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
     
     BSP_CAN_StdDataFrame_t tx_frame;
-    tx_frame.id = 0x140 + param->id;
+    tx_frame.id = param->id;
     tx_frame.dlc = MOTOR_TX_BUF_SIZE;
     
     // 电机关闭命令
@@ -285,7 +299,7 @@ int8_t MOTOR_LK_MotorOff(MOTOR_LK_Param_t *param) {
     tx_frame.data[5] = 0x00;
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    
+    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 

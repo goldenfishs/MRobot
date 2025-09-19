@@ -11,8 +11,16 @@ extern "C" {
 
 #include "bsp/bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported types ----------------------------------------------------------- */
 
 /* 要添加使用SPI的新设备，需要先在此添加对应的枚举值 */
@@ -52,6 +60,10 @@ uint8_t BSP_SPI_MemReadByte(BSP_SPI_t spi, uint8_t reg);
 int8_t BSP_SPI_MemWriteByte(BSP_SPI_t spi, uint8_t reg, uint8_t data);
 int8_t BSP_SPI_MemRead(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size);
 int8_t BSP_SPI_MemWrite(BSP_SPI_t spi, uint8_t reg, uint8_t *data, uint16_t size);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

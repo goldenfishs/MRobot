@@ -11,8 +11,16 @@ extern "C" {
 
 #include "bsp/bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported types ----------------------------------------------------------- */
 
 /* 要添加使用I2C的新设备，需要先在此添加对应的枚举值 */
@@ -61,6 +69,9 @@ int8_t BSP_I2C_MemRead(BSP_I2C_t i2c, uint16_t devAddr, uint16_t memAddr,
 int8_t BSP_I2C_MemWrite(BSP_I2C_t i2c, uint16_t devAddr, uint16_t memAddr,
                         uint8_t *data, uint16_t size, bool dma);
 
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

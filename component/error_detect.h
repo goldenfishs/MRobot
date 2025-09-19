@@ -11,6 +11,14 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 typedef enum {
   /* Low priority */
   ERROR_DETECT_UNIT_NO_DEV = 0,
@@ -53,6 +61,10 @@ typedef struct {
   ErrorDetect_Error_t error[ERROR_DETECT_UNIT_NUM];
 } ErrorDetect_t;
 
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 int8_t ErrorDetect_Init(void);
 void ErrorDetect_Processing(uint32_t sys_time);
 bool ErrorDetect_ErrorExist(ErrorDetect_Unit_t unit);
@@ -60,6 +72,10 @@ ErrorDetect_Unit_t ErrorDetect_GetErrorUnit(void);
 const ErrorDetect_Error_t *ErrorDetect_GetDetail(ErrorDetect_Unit_t unit);
 
 void ErrorDetect_Update(ErrorDetect_Unit_t unit, uint32_t time_current);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

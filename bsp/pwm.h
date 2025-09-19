@@ -9,9 +9,17 @@ extern "C" {
 #include "tim.h"
 #include "bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 
 /* Exported constants ------------------------------------------------------- */
 /* Exported macro ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Exported types ----------------------------------------------------------- */
 /* PWM通道 */
 typedef enum {
@@ -30,6 +38,10 @@ uint16_t BSP_PWM_GetChannel(BSP_PWM_Channel_t ch);
 TIM_HandleTypeDef* BSP_PWM_GetHandle(BSP_PWM_Channel_t ch);
 int8_t BSP_PWM_Start_DMA(BSP_PWM_Channel_t ch, uint32_t *pData, uint16_t Length);
 int8_t BSP_PWM_Stop_DMA(BSP_PWM_Channel_t ch);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

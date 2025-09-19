@@ -3,13 +3,25 @@
 #include "bsp/pwm.h"
 #include "bsp.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
 typedef struct {
   TIM_HandleTypeDef *tim;
   uint16_t channel;
 } BSP_PWM_Config_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
 
 /* Private variables -------------------------------------------------------- */
 static const BSP_PWM_Config_t PWM_Map[BSP_PWM_NUM] = {

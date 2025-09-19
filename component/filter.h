@@ -10,6 +10,14 @@ extern "C" {
 
 #include "user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* 二阶低通滤波器 */
 typedef struct {
   float cutoff_freq; /* 截止频率 */
@@ -41,6 +49,10 @@ typedef struct {
   float delay_element_2;
 
 } NotchFilter_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
 
 /**
  * @brief 初始化滤波器
@@ -98,6 +110,10 @@ float NotchFilter_Apply(NotchFilter_t *f, float sample);
  * @return float 滤波后的值
  */
 float NotchFilter_Reset(NotchFilter_t *f, float sample);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }

@@ -6,9 +6,21 @@
 #include "FreeRTOS.h"
 #include "main.h"
 #include "task.h"
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
 /* Private define ----------------------------------------------------------- */
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
 /* Private variables -------------------------------------------------------- */
 /* Private function  -------------------------------------------------------- */
 /* Exported functions ------------------------------------------------------- */
@@ -63,3 +75,7 @@ int8_t BSP_TIME_Delay_us(uint32_t us) {
 }
 
 int8_t BSP_TIME_Delay(uint32_t ms) __attribute__((alias("BSP_TIME_Delay_ms")));
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

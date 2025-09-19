@@ -213,8 +213,6 @@ int8_t MOTOR_LZ_Relax(MOTOR_LZ_Param_t *param);
  */
 int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param);
 
-int8_t MOTOR_LZ_RecoverToZero(MOTOR_LZ_Param_t *param);
-
 #ifdef __cplusplus
 }
 #endif

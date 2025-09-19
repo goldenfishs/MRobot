@@ -9,10 +9,18 @@
 
 #include "bsp/uart.h"
 #include "bsp/time.h"
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
 /* Private define ----------------------------------------------------------- */
 #define DR16_CH_VALUE_MIN (364u)
 #define DR16_CH_VALUE_MID (1024u)
 #define DR16_CH_VALUE_MAX (1684u)
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
 
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
@@ -83,3 +91,7 @@ bool DR16_WaitDmaCplt(uint32_t timeout) {
   return (osThreadFlagsWait(SIGNAL_DR16_RAW_REDY, osFlagsWaitAll, timeout) ==
           SIGNAL_DR16_RAW_REDY);
 }
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

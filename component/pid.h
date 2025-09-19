@@ -14,6 +14,14 @@ extern "C" {
 #include "filter.h"
 #include "user_math.h"
 
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
 /* PID模式 */
 typedef enum {
   KPID_MODE_NO_D = 0, /* 不使用微分项，PI控制器 */
@@ -89,6 +97,10 @@ int8_t PID_ResetIntegral(KPID_t *pid);
  * @return int8_t 0对应没有错误
  */
 int8_t PID_Reset(KPID_t *pid);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
 
 #ifdef __cplusplus
 }
