@@ -71,6 +71,15 @@ static int8_t MOTOR_RM_GetLogicalIndex(uint16_t can_id, MOTOR_RM_Module_t module
     return DEVICE_ERR;
 }
 
+static float MOTOR_RM_GetRatio(MOTOR_RM_Module_t module) {
+    switch (module) {
+        case MOTOR_M2006: return 36.0f;
+        case MOTOR_M3508: return 19.0f;
+        case MOTOR_GM6020: return 1.0f;
+        default: return 1.0f;
+    }
+}
+
 static int16_t MOTOR_RM_GetLSB(MOTOR_RM_Module_t module) {
     switch (module) {
         case MOTOR_M2006: return M2006_MAX_ABS_LSB;
@@ -97,12 +106,40 @@ static int8_t MOTOR_RM_CreateCANManager(BSP_CAN_t can) {
 
 static void Motor_RM_Decode(MOTOR_RM_t *motor, BSP_CAN_Message_t *msg) {
     uint16_t raw_angle = (uint16_t)((msg->data[0] << 8) | msg->data[1]);
+    int16_t raw_speed = (int16_t)((msg->data[2] << 8) | msg->data[3]);
     int16_t raw_current = (int16_t)((msg->data[4] << 8) | msg->data[5]);
-    motor->motor.feedback.rotor_abs_angle = raw_angle / (float)MOTOR_ENC_RES * M_2PI;
-    motor->motor.feedback.rotor_speed = (int16_t)((msg->data[2] << 8) | msg->data[3]);
     int16_t lsb = MOTOR_RM_GetLSB(motor->param.module);
-    motor->motor.feedback.torque_current = raw_current * lsb / (float)MOTOR_CUR_RES;
-    motor->motor.feedback.temp = msg->data[6];
+    float ratio = MOTOR_RM_GetRatio(motor->param.module);
+
+    float rotor_angle = raw_angle / (float)MOTOR_ENC_RES * M_2PI;
+    float rotor_speed = raw_speed;
+    float torque_current = raw_current * lsb / (float)MOTOR_CUR_RES;
+
+    if (motor->param.gear) {
+        // 多圈累加
+        int32_t delta = (int32_t)raw_angle - (int32_t)motor->last_raw_angle;
+        if (delta > (MOTOR_ENC_RES / 2)) {
+            motor->gearbox_round_count--;
+        } else if (delta < -(MOTOR_ENC_RES / 2)) {
+            motor->gearbox_round_count++;
+        }
+        motor->last_raw_angle = raw_angle;
+        float single_turn = rotor_angle;
+        motor->gearbox_total_angle = (motor->gearbox_round_count * M_2PI + single_turn) / ratio;
+        // 输出轴多圈绝对值
+        motor->feedback.rotor_abs_angle = motor->gearbox_total_angle;
+        motor->feedback.rotor_speed = rotor_speed / ratio;
+        motor->feedback.torque_current = torque_current * ratio;
+    } else {
+        // 非gear模式，直接用转子单圈
+        motor->gearbox_round_count = 0;
+        motor->last_raw_angle = raw_angle;
+        motor->gearbox_total_angle = 0.0f;
+        motor->feedback.rotor_abs_angle = rotor_angle;
+        motor->feedback.rotor_speed = rotor_speed;
+        motor->feedback.torque_current = torque_current;
+    }
+    motor->feedback.temp = msg->data[6];
 }
 
 /* Exported functions ------------------------------------------------------- */
