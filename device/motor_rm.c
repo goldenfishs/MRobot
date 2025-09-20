@@ -140,6 +140,10 @@ static void Motor_RM_Decode(MOTOR_RM_t *motor, BSP_CAN_Message_t *msg) {
         motor->feedback.torque_current = torque_current;
     }
     motor->feedback.temp = msg->data[6];
+    motor->motor.feedback.rotor_abs_angle = motor->feedback.rotor_abs_angle;
+    motor->motor.feedback.rotor_speed = motor->feedback.rotor_speed;
+    motor->motor.feedback.torque_current = motor->feedback.torque_current;
+    motor->motor.feedback.temp = motor->feedback.temp;
 }
 
 /* Exported functions ------------------------------------------------------- */
@@ -193,6 +197,7 @@ int8_t MOTOR_RM_Update(MOTOR_RM_Param_t *param) {
             motor->motor.header.online = true;
             motor->motor.header.last_online_time = BSP_TIME_Get();
             Motor_RM_Decode(motor, &rx_msg);
+        
             return DEVICE_OK;
         }
     }
