@@ -1,5 +1,6 @@
 #pragma once
 
+#include "motor.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,12 +45,19 @@ typedef struct {
     uint16_t id;
     MOTOR_RM_Module_t module;
     bool reverse;
+    bool gear;
 } MOTOR_RM_Param_t;
 
-/*电机实例*/
-typedef struct MOTOR_RM_t {
+typedef MOTOR_Feedback_t MOTOR_RM_Feedback_t;
+
+typedef struct {
     MOTOR_RM_Param_t param;
+    MOTOR_RM_Feedback_t feedback;
     MOTOR_t motor;
+    // 多圈相关变量，仅gear模式下有效
+    uint16_t last_raw_angle;
+    int32_t gearbox_round_count;
+    float gearbox_total_angle;
 } MOTOR_RM_t;
 
 /*CAN管理器，管理一个CAN总线上所有的电机*/
