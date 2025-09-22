@@ -139,11 +139,15 @@ static void Motor_RM_Decode(MOTOR_RM_t *motor, BSP_CAN_Message_t *msg) {
         motor->feedback.rotor_speed = rotor_speed;
         motor->feedback.torque_current = torque_current;
     }
+    if (motor->motor.reverse) {
+        motor->feedback.rotor_abs_angle = M_2_PI - motor->feedback.rotor_abs_angle;
+        motor->feedback.rotor_speed = -motor->feedback.rotor_speed;
+        motor->feedback.torque_current = -motor->feedback.torque_current;
+    }
     motor->feedback.temp = msg->data[6];
 }
 
 /* Exported functions ------------------------------------------------------- */
-
 
 int8_t MOTOR_RM_Register(MOTOR_RM_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
@@ -222,6 +226,9 @@ int8_t MOTOR_RM_SetOutput(MOTOR_RM_Param_t *param, float value) {
     if (manager == NULL) return DEVICE_ERR_NO_DEV;
     if (value > 1.0f) value = 1.0f;
     if (value < -1.0f) value = -1.0f;
+    if (param->reverse){
+        value = -value;
+    }
     MOTOR_RM_t *motor = MOTOR_RM_GetMotor(param);
     if (motor == NULL) return DEVICE_ERR_NO_DEV;
     int8_t logical_index = MOTOR_RM_GetLogicalIndex(param->id, param->module);

@@ -3,17 +3,13 @@
 */
 /*Includes   -----------------------------------------*/
 #include "device/led.h"
-#include "bsp/gpio.h"
-#include "bsp/pwm.h"
 #include "device.h"
 
 
 /* Private define ----------------------------------------------------------- */
 /* Private macro ------------------------------------------------------------ */
 /* Private typedef ---------------------------------------------------------- */
-
-
-
+#ifdef LED_PWM
 int8_t DEVICE_LED_PWM_Set(BSP_PWM_Channel_t channel, float duty_cycle)
 {
     if (duty_cycle < 0.0f || duty_cycle > 1.0f) {
@@ -24,7 +20,9 @@ int8_t DEVICE_LED_PWM_Set(BSP_PWM_Channel_t channel, float duty_cycle)
     BSP_PWM_SetComp(channel, pulse);
     return DEVICE_OK;
 }
+#endif
 
+#ifdef LED_GPIO
 int8_t DEVICE_LED_GPIO_Set(BSP_GPIO_t gpio, bool value)
 {
 	if (value) {
@@ -34,5 +32,6 @@ int8_t DEVICE_LED_GPIO_Set(BSP_GPIO_t gpio, bool value)
 	}
 	return DEVICE_OK;
 }
+#endif
 
 
