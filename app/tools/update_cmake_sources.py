@@ -70,6 +70,36 @@ def update_cmake_sources(cmake_file, c_files):
     else:
         print("❌ 错误: 在CMakeLists.txt中找不到target_sources部分")
         return False
+    
+def update_cmake_includes(cmake_file, user_dir):
+    """确保CMakeLists.txt中的include路径包含User"""
+    if not os.path.exists(cmake_file):
+        print(f"错误: CMakeLists.txt文件不存在: {cmake_file}")
+        return False
+
+    with open(cmake_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # 构建新的include部分
+    include_section = (
+        "# Add include paths\n"
+        "target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE\n"
+        "    # Add user defined include paths\n"
+        "    User\n"
+        ")"
+    )
+
+    # 正则匹配并替换include部分
+    pattern = r'# Add include paths\s*\ntarget_include_directories\(\$\{CMAKE_PROJECT_NAME\}\s+PRIVATE\s*\n.*?\)'
+    if re.search(pattern, content, re.DOTALL):
+        new_content = re.sub(pattern, include_section, content, flags=re.DOTALL)
+        with open(cmake_file, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        print("✅ 成功更新CMakeLists.txt中的include路径")
+        return True
+    else:
+        print("❌ 错误: 在CMakeLists.txt中找不到target_include_directories部分")
+        return False
 
 def main():
     """主函数"""

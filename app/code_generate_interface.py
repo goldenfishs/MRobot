@@ -163,7 +163,7 @@ class CodeGenerateInterface(QWidget):
     def on_cmake_config_btn_clicked(self):
         """配置cmake，自动更新CMakeLists.txt中的源文件列表"""
         try:
-            from app.tools.update_cmake_sources import find_user_c_files, update_cmake_sources
+            from app.tools.update_cmake_sources import find_user_c_files, update_cmake_sources,update_cmake_includes
             from pathlib import Path
             
             # 构建User目录和CMakeLists.txt路径
@@ -204,6 +204,7 @@ class CodeGenerateInterface(QWidget):
             
             # 更新CMakeLists.txt
             success = update_cmake_sources(cmake_file, c_files)
+            success = update_cmake_includes(cmake_file, user_dir)
             
             if success:
                 InfoBar.success(
