@@ -141,13 +141,13 @@ int8_t DR16_ParseData(DR16_t *dr16){
   uint16_t key_value = dr16->raw_data.key;
   
   // 解析键盘位映射（W-B键，位0-15）
-  for (int i = CMD_KEY_W; i <= CMD_KEY_B; i++) {
+  for (int i = DR16_KEY_W; i <= DR16_KEY_B; i++) {
     dr16->data.keyboard.key[i] = (key_value & (1 << i)) != 0;
   }
 
   // 解析鼠标点击
-  dr16->data.keyboard.key[CMD_L_CLICK] = dr16->data.mouse.l_click;
-  dr16->data.keyboard.key[CMD_R_CLICK] = dr16->data.mouse.r_click;
+  dr16->data.keyboard.key[DR16_L_CLICK] = dr16->data.mouse.l_click;
+  dr16->data.keyboard.key[DR16_R_CLICK] = dr16->data.mouse.r_click;
 
   // 解析第五通道
   dr16->data.ch_res = 2.0f * ((float)dr16->raw_data.res - DR16_CH_VALUE_MID) / full_range;

@@ -38,33 +38,33 @@ typedef struct __packed {
 } DR16_RawData_t;
 
 typedef enum {
-  CMD_SW_ERR = 0,
-  CMD_SW_UP = 1,
-  CMD_SW_MID = 3,
-  CMD_SW_DOWN = 2,
+  DR16_SW_ERR = 0,
+  DR16_SW_UP = 1,
+  DR16_SW_MID = 3,
+  DR16_SW_DOWN = 2,
 } DR16_SwitchPos_t;
 
 /* 键盘按键值 */
 typedef enum {
-  CMD_KEY_W = 0,
-  CMD_KEY_S,
-  CMD_KEY_A,
-  CMD_KEY_D,
-  CMD_KEY_SHIFT,
-  CMD_KEY_CTRL,
-  CMD_KEY_Q,
-  CMD_KEY_E,
-  CMD_KEY_R,
-  CMD_KEY_F,
-  CMD_KEY_G,
-  CMD_KEY_Z,
-  CMD_KEY_X,
-  CMD_KEY_C,
-  CMD_KEY_V,
-  CMD_KEY_B,
-  CMD_L_CLICK,
-  CMD_R_CLICK,
-  CMD_KEY_NUM,
+  DR16_KEY_W = 0,
+  DR16_KEY_S,
+  DR16_KEY_A,
+  DR16_KEY_D,
+  DR16_KEY_SHIFT,
+  DR16_KEY_CTRL,
+  DR16_KEY_Q,
+  DR16_KEY_E,
+  DR16_KEY_R,
+  DR16_KEY_F,
+  DR16_KEY_G,
+  DR16_KEY_Z,
+  DR16_KEY_X,
+  DR16_KEY_C,
+  DR16_KEY_V,
+  DR16_KEY_B,
+  DR16_L_CLICK,
+  DR16_R_CLICK,
+  DR16_KEY_NUM,
 } DR16_Key_t;
 
 typedef struct {
@@ -87,7 +87,7 @@ typedef struct {
   } mouse;        /* 鼠标值 */
 
   union {
-    bool key[CMD_KEY_NUM]; /* 键盘按键值 */
+    bool key[DR16_KEY_NUM]; /* 键盘按键值 */
     uint16_t value;        /* 键盘按键值的位映射 */
   } keyboard;
 
