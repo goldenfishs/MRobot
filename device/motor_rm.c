@@ -139,13 +139,13 @@ static void Motor_RM_Decode(MOTOR_RM_t *motor, BSP_CAN_Message_t *msg) {
         motor->feedback.rotor_speed = rotor_speed;
         motor->feedback.torque_current = torque_current;
     }
+    while (motor->feedback.rotor_abs_angle < 0) {
+        motor->feedback.rotor_abs_angle += M_2PI;
+    }
+    while (motor->feedback.rotor_abs_angle >= M_2PI) {
+        motor->feedback.rotor_abs_angle -= M_2PI;
+    }
     if (motor->motor.reverse) {
-        while (motor->feedback.rotor_abs_angle < 0) {
-            motor->feedback.rotor_abs_angle += M_2PI;
-        }
-        while (motor->feedback.rotor_abs_angle >= M_2PI) {
-            motor->feedback.rotor_abs_angle -= M_2PI;
-        }
         motor->feedback.rotor_abs_angle = M_2PI - motor->feedback.rotor_abs_angle;
         motor->feedback.rotor_speed = -motor->feedback.rotor_speed;
         motor->feedback.torque_current = -motor->feedback.torque_current;
