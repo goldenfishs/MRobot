@@ -166,9 +166,13 @@ class CodeGenerateInterface(QWidget):
             from app.tools.update_cmake_sources import find_user_c_files, update_cmake_sources,update_cmake_includes
             from pathlib import Path
             
-            # 构建User目录和CMakeLists.txt路径
-            user_dir = os.path.join(self.project_path, "User")
-            cmake_file = os.path.join(self.project_path, "CMakeLists.txt")
+            # 构建User目录和CMakeLists.txt路径，规范化路径分隔符
+            user_dir = os.path.normpath(os.path.join(self.project_path, "User"))
+            cmake_file = os.path.normpath(os.path.join(self.project_path, "CMakeLists.txt"))
+            
+            print(f"项目路径: {self.project_path}")
+            print(f"User目录路径: {user_dir}")
+            print(f"CMakeLists.txt路径: {cmake_file}")
             
             # 检查User目录是否存在
             if not os.path.exists(user_dir):
@@ -191,7 +195,9 @@ class CodeGenerateInterface(QWidget):
                 return
             
             # 查找User目录下的所有.c文件
+            print("开始查找.c文件...")
             c_files = find_user_c_files(user_dir)
+            print(f"找到 {len(c_files)} 个.c文件")
             
             if not c_files:
                 InfoBar.warning(
@@ -203,13 +209,28 @@ class CodeGenerateInterface(QWidget):
                 return
             
             # 更新CMakeLists.txt
-            success = update_cmake_sources(cmake_file, c_files)
-            success = update_cmake_includes(cmake_file, user_dir)
+            print("开始更新CMakeLists.txt...")
+            sources_success = update_cmake_sources(cmake_file, c_files)
+            includes_success = update_cmake_includes(cmake_file, user_dir)
             
-            if success:
+            if sources_success and includes_success:
                 InfoBar.success(
                     title="配置成功",
                     content=f"已成功更新CMakeLists.txt，共添加了 {len(c_files)} 个源文件",
+                    parent=self,
+                    duration=3000
+                )
+            elif sources_success:
+                InfoBar.warning(
+                    title="部分成功",
+                    content=f"源文件更新成功，但include路径更新失败",
+                    parent=self,
+                    duration=3000
+                )
+            elif includes_success:
+                InfoBar.warning(
+                    title="部分成功", 
+                    content=f"include路径更新成功，但源文件更新失败",
                     parent=self,
                     duration=3000
                 )
@@ -222,6 +243,7 @@ class CodeGenerateInterface(QWidget):
                 )
                 
         except ImportError as e:
+            print(f"导入错误: {e}")
             InfoBar.error(
                 title="导入错误",
                 content=f"无法导入cmake配置模块: {str(e)}",
@@ -229,6 +251,9 @@ class CodeGenerateInterface(QWidget):
                 duration=3000
             )
         except Exception as e:
+            print(f"cmake配置错误: {e}")
+            import traceback
+            traceback.print_exc()
             InfoBar.error(
                 title="配置失败",
                 content=f"cmake配置过程中出现错误: {str(e)}",
