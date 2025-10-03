@@ -21,6 +21,7 @@ extern "C" {
 #define BSP_CAN_DEFAULT_QUEUE_SIZE      10
 #define BSP_CAN_TIMEOUT_IMMEDIATE       0
 #define BSP_CAN_TIMEOUT_FOREVER         osWaitForever
+#define BSP_CAN_TX_QUEUE_SIZE           32    /* 发送队列大小 */
 
 /* USER DEFINE BEGIN */
 
@@ -29,7 +30,8 @@ extern "C" {
 /* Exported macro ----------------------------------------------------------- */
 /* Exported types ----------------------------------------------------------- */
 typedef enum {
-/* AUTO GENERATED BSP_CAN_NAME */
+  BSP_CAN_1,
+  BSP_CAN_2,
   BSP_CAN_NUM,
   BSP_CAN_ERR,
 } BSP_CAN_t;
@@ -101,6 +103,19 @@ typedef struct {
 /* ID解析回调函数类型 */
 typedef uint32_t (*BSP_CAN_IdParser_t)(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
 
+/* CAN发送消息结构体 */
+typedef struct {
+    CAN_TxHeaderTypeDef header;         /* 发送头 */
+    uint8_t data[BSP_CAN_MAX_DLC];      /* 数据 */
+} BSP_CAN_TxMessage_t;
+
+/* 无锁环形队列结构体 */
+typedef struct {
+    BSP_CAN_TxMessage_t buffer[BSP_CAN_TX_QUEUE_SIZE];  /* 缓冲区 */
+    volatile uint32_t head;             /* 队列头 */
+    volatile uint32_t tail;             /* 队列尾 */
+} BSP_CAN_TxQueue_t;
+
 /* USER STRUCT BEGIN */
 
 /* USER STRUCT END */
@@ -112,12 +127,6 @@ typedef uint32_t (*BSP_CAN_IdParser_t)(uint32_t original_id, BSP_CAN_FrameType_t
  * @return BSP_OK 成功，其他值失败
  */
 int8_t BSP_CAN_Init(void);
-
-/**
- * @brief 反初始化 CAN 模块
- * @return BSP_OK 成功，其他值失败
- */
-int8_t BSP_CAN_DeInit(void);
 
 /**
  * @brief 获取 CAN 句柄
@@ -172,13 +181,20 @@ int8_t BSP_CAN_TransmitExtDataFrame(BSP_CAN_t can, BSP_CAN_ExtDataFrame_t *frame
  */
 int8_t BSP_CAN_TransmitRemoteFrame(BSP_CAN_t can, BSP_CAN_RemoteFrame_t *frame);
 
+
 /**
- * @brief 等待CAN发送邮箱空闲
+ * @brief 获取发送队列中待发送消息数量
  * @param can CAN 枚举
- * @param timeout 超时时间（毫秒），0为立即返回，osWaitForever为永久等待
+ * @return 队列中消息数量，-1表示错误
+ */
+int32_t BSP_CAN_GetTxQueueCount(BSP_CAN_t can);
+
+/**
+ * @brief 清空发送队列
+ * @param can CAN 枚举
  * @return BSP_OK 成功，其他值失败
  */
-int8_t BSP_CAN_WaitTxMailboxEmpty(BSP_CAN_t can, uint32_t timeout);
+int8_t BSP_CAN_FlushTxQueue(BSP_CAN_t can);
 
 /**
  * @brief 注册 CAN ID 接收队列
@@ -189,13 +205,7 @@ int8_t BSP_CAN_WaitTxMailboxEmpty(BSP_CAN_t can, uint32_t timeout);
  */
 int8_t BSP_CAN_RegisterId(BSP_CAN_t can, uint32_t can_id, uint8_t queue_size);
 
-/**
- * @brief 注销 CAN ID 接收队列
- * @param can CAN 枚举
- * @param can_id 解析后的CAN ID
- * @return BSP_OK 成功，其他值失败
- */
-int8_t BSP_CAN_UnregisterIdQueue(BSP_CAN_t can, uint32_t can_id);
+
 
 /**
  * @brief 获取 CAN 消息
@@ -230,11 +240,6 @@ int8_t BSP_CAN_FlushQueue(BSP_CAN_t can, uint32_t can_id);
  */
 int8_t BSP_CAN_RegisterIdParser(BSP_CAN_IdParser_t parser);
 
-/**
- * @brief 注销ID解析器
- * @return BSP_OK 成功，其他值失败
- */
-int8_t BSP_CAN_UnregisterIdParser(void);
 
 /**
  * @brief 解析CAN ID
