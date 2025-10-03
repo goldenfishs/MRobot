@@ -133,7 +133,7 @@ static int8_t MOTOR_DM_SendMITCmd(MOTOR_DM_t *motor, MOTOR_MIT_Output_t *output)
     frame.dlc = 8;
     memcpy(frame.data, data, 8);
     
-    BSP_CAN_WaitTxMailboxEmpty(motor->param.can, 1);
+
     return BSP_CAN_TransmitStdDataFrame(motor->param.can, &frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -163,7 +163,6 @@ static int8_t MOTOR_DM_SendPosVelCmd(MOTOR_DM_t *motor, float pos, float vel) {
     frame.dlc = 8;
     memcpy(frame.data, data, 8);
     
-    BSP_CAN_WaitTxMailboxEmpty(motor->param.can, 1);
     return BSP_CAN_TransmitStdDataFrame(motor->param.can, &frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -190,7 +189,6 @@ static int8_t MOTOR_DM_SendVelCmd(MOTOR_DM_t *motor, float vel) {
     frame.dlc = 4;
     memcpy(frame.data, data, 4);
     
-    BSP_CAN_WaitTxMailboxEmpty(motor->param.can, 1);
     return BSP_CAN_TransmitStdDataFrame(motor->param.can, &frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -460,7 +458,7 @@ int8_t MOTOR_DM_Enable(MOTOR_DM_Param_t *param){
     frame.data[5] = 0xFF;
     frame.data[6] = 0xFF;
     frame.data[7] = 0xFC;
-    BSP_CAN_WaitTxMailboxEmpty(motor->param.can, 1);
+
     return BSP_CAN_TransmitStdDataFrame(motor->param.can, &frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 

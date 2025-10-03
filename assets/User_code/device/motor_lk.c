@@ -253,7 +253,6 @@ int8_t MOTOR_LK_SetOutput(MOTOR_LK_Param_t *param, float value) {
     tx_frame.data[5] = (uint8_t)((torque_control >> 8) & 0xFF);
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -279,7 +278,6 @@ int8_t MOTOR_LK_MotorOn(MOTOR_LK_Param_t *param) {
     tx_frame.data[5] = 0x00;
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -299,7 +297,6 @@ int8_t MOTOR_LK_MotorOff(MOTOR_LK_Param_t *param) {
     tx_frame.data[5] = 0x00;
     tx_frame.data[6] = 0x00;
     tx_frame.data[7] = 0x00;
-    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 

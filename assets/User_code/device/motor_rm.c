@@ -291,7 +291,6 @@ int8_t MOTOR_RM_Ctrl(MOTOR_RM_Param_t *param) {
         default:
             return DEVICE_ERR;
     }
-    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
