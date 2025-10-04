@@ -243,14 +243,6 @@ int8_t MOTOR_LZ_Init(void) {
     return BSP_CAN_RegisterIdParser(MOTOR_LZ_IdParser) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
-/**
- * @brief 反初始化灵足电机驱动系统
- * @return 设备状态码
- */
-int8_t MOTOR_LZ_DeInit(void) {
-    // 注销ID解析器
-    return BSP_CAN_UnregisterIdParser() == BSP_OK ? DEVICE_OK : DEVICE_ERR;
-}
 
 int8_t MOTOR_LZ_Register(MOTOR_LZ_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
