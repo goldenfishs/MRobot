@@ -21,6 +21,10 @@ extern "C" {
 #define M_DEG2RAD_MULT (0.01745329251f)
 #define M_RAD2DEG_MULT (57.2957795131f)
 
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679f
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
 #endif
@@ -82,21 +86,17 @@ float Sign(float in);
 void ResetMoveVector(MoveVector_t *mv);
 
 /**
- * \brief 计算循环值的误差，用于没有负数值，并在一定范围内变化的值
- * 例如编码器：相差1.5PI其实等于相差-0.5PI
- *
- * \param sp 被操作的值
- * \param fb 变化量
+ * \brief 计算循环值的误差，适用于设定值与反馈值均在（x,y）范围内循环的情况，range应设定为y-x
+ * 例如：（-M_PI,M_PI）range=M_2PI;(0,M_2PI)range=M_2PI;（a,a+b）range=b;
+ * \param sp 设定值
+ * \param fb 反馈值
  * \param range 被操作的值变化范围，正数时起效
- *
  * \return 函数运行结果
  */
 float CircleError(float sp, float fb, float range);
 
 /**
- * \brief 循环加法，用于没有负数值，并在一定范围内变化的值
- * 例如编码器，在0-2PI内变化，1.5PI + 1.5PI = 1PI
- *
+ * \brief 循环加法，适用于被操作的值在（0,range）范围内循环的情况
  * \param origin 被操作的值
  * \param delta 变化量
  * \param range 被操作的值变化范围，正数时起效

@@ -254,7 +254,7 @@ int8_t DM_IMU_AutoUpdateAll(DM_IMU_t *imu){
         count = 0; // 重置计数器
         return DEVICE_OK;
     }
-    return DEVICE_ERROR;
+    return DEVICE_ERR;
 }
 
 /**
