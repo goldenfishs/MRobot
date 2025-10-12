@@ -318,7 +318,8 @@ class component(QWidget):
                             components_to_generate.add(dep_name)
         
         # 为没有对应页面但需要生成的依赖组件创建临时页面
-        user_code_dir = os.path.join(os.path.dirname(__file__), "../../assets/User_code")
+        from ..tools.code_generator import CodeGenerator
+        user_code_dir = CodeGenerator.get_assets_dir("User_code")
         for comp_name in components_to_generate:
             if comp_name not in component_pages:
                 # 创建临时组件页面

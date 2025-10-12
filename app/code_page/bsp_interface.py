@@ -743,7 +743,7 @@ class bsp_gpio(QWidget):
         self.project_path = project_path
         self.available_list = self._get_all_gpio_list()
         # 加载描述
-        describe_path = os.path.join(os.path.dirname(__file__), "../../assets/User_code/bsp/describe.csv")
+        describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
         self.descriptions = load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
@@ -982,7 +982,7 @@ class bsp_pwm(QWidget):
         self.project_path = project_path
         self.available_list = self._get_pwm_channels()
         # 加载描述
-        describe_path = os.path.join(os.path.dirname(__file__), "../../assets/User_code/bsp/describe.csv")
+        describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
         self.descriptions = load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
@@ -1236,7 +1236,7 @@ class bsp(QWidget):
     def generate_bsp(project_path, pages):
         """生成所有BSP代码"""
         # 自动添加 bsp.h
-        src_bsp_h = os.path.join(os.path.dirname(__file__), "../../assets/User_code/bsp/bsp.h")
+        src_bsp_h = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "bsp.h")
         dst_bsp_h = os.path.join(project_path, "User/bsp/bsp.h")
         os.makedirs(os.path.dirname(dst_bsp_h), exist_ok=True)
         if os.path.exists(src_bsp_h):

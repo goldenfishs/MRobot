@@ -262,43 +262,31 @@ class DataInterface(QWidget):
         self.stacked_layout.setCurrentWidget(self.home_page)
 
     def update_user_template(self):
-        url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
-        local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../assets/User_code")
-        try:
-            resp = requests.get(url, timeout=30)
-            resp.raise_for_status()
-            z = zipfile.ZipFile(io.BytesIO(resp.content))
-            if os.path.exists(local_dir):
-                shutil.rmtree(local_dir)
-            for member in z.namelist():
-                rel_path = os.path.relpath(member, z.namelist()[0])
-                if rel_path == ".":
-                    continue
-                target_path = os.path.join(local_dir, rel_path)
-                if member.endswith('/'):
-                    os.makedirs(target_path, exist_ok=True)
-                else:
-                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                    with open(target_path, "wb") as f:
-                        f.write(z.read(member))
+        from app.tools.update_code import update_code
+        
+        def info_callback(parent):
             InfoBar.success(
                 title="更新成功",
                 content="用户模板已更新到最新版本！",
-                parent=self,
+                parent=parent,
                 duration=2000
             )
-        except Exception as e:
+        
+        def error_callback(parent, msg):
             InfoBar.error(
                 title="更新失败",
-                content=f"用户模板更新失败: {e}",
-                parent=self,
+                content=f"用户模板更新失败: {msg}",
+                parent=parent,
                 duration=3000
             )
+        
+        update_code(parent=self, info_callback=info_callback, error_callback=error_callback)
 
     def show_user_code_files(self):
+        from app.tools.code_generator import CodeGenerator
         file_tree = self.codegen_page.file_tree
         file_tree.clear()
-        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../assets/User_code")
+        base_dir = CodeGenerator.get_assets_dir("User_code")
         user_dir = os.path.join(self.project_path, "User")
         sub_dirs = ["bsp", "component", "device", "module"]
 
@@ -412,7 +400,8 @@ class DataInterface(QWidget):
 
     def generate_code(self):
         import shutil
-        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../assets/User_code")
+        from app.tools.code_generator import CodeGenerator
+        base_dir = CodeGenerator.get_assets_dir("User_code")
         user_dir = os.path.join(self.project_path, "User")
         copied = []
         files = self.get_checked_files()
@@ -563,8 +552,8 @@ class DataInterface(QWidget):
                 )
 
     def generate_task_code(self, task_list):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        template_dir = os.path.join(base_dir, "../assets/User_code/task")
+        from app.tools.code_generator import CodeGenerator
+        template_dir = CodeGenerator.get_assets_dir("User_code/task")
         output_dir = os.path.join(self.project_path, "User", "task")
         os.makedirs(output_dir, exist_ok=True)
 

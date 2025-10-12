@@ -63,16 +63,8 @@ class CodeGenerator:
     @staticmethod
     def get_template_dir():
         """获取模板目录路径，兼容打包环境"""
-        if getattr(sys, 'frozen', False):
-            # 打包后的环境
-            base_path = sys._MEIPASS
-            template_dir = os.path.join(base_path, "assets", "User_code", "bsp")
-        else:
-            # 开发环境
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
-                current_dir = os.path.dirname(current_dir)
-            template_dir = os.path.join(current_dir, "assets", "User_code", "bsp")
+        # 使用统一的get_assets_dir方法来获取路径
+        template_dir = CodeGenerator.get_assets_dir("User_code/bsp")
         
         print(f"模板目录路径: {template_dir}")
         if not os.path.exists(template_dir):
@@ -89,15 +81,23 @@ class CodeGenerator:
             str: 完整的assets路径
         """
         if getattr(sys, 'frozen', False):
-            # 打包后的环境
-            base_path = sys._MEIPASS
-            assets_dir = os.path.join(base_path, "assets")
+            # 打包后的环境 - 使用可执行文件所在目录而不是临时目录
+            exe_dir = os.path.dirname(sys.executable)
+            assets_dir = os.path.join(exe_dir, "assets")
+            print(f"打包环境：尝试使用路径: {assets_dir}")
+            
+            # 如果exe_dir/assets不存在，尝试使用sys._MEIPASS作为后备
+            if not os.path.exists(assets_dir) and hasattr(sys, '_MEIPASS'):
+                base_path = getattr(sys, '_MEIPASS')
+                assets_dir = os.path.join(base_path, "assets")
+                print(f"后备路径: {assets_dir}")
         else:
             # 开发环境
             current_dir = os.path.dirname(os.path.abspath(__file__))
             while os.path.basename(current_dir) != 'MRobot' and current_dir != '/':
                 current_dir = os.path.dirname(current_dir)
             assets_dir = os.path.join(current_dir, "assets")
+            print(f"开发环境：使用路径: {assets_dir}")
         
         if sub_path:
             full_path = os.path.join(assets_dir, sub_path)

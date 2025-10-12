@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import zipfile
 import io
@@ -8,7 +9,25 @@ import time
 
 def update_code(parent=None, info_callback=None, error_callback=None):
     url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
-    local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets/User_code")
+    
+    # 使用与CodeGenerator.get_assets_dir相同的逻辑确定assets目录
+    if getattr(sys, 'frozen', False):
+        # 打包后的环境 - 使用可执行文件所在目录
+        exe_dir = os.path.dirname(sys.executable)
+        assets_dir = os.path.join(exe_dir, "assets")
+        print(f"更新代码：打包环境，使用路径: {assets_dir}")
+        
+        # 如果exe_dir/assets不存在，尝试使用相对路径作为后备
+        if not os.path.exists(assets_dir):
+            assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets")
+            print(f"更新代码：后备路径: {assets_dir}")
+    else:
+        # 开发环境
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets")
+        print(f"更新代码：开发环境，使用路径: {assets_dir}")
+    
+    local_dir = os.path.join(assets_dir, "User_code")
+    print(f"更新代码：最终目标目录: {local_dir}")
     
     try:
         # 下载远程代码库
