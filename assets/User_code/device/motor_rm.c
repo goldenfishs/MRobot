@@ -74,7 +74,7 @@ static int8_t MOTOR_RM_GetLogicalIndex(uint16_t can_id, MOTOR_RM_Module_t module
 static float MOTOR_RM_GetRatio(MOTOR_RM_Module_t module) {
     switch (module) {
         case MOTOR_M2006: return 36.0f;
-        case MOTOR_M3508: return 19.0f;
+        case MOTOR_M3508: return 3591.0f / 187.0f;
         case MOTOR_GM6020: return 1.0f;
         default: return 1.0f;
     }
