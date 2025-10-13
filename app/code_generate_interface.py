@@ -267,6 +267,7 @@ class CodeGenerateInterface(QWidget):
         """生成所有代码，包括未加载页面"""
         try:
             # 先收集所有页面名（从CSV配置文件读取）
+            from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
             csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
             all_class_names = []
             if os.path.exists(csv_path):
@@ -344,6 +345,7 @@ class CodeGenerateInterface(QWidget):
         return "未找到.ioc文件"
 
     def _load_csv_and_build_tree(self):
+        from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
         csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
         print(f"加载CSV路径: {csv_path}")
         if not os.path.exists(csv_path):

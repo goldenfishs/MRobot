@@ -286,6 +286,9 @@ class component(QWidget):
     @staticmethod
     def generate_component(project_path, pages):
         """生成所有组件代码，处理依赖关系"""
+        # 在方法开始时导入CodeGenerator以确保可用
+        from app.tools.code_generator import CodeGenerator
+        
         # 自动添加 component.h
         src_component_h = os.path.join(CodeGenerator.get_assets_dir("User_code/component"), "component.h")
         dst_component_h = os.path.join(project_path, "User/component/component.h")
@@ -318,7 +321,6 @@ class component(QWidget):
                             components_to_generate.add(dep_name)
         
         # 为没有对应页面但需要生成的依赖组件创建临时页面
-        from ..tools.code_generator import CodeGenerator
         user_code_dir = CodeGenerator.get_assets_dir("User_code")
         for comp_name in components_to_generate:
             if comp_name not in component_pages:

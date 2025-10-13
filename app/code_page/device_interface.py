@@ -41,6 +41,7 @@ def get_available_bsp_devices(project_path, bsp_type, gpio_type=None):
 
 def generate_device_header(project_path, enabled_devices):
     """生成device.h文件"""
+    from app.tools.code_generator import CodeGenerator
     device_dir = CodeGenerator.get_assets_dir("User_code/device")
     template_path = os.path.join(device_dir, "device.h")
     
@@ -318,6 +319,7 @@ class DeviceSimple(QWidget):
 def get_device_page(device_name, project_path):
     """根据设备名返回对应的页面类"""
     # 加载设备配置
+    from app.tools.code_generator import CodeGenerator
     device_dir = CodeGenerator.get_assets_dir("User_code/device")
     config_path = os.path.join(device_dir, "config.yaml")
     device_configs = load_device_config(config_path)

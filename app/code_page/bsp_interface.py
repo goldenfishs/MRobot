@@ -1235,6 +1235,9 @@ class bsp(QWidget):
     @staticmethod
     def generate_bsp(project_path, pages):
         """生成所有BSP代码"""
+        # 在方法开始时导入CodeGenerator以确保可用
+        from app.tools.code_generator import CodeGenerator
+        
         # 自动添加 bsp.h
         src_bsp_h = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "bsp.h")
         dst_bsp_h = os.path.join(project_path, "User/bsp/bsp.h")
