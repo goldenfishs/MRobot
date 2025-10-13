@@ -44,10 +44,17 @@ def generate_device_header(project_path, enabled_devices):
     from app.tools.code_generator import CodeGenerator
     device_dir = CodeGenerator.get_assets_dir("User_code/device")
     template_path = os.path.join(device_dir, "device.h")
+    dst_path = os.path.join(project_path, "User/device/device.h")
     
-    # 读取模板文件
-    with open(template_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+    # 优先读取项目中已存在的文件，如果不存在则使用模板
+    if os.path.exists(dst_path):
+        # 读取现有文件以保留用户区域
+        with open(dst_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    else:
+        # 文件不存在时从模板创建
+        with open(template_path, 'r', encoding='utf-8') as f:
+            content = f.read()
     
     # 收集所有需要的信号定义
     signals = []
@@ -71,13 +78,12 @@ def generate_device_header(project_path, enabled_devices):
     # 生成信号定义文本
     signals_text = '\n'.join(signals) if signals else '/* No signals defined */'
     
-    # 替换AUTO GENERATED SIGNALS部分
+    # 替换AUTO GENERATED SIGNALS部分，保留其他所有用户区域
     pattern = r'/\* AUTO GENERATED SIGNALS BEGIN \*/(.*?)/\* AUTO GENERATED SIGNALS END \*/'
     replacement = f'/* AUTO GENERATED SIGNALS BEGIN */\n{signals_text}\n/* AUTO GENERATED SIGNALS END */'
     content = re.sub(pattern, replacement, content, flags=re.DOTALL)
     
     # 保存文件
-    dst_path = os.path.join(project_path, "User/device/device.h")
     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
     with open(dst_path, 'w', encoding='utf-8') as f:
         f.write(content)
