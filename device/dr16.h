@@ -94,7 +94,6 @@ typedef struct {
   uint16_t res; /* 保留，未启用 */
 } DR16_Data_t;
 
-
 typedef struct {
   DEVICE_Header_t header;
   DR16_RawData_t raw_data;

@@ -134,7 +134,6 @@ static int8_t MOTOR_LZ_SendExtFrame(BSP_CAN_t can, uint32_t ext_id, uint8_t *dat
     } else {
         memset(tx_frame.data, 0, dlc);
     }
-    BSP_CAN_WaitTxMailboxEmpty(can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitExtDataFrame(can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
@@ -244,14 +243,6 @@ int8_t MOTOR_LZ_Init(void) {
     return BSP_CAN_RegisterIdParser(MOTOR_LZ_IdParser) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
-/**
- * @brief 反初始化灵足电机驱动系统
- * @return 设备状态码
- */
-int8_t MOTOR_LZ_DeInit(void) {
-    // 注销ID解析器
-    return BSP_CAN_UnregisterIdParser() == BSP_OK ? DEVICE_OK : DEVICE_ERR;
-}
 
 int8_t MOTOR_LZ_Register(MOTOR_LZ_Param_t *param) {
     if (param == NULL) return DEVICE_ERR_NULL;
@@ -369,7 +360,6 @@ int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *m
     uint16_t raw_kd = MOTOR_LZ_FloatToRawPositive(send_param.kd, LZ_KD_MAX);
     data[6] = (raw_kd >> 8) & 0xFF;
     data[7] = raw_kd & 0xFF;
-    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return MOTOR_LZ_SendExtFrame(param->can, ext_id, data, 8);
 }
 

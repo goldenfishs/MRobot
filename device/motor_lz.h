@@ -112,12 +112,6 @@ typedef struct {
 int8_t MOTOR_LZ_Init(void);
 
 /**
- * @brief 反初始化灵足电机驱动系统
- * @return 设备状态码
- */
-int8_t MOTOR_LZ_DeInit(void);
-
-/**
  * @brief 注册一个灵足电机
  * @param param 电机参数
  * @return 设备状态码

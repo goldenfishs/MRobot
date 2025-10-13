@@ -1,5 +1,5 @@
 uart,请开启uart的dma和中断
-can,请开启can中断，使用函数前请确保can已经初始化。
+can,请开启can中断，使用函数前请确保can已经初始化。一定要开启can发送中断！！！
 gpio,会自动读取cubemx中配置为gpio的引脚，并自动区分输入输出和中断。
 spi,请开启spi的dma和中断
 i2c,要求开始spi中断

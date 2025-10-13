@@ -166,7 +166,6 @@ int8_t DM_IMU_Request(DM_IMU_t *imu, DM_IMU_RID_t rid) {
         .dlc = 4,
     };
     memcpy(frame.data, tx_data, 4);
-    BSP_CAN_WaitTxMailboxEmpty(imu->param.can, 1); // 等待发送邮箱空闲
     int8_t result = BSP_CAN_TransmitStdDataFrame(imu->param.can, &frame);
     return (result == BSP_OK) ? DEVICE_OK : DEVICE_ERR;
 }
@@ -253,8 +252,9 @@ int8_t DM_IMU_AutoUpdateAll(DM_IMU_t *imu){
     count++;
     if (count >= 4) {
         count = 0; // 重置计数器
+        return DEVICE_OK;
     }
-    return DEVICE_OK;
+    return DEVICE_ERR;
 }
 
 /**

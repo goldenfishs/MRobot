@@ -9,33 +9,33 @@
 /* USER INCLUDE END */
 
 inline float InvSqrt(float x) {
-  // #if 0
+//#if 0
   /* Fast inverse square-root */
   /* See: http://en.wikipedia.org/wiki/Fast_inverse_square_root */
-  float halfx = 0.5f * x;
-  float y = x;
-  long i = *(long *)&y;
-  i = 0x5f3759df - (i >> 1);
-  y = *(float *)&i;
-  y = y * (1.5f - (halfx * y * y));
-  y = y * (1.5f - (halfx * y * y));
-  return y;
-  // #else
-  //   return 1.0f / sqrtf(x);
-  // #endif
+	float halfx = 0.5f * x;
+	float y = x;
+	long i = *(long*)&y;
+	i = 0x5f3759df - (i>>1);
+	y = *(float*)&i;
+	y = y * (1.5f - (halfx * y * y));
+	y = y * (1.5f - (halfx * y * y));
+	return y;	
+//#else
+//  return 1.0f / sqrtf(x);
+//#endif
 }
 
 inline float AbsClip(float in, float limit) {
   return (in < -limit) ? -limit : ((in > limit) ? limit : in);
 }
 
-float fAbs(float in) { return (in > 0) ? in : -in; }
+float fAbs(float in){
+  return (in > 0) ? in : -in;
+}
 
 inline void Clip(float *origin, float min, float max) {
-  if (*origin > max)
-    *origin = max;
-  if (*origin < min)
-    *origin = min;
+  if (*origin > max) *origin = max;
+  if (*origin < min) *origin = min;
 }
 
 inline float Sign(float in) { return (in > 0) ? 1.0f : 0.0f; }
@@ -48,9 +48,8 @@ inline float Sign(float in) { return (in > 0) ? 1.0f : 0.0f; }
 inline void ResetMoveVector(MoveVector_t *mv) { memset(mv, 0, sizeof(*mv)); }
 
 /**
- * \brief
- *计算循环值的误差，适用于设定值与反馈值均在（x,y）范围内循环的情况，range应设定为y-x
- *例如：（-M_PI,M_PI）range=M_2PI;(0,M_2PI)range=M_2PI;（a,a+b）range=b;
+ * \brief 计算循环值的误差，适用于设定值与反馈值均在（x,y）范围内循环的情况，range应设定为y-x
+ * 例如：（-M_PI,M_PI）range=M_2PI;(0,M_2PI)range=M_2PI;（a,a+b）range=b;
  * \param sp 设定值
  * \param fb 反馈值
  * \param range 被操作的值变化范围，正数时起效
@@ -70,8 +69,7 @@ inline float CircleError(float sp, float fb, float range) {
 }
 
 /**
- * \brief 循环加法，适用于被操作的值在（x,y）范围内循环的情况，range应设定为y-x
- * 例如：（-M_PI,M_PI）range=M_2PI;(0,M_2PI)range=M_2PI;（a,a+b）range=b;
+ * \brief 循环加法，适用于被操作的值在（0,range）范围内循环的情况
  * \param origin 被操作的值
  * \param delta 变化量
  * \param range 被操作的值变化范围，正数时起效
@@ -103,20 +101,14 @@ inline void CircleReverse(float *origin) { *origin = -(*origin) + M_2PI; }
  * @return 摩擦轮转速
  */
 inline float CalculateRpm(float bullet_speed, float fric_radius, bool is17mm) {
-  if (bullet_speed == 0.0f)
-    return 0.f;
+  if (bullet_speed == 0.0f) return 0.f;
   if (is17mm) {
-    if (bullet_speed == 15.0f)
-      return 4670.f;
-    if (bullet_speed == 18.0f)
-      return 5200.f;
-    if (bullet_speed == 30.0f)
-      return 7350.f;
+    if (bullet_speed == 15.0f) return 4670.f;
+    if (bullet_speed == 18.0f) return 5200.f;
+    if (bullet_speed == 30.0f) return 7350.f;
   } else {
-    if (bullet_speed == 10.0f)
-      return 4450.f;
-    if (bullet_speed == 16.0f)
-      return 5800.f;
+    if (bullet_speed == 10.0f) return 4450.f;
+    if (bullet_speed == 16.0f) return 5800.f;
   }
 
   /* 不为裁判系统设定值时,计算转速 */

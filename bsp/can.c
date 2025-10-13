@@ -37,16 +37,21 @@ static osMutexId_t queue_mutex = NULL;
 static void (*CAN_Callback[BSP_CAN_NUM][BSP_CAN_CB_NUM])(void);
 static bool inited = false;
 static BSP_CAN_IdParser_t id_parser = NULL; /* ID解析器 */
+static BSP_CAN_TxQueue_t tx_queues[BSP_CAN_NUM]; /* 每个CAN的发送队列 */
 
 /* Private function prototypes ---------------------------------------------- */
 static BSP_CAN_t CAN_Get(CAN_HandleTypeDef *hcan);
 static osMessageQueueId_t BSP_CAN_FindQueue(BSP_CAN_t can, uint32_t can_id);
 static int8_t BSP_CAN_CreateIdQueue(BSP_CAN_t can, uint32_t can_id, uint8_t queue_size);
-static int8_t BSP_CAN_DeleteIdQueue(BSP_CAN_t can, uint32_t can_id);
 static void BSP_CAN_RxFifo0Callback(void);
 static void BSP_CAN_RxFifo1Callback(void);
+static void BSP_CAN_TxCompleteCallback(void);
 static BSP_CAN_FrameType_t BSP_CAN_GetFrameType(CAN_RxHeaderTypeDef *header);
 static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_t frame_type);
+static void BSP_CAN_TxQueueInit(BSP_CAN_t can);
+static bool BSP_CAN_TxQueuePush(BSP_CAN_t can, BSP_CAN_TxMessage_t *msg);
+static bool BSP_CAN_TxQueuePop(BSP_CAN_t can, BSP_CAN_TxMessage_t *msg);
+static bool BSP_CAN_TxQueueIsEmpty(BSP_CAN_t can);
 
 /* Private functions -------------------------------------------------------- */
 /* USER FUNCTION BEGIN */
@@ -118,29 +123,7 @@ static int8_t BSP_CAN_CreateIdQueue(BSP_CAN_t can, uint32_t can_id, uint8_t queu
     return BSP_OK;
 }
 
-/**
- * @brief 删除指定CAN ID的消息队列
- * @note 内部函数，已包含互斥锁保护
- */
-static int8_t BSP_CAN_DeleteIdQueue(BSP_CAN_t can, uint32_t can_id) {
-    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) != osOK) {
-        return BSP_ERR_TIMEOUT;
-    }
-    BSP_CAN_QueueNode_t **current = &queue_list;
-    while (*current != NULL) {
-        if ((*current)->can == can && (*current)->can_id == can_id) {
-            BSP_CAN_QueueNode_t *to_delete = *current;
-            *current = (*current)->next;
-            osMessageQueueDelete(to_delete->queue);
-            BSP_Free(to_delete);
-            osMutexRelease(queue_mutex);
-            return BSP_OK;
-        }
-        current = &(*current)->next;
-    }
-    osMutexRelease(queue_mutex);
-    return BSP_ERR;  // 未找到
-}
+
 /**
  * @brief 获取帧类型
  */
@@ -159,6 +142,106 @@ static uint32_t BSP_CAN_DefaultIdParser(uint32_t original_id, BSP_CAN_FrameType_
     (void)frame_type;  // 避免未使用参数警告
     return original_id;
 }
+
+/**
+ * @brief 初始化发送队列
+ */
+static void BSP_CAN_TxQueueInit(BSP_CAN_t can) {
+    if (can >= BSP_CAN_NUM) return;
+    
+    tx_queues[can].head = 0;
+    tx_queues[can].tail = 0;
+}
+
+/**
+ * @brief 向发送队列添加消息（无锁）
+ */
+static bool BSP_CAN_TxQueuePush(BSP_CAN_t can, BSP_CAN_TxMessage_t *msg) {
+    if (can >= BSP_CAN_NUM || msg == NULL) return false;
+    
+    BSP_CAN_TxQueue_t *queue = &tx_queues[can];
+    uint32_t next_head = (queue->head + 1) % BSP_CAN_TX_QUEUE_SIZE;
+    
+    // 队列满
+    if (next_head == queue->tail) {
+        return false;
+    }
+    
+    // 复制消息
+    queue->buffer[queue->head] = *msg;
+    
+    // 更新头指针（原子操作）
+    queue->head = next_head;
+    
+    return true;
+}
+
+
+/**
+ * @brief 从发送队列取出消息（无锁）
+ */
+static bool BSP_CAN_TxQueuePop(BSP_CAN_t can, BSP_CAN_TxMessage_t *msg) {
+    if (can >= BSP_CAN_NUM || msg == NULL) return false;
+    
+    BSP_CAN_TxQueue_t *queue = &tx_queues[can];
+    
+    // 队列空
+    if (queue->head == queue->tail) {
+        return false;
+    }
+    
+    // 复制消息
+    *msg = queue->buffer[queue->tail];
+    
+    // 更新尾指针（原子操作）
+    queue->tail = (queue->tail + 1) % BSP_CAN_TX_QUEUE_SIZE;
+    
+    return true;
+}
+
+/**
+ * @brief 检查发送队列是否为空
+ */
+static bool BSP_CAN_TxQueueIsEmpty(BSP_CAN_t can) {
+    if (can >= BSP_CAN_NUM) return true;
+    
+    return tx_queues[can].head == tx_queues[can].tail;
+}
+
+/**
+ * @brief 处理所有CAN实例的发送队列
+ */
+static void BSP_CAN_TxCompleteCallback(void) {
+    // 处理所有CAN实例的发送队列
+    for (int i = 0; i < BSP_CAN_NUM; i++) {
+        BSP_CAN_t can = (BSP_CAN_t)i;
+        CAN_HandleTypeDef *hcan = BSP_CAN_GetHandle(can);
+        if (hcan == NULL) continue;
+        
+        BSP_CAN_TxMessage_t msg;
+        uint32_t mailbox;
+        
+        // 尝试发送队列中的消息
+        while (!BSP_CAN_TxQueueIsEmpty(can)) {
+            // 检查是否有空闲邮箱
+            if (HAL_CAN_GetTxMailboxesFreeLevel(hcan) == 0) {
+                break; // 没有空闲邮箱，等待下次中断
+            }
+            
+            // 从队列中取出消息
+            if (!BSP_CAN_TxQueuePop(can, &msg)) {
+                break;
+            }
+            
+            // 发送消息
+            if (HAL_CAN_AddTxMessage(hcan, &msg.header, msg.data, &mailbox) != HAL_OK) {
+                // 发送失败，消息已经从队列中移除，直接丢弃
+                break;
+            }
+        }
+    }
+}
+
 
 /**
  * @brief FIFO0接收处理函数
@@ -344,7 +427,12 @@ int8_t BSP_CAN_Init(void) {
     
     // 清零回调函数数组
     memset(CAN_Callback, 0, sizeof(CAN_Callback));
-    
+        
+    // 初始化发送队列
+    for (int i = 0; i < BSP_CAN_NUM; i++) {
+        BSP_CAN_TxQueueInit((BSP_CAN_t)i);
+    }
+
     // 初始化ID解析器为默认解析器
     id_parser = BSP_CAN_DefaultIdParser;
     
@@ -360,39 +448,6 @@ int8_t BSP_CAN_Init(void) {
     return BSP_OK;
 }
 
-int8_t BSP_CAN_DeInit(void) {
-    if (!inited) {
-        return BSP_ERR;
-    }
-    
-    // 删除所有队列
-    if (osMutexAcquire(queue_mutex, CAN_QUEUE_MUTEX_TIMEOUT) == osOK) {
-        BSP_CAN_QueueNode_t *current = queue_list;
-        while (current != NULL) {
-            BSP_CAN_QueueNode_t *next = current->next;
-            osMessageQueueDelete(current->queue);
-            BSP_Free(current);
-            current = next;
-        }
-        queue_list = NULL;
-        osMutexRelease(queue_mutex);
-    }
-    
-    // 删除互斥锁
-    if (queue_mutex != NULL) {
-        osMutexDelete(queue_mutex);
-        queue_mutex = NULL;
-    }
-    
-    // 清零回调函数数组
-    memset(CAN_Callback, 0, sizeof(CAN_Callback));
-    
-    // 重置ID解析器
-    id_parser = NULL;
-    
-    inited = false;
-    return BSP_OK;
-}
 
 CAN_HandleTypeDef *BSP_CAN_GetHandle(BSP_CAN_t can) {
     if (can >= BSP_CAN_NUM) {
@@ -445,44 +500,58 @@ int8_t BSP_CAN_Transmit(BSP_CAN_t can, BSP_CAN_Format_t format,
         return BSP_ERR_NULL;
     }
     
-    CAN_TxHeaderTypeDef header = {0};
-    uint32_t mailbox;
+    // 准备发送消息
+    BSP_CAN_TxMessage_t tx_msg = {0};
     
     switch (format) {
         case BSP_CAN_FORMAT_STD_DATA:
-            header.StdId = id;
-            header.IDE = CAN_ID_STD;
-            header.RTR = CAN_RTR_DATA;
+            tx_msg.header.StdId = id;
+            tx_msg.header.IDE = CAN_ID_STD;
+            tx_msg.header.RTR = CAN_RTR_DATA;
             break;
         case BSP_CAN_FORMAT_EXT_DATA:
-            header.ExtId = id;
-            header.IDE = CAN_ID_EXT;
-            header.RTR = CAN_RTR_DATA;
+            tx_msg.header.ExtId = id;
+            tx_msg.header.IDE = CAN_ID_EXT;
+            tx_msg.header.RTR = CAN_RTR_DATA;
             break;
         case BSP_CAN_FORMAT_STD_REMOTE:
-            header.StdId = id;
-            header.IDE = CAN_ID_STD;
-            header.RTR = CAN_RTR_REMOTE;
+            tx_msg.header.StdId = id;
+            tx_msg.header.IDE = CAN_ID_STD;
+            tx_msg.header.RTR = CAN_RTR_REMOTE;
             break;
         case BSP_CAN_FORMAT_EXT_REMOTE:
-            header.ExtId = id;
-            header.IDE = CAN_ID_EXT;
-            header.RTR = CAN_RTR_REMOTE;
+            tx_msg.header.ExtId = id;
+            tx_msg.header.IDE = CAN_ID_EXT;
+            tx_msg.header.RTR = CAN_RTR_REMOTE;
             break;
         default:
             return BSP_ERR;
     }
     
-    header.DLC = dlc;
-    header.TransmitGlobalTime = DISABLE;
+    tx_msg.header.DLC = dlc;
+    tx_msg.header.TransmitGlobalTime = DISABLE;
     
-    HAL_StatusTypeDef result = HAL_CAN_AddTxMessage(hcan, &header, data, &mailbox);
-    
-    if (result != HAL_OK) {
-        return BSP_ERR;
+    // 复制数据
+    if (data != NULL && dlc > 0) {
+        memcpy(tx_msg.data, data, dlc);
     }
     
-    return BSP_OK;
+    // 尝试直接发送到邮箱
+    uint32_t mailbox;
+    if (HAL_CAN_GetTxMailboxesFreeLevel(hcan) > 0) {
+        HAL_StatusTypeDef result = HAL_CAN_AddTxMessage(hcan, &tx_msg.header, tx_msg.data, &mailbox);
+        if (result == HAL_OK) {
+            return BSP_OK; // 发送成功
+        }
+    }
+    
+    // 邮箱满，尝试放入队列
+    if (BSP_CAN_TxQueuePush(can, &tx_msg)) {
+        return BSP_OK; // 成功放入队列
+    }
+    
+    // 队列也满，丢弃数据
+    return BSP_ERR; // 数据丢弃
 }
 
 int8_t BSP_CAN_TransmitStdDataFrame(BSP_CAN_t can, BSP_CAN_StdDataFrame_t *frame) {
@@ -514,12 +583,6 @@ int8_t BSP_CAN_RegisterId(BSP_CAN_t can, uint32_t can_id, uint8_t queue_size) {
     return BSP_CAN_CreateIdQueue(can, can_id, queue_size);
 }
 
-int8_t BSP_CAN_UnregisterIdQueue(BSP_CAN_t can, uint32_t can_id) {
-    if (!inited) {
-        return BSP_ERR_INITED;
-    }
-    return BSP_CAN_DeleteIdQueue(can, can_id);
-}
 
 int8_t BSP_CAN_GetMessage(BSP_CAN_t can, uint32_t can_id, BSP_CAN_Message_t *msg, uint32_t timeout) {
     if (!inited) {
@@ -586,15 +649,6 @@ int8_t BSP_CAN_RegisterIdParser(BSP_CAN_IdParser_t parser) {
     return BSP_OK;
 }
 
-int8_t BSP_CAN_UnregisterIdParser(void) {
-    if (!inited) {
-        return BSP_ERR_INITED;
-    }
-    
-    id_parser = BSP_CAN_DefaultIdParser;
-    return BSP_OK;
-}
-
 uint32_t BSP_CAN_ParseId(uint32_t original_id, BSP_CAN_FrameType_t frame_type) {
     if (id_parser != NULL) {
         return id_parser(original_id, frame_type);
@@ -602,43 +656,4 @@ uint32_t BSP_CAN_ParseId(uint32_t original_id, BSP_CAN_FrameType_t frame_type) {
     return BSP_CAN_DefaultIdParser(original_id, frame_type);
 }
 
-int8_t BSP_CAN_WaitTxMailboxEmpty(BSP_CAN_t can, uint32_t timeout) {
-    if (!inited) {
-        return BSP_ERR_INITED;
-    }
-    if (can >= BSP_CAN_NUM) {
-        return BSP_ERR;
-    }
-    
-    CAN_HandleTypeDef *hcan = BSP_CAN_GetHandle(can);
-    if (hcan == NULL) {
-        return BSP_ERR_NULL;
-    }
-    
-    uint32_t start_time = HAL_GetTick();
-    
-    // 如果超时时间为0，立即检查并返回
-    if (timeout == 0) {
-        uint32_t free_level = HAL_CAN_GetTxMailboxesFreeLevel(hcan);
-        return (free_level > 0) ? BSP_OK : BSP_ERR_TIMEOUT;
-    }
-    
-    // 等待至少有一个邮箱空闲
-    while (true) {
-        uint32_t free_level = HAL_CAN_GetTxMailboxesFreeLevel(hcan);
-        if (free_level > 0) {
-            return BSP_OK;
-        }
-        
-        // 检查超时
-        if (timeout != BSP_CAN_TIMEOUT_FOREVER) {
-            uint32_t elapsed = HAL_GetTick() - start_time;
-            if (elapsed >= timeout) {
-                return BSP_ERR_TIMEOUT;
-            }
-        }
-        
-        // 短暂延时，避免占用过多CPU
-        osDelay(1);
-    }
-}
+

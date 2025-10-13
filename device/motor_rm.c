@@ -74,7 +74,7 @@ static int8_t MOTOR_RM_GetLogicalIndex(uint16_t can_id, MOTOR_RM_Module_t module
 static float MOTOR_RM_GetRatio(MOTOR_RM_Module_t module) {
     switch (module) {
         case MOTOR_M2006: return 36.0f;
-        case MOTOR_M3508: return 19.0f;
+        case MOTOR_M3508: return 3591.0f / 187.0f;
         case MOTOR_GM6020: return 1.0f;
         default: return 1.0f;
     }
@@ -139,12 +139,12 @@ static void Motor_RM_Decode(MOTOR_RM_t *motor, BSP_CAN_Message_t *msg) {
         motor->feedback.rotor_speed = rotor_speed;
         motor->feedback.torque_current = torque_current;
     }
-    while (motor->feedback.rotor_abs_angle < 0) {
-        motor->feedback.rotor_abs_angle += M_2PI;
-    }
-    while (motor->feedback.rotor_abs_angle >= M_2PI) {
-        motor->feedback.rotor_abs_angle -= M_2PI;
-    }
+        while (motor->feedback.rotor_abs_angle < 0) {
+            motor->feedback.rotor_abs_angle += M_2PI;
+        }
+        while (motor->feedback.rotor_abs_angle >= M_2PI) {
+            motor->feedback.rotor_abs_angle -= M_2PI;
+        }
     if (motor->motor.reverse) {
         motor->feedback.rotor_abs_angle = M_2PI - motor->feedback.rotor_abs_angle;
         motor->feedback.rotor_speed = -motor->feedback.rotor_speed;
@@ -291,7 +291,6 @@ int8_t MOTOR_RM_Ctrl(MOTOR_RM_Param_t *param) {
         default:
             return DEVICE_ERR;
     }
-    BSP_CAN_WaitTxMailboxEmpty(param->can, 1); // 等待发送邮箱空闲
     return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
 }
 
