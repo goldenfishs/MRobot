@@ -25,9 +25,8 @@ class MainWindow(FluentWindow):
         self.initInterface()
         self.initNavigation()
 
-        # 检查更新
-        # checkUpdate(self, flag=True)
-        # checkAnnouncement(self) # 检查公告
+        # 后台检查更新（不弹窗，只显示通知）
+        # self.check_updates_in_background()
 
     def initWindow(self):
         self.setMicaEffectEnabled(False)
@@ -74,6 +73,14 @@ class MainWindow(FluentWindow):
             None,
             NavigationItemPosition.BOTTOM
         )
+    
+    def check_updates_in_background(self):
+        """后台检查更新"""
+        try:
+            # 后台更新检查已移至关于页面手动触发
+            pass
+        except Exception as e:
+            print(f"初始化完成: {e}")
 
     # main_window.py 只需修改关闭事件
     def closeEvent(self, e):
