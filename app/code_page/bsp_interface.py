@@ -1243,7 +1243,9 @@ class bsp(QWidget):
         dst_bsp_h = os.path.join(project_path, "User/bsp/bsp.h")
         os.makedirs(os.path.dirname(dst_bsp_h), exist_ok=True)
         if os.path.exists(src_bsp_h):
-            shutil.copyfile(src_bsp_h, dst_bsp_h)
+            with open(src_bsp_h, 'r', encoding='utf-8') as f:
+                content = f.read()
+            save_with_preserve(dst_bsp_h, content)
         
         total = 0
         success_count = 0

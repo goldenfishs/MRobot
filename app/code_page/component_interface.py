@@ -294,7 +294,9 @@ class component(QWidget):
         dst_component_h = os.path.join(project_path, "User/component/component.h")
         os.makedirs(os.path.dirname(dst_component_h), exist_ok=True)
         if os.path.exists(src_component_h):
-            shutil.copyfile(src_component_h, dst_component_h)
+            with open(src_component_h, 'r', encoding='utf-8') as f:
+                content = f.read()
+            save_with_preserve(dst_component_h, content)
         
         # 收集所有需要生成的组件和它们的依赖
         components_to_generate = set()
@@ -367,9 +369,11 @@ class component(QWidget):
                         shutil.rmtree(dst_path)
                     shutil.copytree(src_path, dst_path)
                 elif os.path.isfile(src_path):
-                    # 如果是文件，复制单个文件
+                    # 如果是文件，复制单个文件并保留用户区域
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                    shutil.copyfile(src_path, dst_path)
+                    with open(src_path, 'r', encoding='utf-8') as f:
+                        new_content = f.read()
+                    save_with_preserve(dst_path, new_content)
                 else:
                     # 如果既不是文件也不是目录，跳过
                     print(f"跳过不存在的依赖: {dep_path}")

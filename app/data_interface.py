@@ -416,14 +416,18 @@ class DataInterface(QWidget):
                 skipped.append(dst_c)
             else:
                 os.makedirs(os.path.dirname(dst_c), exist_ok=True)
-                shutil.copy2(src_c, dst_c)
+                with open(src_c, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                save_with_preserve(dst_c, content)
                 copied.append(dst_c)
             if os.path.exists(src_h):
                 if os.path.exists(dst_h):
                     skipped.append(dst_h)
                 else:
                     os.makedirs(os.path.dirname(dst_h), exist_ok=True)
-                    shutil.copy2(src_h, dst_h)
+                    with open(src_h, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    save_with_preserve(dst_h, content)
                     copied.append(dst_h)
         msg = f"已拷贝 {len(copied)} 个文件到 User 目录"
         if skipped:

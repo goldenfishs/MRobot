@@ -7,6 +7,38 @@ import shutil
 import yaml
 import re
 
+def preserve_all_user_regions(new_code, old_code):
+    """ Preserves all user-defined regions in the new code based on the old code.
+    This function uses regex to find user-defined regions in the old code and replaces them in the new code.
+    Args:
+        new_code (str): The new code content.
+        old_code (str): The old code content.
+    Returns:
+        str: The new code with preserved user-defined regions.  
+    """
+    pattern = re.compile(
+        r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
+        re.DOTALL
+    )
+    old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code or "")}
+    def repl(m):
+        region = m.group(1)
+        old_content = old_regions.get(region)
+        if old_content is not None:
+            return m.group(0).replace(m.group(2), old_content)
+        return m.group(0)
+    return pattern.sub(repl, new_code)
+
+def save_with_preserve(path, new_code):
+    """保存文件并保留用户区域"""
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            old_code = f.read()
+        new_code = preserve_all_user_regions(new_code, old_code)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(new_code)
+
 def load_device_config(config_path):
     """加载设备配置"""
     if os.path.exists(config_path):
@@ -269,9 +301,11 @@ class DeviceSimple(QWidget):
                     f.write(content)
 
                 if file_type == 'header':
-                    # 头文件直接复制，不做修改
+                    # 头文件需要保留用户区域
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                    shutil.copy2(src_path, dst_path)
+                    with open(src_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    save_with_preserve(dst_path, content)
                     
                 elif file_type == 'source':
                     # 源文件需要替换BSP设备名称
