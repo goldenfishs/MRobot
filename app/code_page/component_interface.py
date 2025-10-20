@@ -4,66 +4,7 @@ from qfluentwidgets import InfoBar
 from PyQt5.QtCore import Qt, pyqtSignal
 from app.tools.code_generator import CodeGenerator
 import os
-import csv
 import shutil
-import re
-
-def preserve_all_user_regions(new_code, old_code):
-    """ Preserves all user-defined regions in the new code based on the old code.
-    This function uses regex to find user-defined regions in the old code and replaces them in the new code.
-    Args:
-        new_code (str): The new code content.
-        old_code (str): The old code content.
-    Returns:
-        str: The new code with preserved user-defined regions.  
-    """
-    pattern = re.compile(
-        r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
-        re.DOTALL
-    )
-    old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code or "")}
-    def repl(m):
-        region = m.group(1)
-        old_content = old_regions.get(region)
-        if old_content is not None:
-            return m.group(0).replace(m.group(2), old_content)
-        return m.group(0)
-    return pattern.sub(repl, new_code)
-
-def save_with_preserve(path, new_code):
-    """保存文件并保留用户区域"""
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            old_code = f.read()
-        new_code = preserve_all_user_regions(new_code, old_code)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new_code)
-
-def load_descriptions(csv_path):
-    """加载组件描述信息"""
-    descriptions = {}
-    if os.path.exists(csv_path):
-        with open(csv_path, encoding='utf-8') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if len(row) >= 2:
-                    key, desc = row[0].strip(), row[1].strip()
-                    descriptions[key.lower()] = desc
-    return descriptions
-
-def load_dependencies(csv_path):
-    """加载组件依赖关系"""
-    dependencies = {}
-    if os.path.exists(csv_path):
-        with open(csv_path, encoding='utf-8') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if len(row) >= 2:
-                    component = row[0].strip()
-                    deps = [dep.strip() for dep in row[1:] if dep.strip()]
-                    dependencies[component] = deps
-    return dependencies
 
 
 def get_component_page(component_name, project_path, component_manager=None):
@@ -108,8 +49,8 @@ class ComponentSimple(QWidget):
         component_dir = CodeGenerator.get_assets_dir("User_code/component")
         describe_path = os.path.join(component_dir, "describe.csv")
         dependencies_path = os.path.join(component_dir, "dependencies.csv")
-        self.descriptions = load_descriptions(describe_path)
-        self.dependencies = load_dependencies(dependencies_path)
+        self.descriptions = CodeGenerator.load_descriptions(describe_path)
+        self.dependencies = CodeGenerator.load_dependencies(dependencies_path)
         
         self._init_ui()
         self._load_config()
@@ -174,7 +115,7 @@ class ComponentSimple(QWidget):
                 print(f"模板文件不存在或为空: {template_path}")
                 continue
             output_path = os.path.join(self.project_path, f"User/component/{filename}")
-            save_with_preserve(output_path, template_content)
+            CodeGenerator.save_with_preserve(output_path, template_content)
         self._save_config()
         return True
     
@@ -296,7 +237,7 @@ class component(QWidget):
         if os.path.exists(src_component_h):
             with open(src_component_h, 'r', encoding='utf-8') as f:
                 content = f.read()
-            save_with_preserve(dst_component_h, content)
+            CodeGenerator.save_with_preserve(dst_component_h, content)
         
         # 收集所有需要生成的组件和它们的依赖
         components_to_generate = set()
@@ -373,7 +314,7 @@ class component(QWidget):
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     with open(src_path, 'r', encoding='utf-8') as f:
                         new_content = f.read()
-                    save_with_preserve(dst_path, new_content)
+                    CodeGenerator.save_with_preserve(dst_path, new_content)
                 else:
                     # 如果既不是文件也不是目录，跳过
                     print(f"跳过不存在的依赖: {dep_path}")

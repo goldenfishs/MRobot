@@ -1,9 +1,10 @@
 import os
 import yaml
 import shutil
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import sys
-import os
+import re
+import csv
 class CodeGenerator:
     """通用代码生成器"""
     
@@ -164,3 +165,303 @@ class CodeGenerator:
             setattr(CodeGenerator, warning_key, True)
         
         return full_path
+    
+    @staticmethod
+    def preserve_all_user_regions(new_code: str, old_code: str) -> str:
+        """保留用户定义的代码区域
+        
+        在新代码中保留旧代码中所有用户定义的区域。
+        用户区域使用如下格式标记：
+        /* USER REGION_NAME BEGIN */
+        用户代码...
+        /* USER REGION_NAME END */
+        
+        Args:
+            new_code: 新的代码内容
+            old_code: 旧的代码内容
+            
+        Returns:
+            str: 保留了用户区域的新代码
+        """
+        if not old_code:
+            return new_code
+            
+        pattern = re.compile(
+            r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
+            re.DOTALL
+        )
+        
+        # 提取旧代码中的所有用户区域
+        old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code)}
+        
+        def repl(m):
+            region_name = m.group(1)
+            old_content = old_regions.get(region_name)
+            if old_content is not None:
+                # 替换为旧的用户内容
+                return m.group(0).replace(m.group(2), old_content)
+            return m.group(0)
+        
+        return pattern.sub(repl, new_code)
+    
+    @staticmethod
+    def save_with_preserve(file_path: str, new_code: str) -> bool:
+        """保存文件并保留用户代码区域
+        
+        如果文件已存在，会先读取旧文件内容，保留其中的用户代码区域，
+        然后将新代码与保留的用户区域合并后保存。
+        
+        Args:
+            file_path: 文件路径
+            new_code: 新的代码内容
+            
+        Returns:
+            bool: 保存是否成功
+        """
+        try:
+            # 如果文件已存在，先读取旧内容
+            old_code = ""
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    old_code = f.read()
+            
+            # 保留用户区域
+            final_code = CodeGenerator.preserve_all_user_regions(new_code, old_code)
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # 保存文件
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(final_code)
+                
+            return True
+            
+        except Exception as e:
+            print(f"保存文件失败: {file_path}, 错误: {e}")
+            return False
+    
+    @staticmethod
+    def load_descriptions(csv_path: str) -> Dict[str, str]:
+        """从CSV文件加载组件或设备的描述信息
+        
+        CSV格式：第一列为组件/设备名称，第二列为描述
+        
+        Args:
+            csv_path: CSV文件路径
+            
+        Returns:
+            Dict[str, str]: 名称到描述的映射字典
+        """
+        descriptions = {}
+        if os.path.exists(csv_path):
+            try:
+                with open(csv_path, encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        if len(row) >= 2:
+                            key, desc = row[0].strip(), row[1].strip()
+                            descriptions[key.lower()] = desc
+            except Exception as e:
+                print(f"加载描述文件失败: {csv_path}, 错误: {e}")
+        return descriptions
+    
+    @staticmethod
+    def load_dependencies(csv_path: str) -> Dict[str, List[str]]:
+        """从CSV文件加载组件依赖关系
+        
+        CSV格式：第一列为组件名，后续列为依赖的组件
+        
+        Args:
+            csv_path: CSV文件路径
+            
+        Returns:
+            Dict[str, List[str]]: 组件名到依赖列表的映射字典
+        """
+        dependencies = {}
+        if os.path.exists(csv_path):
+            try:
+                with open(csv_path, encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    for row in reader:
+                        if len(row) >= 2:
+                            component = row[0].strip()
+                            deps = [dep.strip() for dep in row[1:] if dep.strip()]
+                            dependencies[component] = deps
+            except Exception as e:
+                print(f"加载依赖文件失败: {csv_path}, 错误: {e}")
+        return dependencies
+    
+    @staticmethod
+    def load_device_config(config_path: str) -> Dict:
+        """加载设备配置文件
+        
+        Args:
+            config_path: YAML配置文件路径
+            
+        Returns:
+            Dict: 配置数据字典
+        """
+        return CodeGenerator.load_config(config_path)
+    
+    @staticmethod
+    def copy_dependency_file(src_path: str, dst_path: str) -> bool:
+        """复制依赖文件
+        
+        Args:
+            src_path: 源文件路径
+            dst_path: 目标文件路径
+            
+        Returns:
+            bool: 复制是否成功
+        """
+        try:
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            shutil.copy2(src_path, dst_path)
+            return True
+        except Exception as e:
+            print(f"复制文件失败: {src_path} -> {dst_path}, 错误: {e}")
+            return False
+    
+    @staticmethod
+    def generate_code_from_template(template_path: str, output_path: str, 
+                                  replacements: Optional[Dict[str, str]] = None,
+                                  preserve_user_code: bool = True) -> bool:
+        """从模板生成代码文件
+        
+        Args:
+            template_path: 模板文件路径
+            output_path: 输出文件路径
+            replacements: 要替换的标记字典，如 {'MARKER': 'replacement_content'}
+            preserve_user_code: 是否保留用户代码区域
+            
+        Returns:
+            bool: 生成是否成功
+        """
+        try:
+            # 加载模板
+            template_content = CodeGenerator.load_template(template_path)
+            if not template_content:
+                print(f"模板文件不存在或为空: {template_path}")
+                return False
+            
+            # 执行替换
+            if replacements:
+                for marker, replacement in replacements.items():
+                    template_content = CodeGenerator.replace_auto_generated(
+                        template_content, marker, replacement
+                    )
+            
+            # 保存文件
+            if preserve_user_code:
+                return CodeGenerator.save_with_preserve(output_path, template_content)
+            else:
+                return CodeGenerator.save_file(template_content, output_path)
+                
+        except Exception as e:
+            print(f"从模板生成代码失败: {template_path} -> {output_path}, 错误: {e}")
+            return False
+    
+    @staticmethod
+    def read_file_content(file_path: str) -> Optional[str]:
+        """读取文件内容
+        
+        Args:
+            file_path: 文件路径
+            
+        Returns:
+            str: 文件内容，如果失败返回None
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"读取文件失败: {file_path}, 错误: {e}")
+            return None
+    
+    @staticmethod
+    def write_file_content(file_path: str, content: str) -> bool:
+        """写入文件内容
+        
+        Args:
+            file_path: 文件路径
+            content: 文件内容
+            
+        Returns:
+            bool: 写入是否成功
+        """
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return True
+        except Exception as e:
+            print(f"写入文件失败: {file_path}, 错误: {e}")
+            return False
+    
+    @staticmethod
+    def update_file_with_pattern(file_path: str, pattern: str, replacement: str, 
+                               use_regex: bool = True) -> bool:
+        """更新文件中匹配模式的内容
+        
+        Args:
+            file_path: 文件路径
+            pattern: 要匹配的模式
+            replacement: 替换内容
+            use_regex: 是否使用正则表达式
+            
+        Returns:
+            bool: 更新是否成功
+        """
+        try:
+            content = CodeGenerator.read_file_content(file_path)
+            if content is None:
+                return False
+            
+            if use_regex:
+                import re
+                updated_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+            else:
+                updated_content = content.replace(pattern, replacement)
+            
+            return CodeGenerator.write_file_content(file_path, updated_content)
+            
+        except Exception as e:
+            print(f"更新文件失败: {file_path}, 错误: {e}")
+            return False
+    
+    @staticmethod
+    def replace_multiple_markers(content: str, replacements: Dict[str, str]) -> str:
+        """批量替换内容中的多个标记
+        
+        Args:
+            content: 要处理的内容
+            replacements: 替换字典，如 {'MARKER1': 'content1', 'MARKER2': 'content2'}
+            
+        Returns:
+            str: 替换后的内容
+        """
+        result = content
+        for marker, replacement in replacements.items():
+            result = CodeGenerator.replace_auto_generated(result, marker, replacement)
+        return result
+    
+    @staticmethod
+    def extract_user_regions(code: str) -> Dict[str, str]:
+        """从代码中提取所有用户区域
+        
+        Args:
+            code: 要提取的代码内容
+            
+        Returns:
+            Dict[str, str]: 区域名称到区域内容的映射
+        """
+        if not code:
+            return {}
+            
+        pattern = re.compile(
+            r"/\*\s*USER CODE BEGIN ([A-Za-z0-9_ ]+)\s*\*/(.*?)/\*\s*USER CODE END \1\s*\*/",
+            re.DOTALL
+        )
+        
+        return {m.group(1): m.group(2) for m in pattern.finditer(code)}

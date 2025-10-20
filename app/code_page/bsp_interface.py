@@ -6,41 +6,7 @@ from app.tools.analyzing_ioc import analyzing_ioc
 from app.tools.code_generator import CodeGenerator
 import os
 import csv
-import shutil
 import re
-
-def preserve_all_user_regions(new_code, old_code):
-    """ Preserves all user-defined regions in the new code based on the old code.
-    This function uses regex to find user-defined regions in the old code and replaces them in the new code.
-    Args:
-        new_code (str): The new code content.
-        old_code (str): The old code content.
-    Returns:
-        str: The new code with preserved user-defined regions.  
-    """
-    import re
-    pattern = re.compile(
-        r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
-        re.DOTALL
-    )
-    old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code or "")}
-    def repl(m):
-        region = m.group(1)
-        old_content = old_regions.get(region)
-        if old_content is not None:
-            return m.group(0).replace(m.group(2), old_content)
-        return m.group(0)
-    return pattern.sub(repl, new_code)
-
-def save_with_preserve(path, new_code):
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            old_code = f.read()
-        new_code = preserve_all_user_regions(new_code, old_code)
-    # 确保目录存在
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new_code)
 
 class BspSimplePeripheral(QWidget):
     def __init__(self, project_path, peripheral_name, template_names):
@@ -50,7 +16,7 @@ class BspSimplePeripheral(QWidget):
         self.template_names = template_names
         # 加载描述
         describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
-        self.descriptions = load_descriptions(describe_path)
+        self.descriptions = CodeGenerator.load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
 
@@ -102,7 +68,7 @@ class BspSimplePeripheral(QWidget):
             if not template_content:
                 return False
             output_path = os.path.join(self.project_path, f"User/bsp/{filename}")
-            save_with_preserve(output_path, template_content)  # 使用保留用户区域的写入
+            CodeGenerator.save_with_preserve(output_path, template_content)  # 使用保留用户区域的写入
         self._save_config()
         return True
 
@@ -133,7 +99,7 @@ class BspPeripheralBase(QWidget):
         self.available_list = []
         # 新增：加载描述
         describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
-        self.descriptions = load_descriptions(describe_path)
+        self.descriptions = CodeGenerator.load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
 
@@ -249,7 +215,7 @@ class BspPeripheralBase(QWidget):
             template_content, f"AUTO GENERATED {self.enum_prefix}_NAME", "\n".join(enum_lines)
         )
         output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['header']}")
-        save_with_preserve(output_path, content)  # 使用保留用户区域的写入
+        CodeGenerator.save_with_preserve(output_path, content)  # 使用保留用户区域的写入
         return True
 
     def _generate_source_file(self, configs, template_dir):
@@ -283,7 +249,7 @@ class BspPeripheralBase(QWidget):
             content, f"AUTO GENERATED {self.enum_prefix}_GET_HANDLE", "\n".join(handle_lines)
         )
         output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['source']}")
-        save_with_preserve(output_path, content)  # 使用保留用户区域的写入
+        CodeGenerator.save_with_preserve(output_path, content)  # 使用保留用户区域的写入
         return True
 
     def _save_config(self, configs):
@@ -336,17 +302,6 @@ class BspPeripheralBase(QWidget):
             return False
         self._save_config(configs)
         return True
-
-def load_descriptions(csv_path):
-    descriptions = {}
-    if os.path.exists(csv_path):
-        with open(csv_path, encoding='utf-8') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if len(row) >= 2:
-                    key, desc = row[0].strip(), row[1].strip()
-                    descriptions[key.lower()] = desc
-    return descriptions
 
 # 各外设的可用列表获取函数
 def get_available_i2c(project_path):
@@ -474,7 +429,7 @@ class bsp_can(BspPeripheralBase):
         )
         
         output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['source']}")
-        save_with_preserve(output_path, content)
+        CodeGenerator.save_with_preserve(output_path, content)
         return True
 
     def _generate_single_can_init(self, init_lines, configs, fifo_assignment):
@@ -744,7 +699,7 @@ class bsp_gpio(QWidget):
         self.available_list = self._get_all_gpio_list()
         # 加载描述
         describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
-        self.descriptions = load_descriptions(describe_path)
+        self.descriptions = CodeGenerator.load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
 
@@ -891,7 +846,7 @@ class bsp_gpio(QWidget):
         )
         
         output_path = os.path.join(self.project_path, "User/bsp/gpio.h")
-        save_with_preserve(output_path, content)
+        CodeGenerator.save_with_preserve(output_path, content)
         return True
 
     def _generate_source_file(self, configs, template_dir):
@@ -932,7 +887,7 @@ class bsp_gpio(QWidget):
         )
         
         output_path = os.path.join(self.project_path, "User/bsp/gpio.c")
-        save_with_preserve(output_path, content)
+        CodeGenerator.save_with_preserve(output_path, content)
         return True
 
 
@@ -983,7 +938,7 @@ class bsp_pwm(QWidget):
         self.available_list = self._get_pwm_channels()
         # 加载描述
         describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
-        self.descriptions = load_descriptions(describe_path)
+        self.descriptions = CodeGenerator.load_descriptions(describe_path)
         self._init_ui()
         self._load_config()
 
@@ -1148,7 +1103,7 @@ class bsp_pwm(QWidget):
         )
         
         output_path = os.path.join(self.project_path, "User/bsp/pwm.h")
-        save_with_preserve(output_path, content)
+        CodeGenerator.save_with_preserve(output_path, content)
         return True
 
     def _generate_source_file(self, configs, template_dir):
@@ -1169,7 +1124,7 @@ class bsp_pwm(QWidget):
         )
         
         output_path = os.path.join(self.project_path, "User/bsp/pwm.c")
-        save_with_preserve(output_path, content)
+        CodeGenerator.save_with_preserve(output_path, content)
         return True
 
     def _save_config(self, configs):
@@ -1245,7 +1200,7 @@ class bsp(QWidget):
         if os.path.exists(src_bsp_h):
             with open(src_bsp_h, 'r', encoding='utf-8') as f:
                 content = f.read()
-            save_with_preserve(dst_bsp_h, content)
+            CodeGenerator.save_with_preserve(dst_bsp_h, content)
         
         total = 0
         success_count = 0

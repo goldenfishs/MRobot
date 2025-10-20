@@ -3,48 +3,8 @@ from qfluentwidgets import BodyLabel, CheckBox, ComboBox, SubtitleLabel
 from PyQt5.QtCore import Qt
 from app.tools.code_generator import CodeGenerator
 import os
-import shutil
 import yaml
 import re
-
-def preserve_all_user_regions(new_code, old_code):
-    """ Preserves all user-defined regions in the new code based on the old code.
-    This function uses regex to find user-defined regions in the old code and replaces them in the new code.
-    Args:
-        new_code (str): The new code content.
-        old_code (str): The old code content.
-    Returns:
-        str: The new code with preserved user-defined regions.  
-    """
-    pattern = re.compile(
-        r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
-        re.DOTALL
-    )
-    old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code or "")}
-    def repl(m):
-        region = m.group(1)
-        old_content = old_regions.get(region)
-        if old_content is not None:
-            return m.group(0).replace(m.group(2), old_content)
-        return m.group(0)
-    return pattern.sub(repl, new_code)
-
-def save_with_preserve(path, new_code):
-    """保存文件并保留用户区域"""
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            old_code = f.read()
-        new_code = preserve_all_user_regions(new_code, old_code)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new_code)
-
-def load_device_config(config_path):
-    """加载设备配置"""
-    if os.path.exists(config_path):
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return yaml.safe_load(f)
-    return {}
 
 def get_available_bsp_devices(project_path, bsp_type, gpio_type=None):
     """获取可用的BSP设备，GPIO可选类型过滤"""
@@ -94,7 +54,7 @@ def generate_device_header(project_path, enabled_devices):
     
     # 加载设备配置来获取信号信息
     config_path = os.path.join(device_dir, "config.yaml")
-    device_configs = load_device_config(config_path)
+    device_configs = CodeGenerator.load_device_config(config_path)
     
     for device_name in enabled_devices:
         device_key = device_name.lower()
@@ -305,7 +265,7 @@ class DeviceSimple(QWidget):
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     with open(src_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                    save_with_preserve(dst_path, content)
+                    CodeGenerator.save_with_preserve(dst_path, content)
                     
                 elif file_type == 'source':
                     # 源文件需要替换BSP设备名称
@@ -362,7 +322,7 @@ def get_device_page(device_name, project_path):
     from app.tools.code_generator import CodeGenerator
     device_dir = CodeGenerator.get_assets_dir("User_code/device")
     config_path = os.path.join(device_dir, "config.yaml")
-    device_configs = load_device_config(config_path)
+    device_configs = CodeGenerator.load_device_config(config_path)
     
     devices = device_configs.get('devices', {})
     device_key = device_name.lower()
