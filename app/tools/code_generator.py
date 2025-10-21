@@ -35,7 +35,9 @@ class CodeGenerator:
     def save_file(content: str, file_path: str) -> bool:
         """保存文件"""
         try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            dir_path = os.path.dirname(file_path)
+            if dir_path:  # 只有当目录路径不为空时才创建
+                os.makedirs(dir_path, exist_ok=True)
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             return True
@@ -176,6 +178,11 @@ class CodeGenerator:
         用户代码...
         /* USER REGION_NAME END */
         
+        支持的格式示例：
+        - /* USER REFEREE BEGIN */ ... /* USER REFEREE END */
+        - /* USER CODE BEGIN */ ... /* USER CODE END */
+        - /* USER CUSTOM_NAME BEGIN */ ... /* USER CUSTOM_NAME END */
+        
         Args:
             new_code: 新的代码内容
             old_code: 旧的代码内容
@@ -186,23 +193,40 @@ class CodeGenerator:
         if not old_code:
             return new_code
             
+        # 更灵活的正则表达式，支持更多格式的用户区域标记
+        # 匹配 /* USER 任意字符 BEGIN */ ... /* USER 相同字符 END */
         pattern = re.compile(
-            r"/\*\s*(USER [A-Z0-9_ ]+)\s*BEGIN\s*\*/(.*?)/\*\s*\1\s*END\s*\*/",
-            re.DOTALL
+            r"/\*\s*USER\s+([A-Za-z0-9_\s]+?)\s+BEGIN\s*\*/(.*?)/\*\s*USER\s+\1\s+END\s*\*/",
+            re.DOTALL | re.IGNORECASE
         )
         
         # 提取旧代码中的所有用户区域
-        old_regions = {m.group(1): m.group(2) for m in pattern.finditer(old_code)}
+        old_regions = {}
+        for match in pattern.finditer(old_code):
+            region_name = match.group(1).strip()
+            region_content = match.group(2)
+            old_regions[region_name.upper()] = region_content
         
-        def repl(m):
-            region_name = m.group(1)
+        # 替换函数
+        def repl(match):
+            region_name = match.group(1).strip().upper()
+            current_content = match.group(2)
             old_content = old_regions.get(region_name)
+            
             if old_content is not None:
-                # 替换为旧的用户内容
-                return m.group(0).replace(m.group(2), old_content)
-            return m.group(0)
+                # 直接替换中间的内容，保持原有的注释标记不变
+                return match.group(0).replace(current_content, old_content)
+            
+            return match.group(0)
         
-        return pattern.sub(repl, new_code)
+        # 应用替换
+        result = pattern.sub(repl, new_code)
+        
+        # 调试信息：记录找到的用户区域
+        if old_regions:
+            print(f"保留了 {len(old_regions)} 个用户区域: {list(old_regions.keys())}")
+        
+        return result
     
     @staticmethod
     def save_with_preserve(file_path: str, new_code: str) -> bool:
@@ -229,7 +253,9 @@ class CodeGenerator:
             final_code = CodeGenerator.preserve_all_user_regions(new_code, old_code)
             
             # 确保目录存在
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            dir_path = os.path.dirname(file_path)
+            if dir_path:  # 只有当目录路径不为空时才创建
+                os.makedirs(dir_path, exist_ok=True)
             
             # 保存文件
             with open(file_path, "w", encoding="utf-8") as f:
@@ -450,6 +476,11 @@ class CodeGenerator:
     def extract_user_regions(code: str) -> Dict[str, str]:
         """从代码中提取所有用户区域
         
+        支持提取各种格式的用户区域：
+        - /* USER REFEREE BEGIN */ ... /* USER REFEREE END */
+        - /* USER CODE BEGIN */ ... /* USER CODE END */
+        - /* USER CUSTOM_NAME BEGIN */ ... /* USER CUSTOM_NAME END */
+        
         Args:
             code: 要提取的代码内容
             
@@ -459,9 +490,68 @@ class CodeGenerator:
         if not code:
             return {}
             
+        # 使用与preserve_all_user_regions相同的正则表达式
         pattern = re.compile(
-            r"/\*\s*USER CODE BEGIN ([A-Za-z0-9_ ]+)\s*\*/(.*?)/\*\s*USER CODE END \1\s*\*/",
-            re.DOTALL
+            r"/\*\s*USER\s+([A-Za-z0-9_\s]+?)\s+BEGIN\s*\*/(.*?)/\*\s*USER\s+\1\s+END\s*\*/",
+            re.DOTALL | re.IGNORECASE
         )
         
-        return {m.group(1): m.group(2) for m in pattern.finditer(code)}
+        regions = {}
+        for match in pattern.finditer(code):
+            region_name = match.group(1).strip().upper()
+            region_content = match.group(2)
+            regions[region_name] = region_content
+        
+        return regions
+    
+    @staticmethod
+    def debug_user_regions(new_code: str, old_code: str, verbose: bool = False) -> Dict[str, Dict[str, str]]:
+        """调试用户区域，显示新旧内容的对比
+        
+        Args:
+            new_code: 新的代码内容
+            old_code: 旧的代码内容
+            verbose: 是否输出详细信息
+            
+        Returns:
+            Dict: 包含所有用户区域信息的字典
+        """
+        if verbose:
+            print("=== 用户区域调试信息 ===")
+        
+        new_regions = CodeGenerator.extract_user_regions(new_code)
+        old_regions = CodeGenerator.extract_user_regions(old_code)
+        
+        all_region_names = set(new_regions.keys()) | set(old_regions.keys())
+        
+        result = {}
+        
+        for region_name in sorted(all_region_names):
+            new_content = new_regions.get(region_name, "")
+            old_content = old_regions.get(region_name, "")
+            
+            result[region_name] = {
+                "new_content": new_content,
+                "old_content": old_content,
+                "will_preserve": bool(old_content),
+                "exists_in_new": region_name in new_regions,
+                "exists_in_old": region_name in old_regions
+            }
+            
+            if verbose:
+                status = "保留旧内容" if old_content else "使用新内容"
+                print(f"\n区域: {region_name} ({status})")
+                print(f"  新模板中存在: {'是' if region_name in new_regions else '否'}")
+                print(f"  旧文件中存在: {'是' if region_name in old_regions else '否'}")
+                
+                if new_content.strip():
+                    print(f"  新内容预览: {repr(new_content.strip()[:50])}...")
+                if old_content.strip():
+                    print(f"  旧内容预览: {repr(old_content.strip()[:50])}...")
+        
+        if verbose:
+            print(f"\n总计: {len(all_region_names)} 个用户区域")
+            preserve_count = sum(1 for info in result.values() if info["will_preserve"])
+            print(f"将保留: {preserve_count} 个区域的旧内容")
+        
+        return result

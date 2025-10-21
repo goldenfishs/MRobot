@@ -661,8 +661,8 @@ def patch_uart_interrupts(project_path, uart_instances):
                 flags=re.DOTALL
             )
 
-    with open(it_path, "w", encoding="utf-8") as f:
-        f.write(code)
+    # 使用save_with_preserve保存文件以保留用户区域
+    CodeGenerator.save_with_preserve(it_path, code)
 
 
 class bsp_uart(BspPeripheralBase):

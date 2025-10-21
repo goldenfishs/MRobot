@@ -75,10 +75,8 @@ def generate_device_header(project_path, enabled_devices):
     replacement = f'/* AUTO GENERATED SIGNALS BEGIN */\n{signals_text}\n/* AUTO GENERATED SIGNALS END */'
     content = re.sub(pattern, replacement, content, flags=re.DOTALL)
     
-    # 保存文件
-    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-    with open(dst_path, 'w', encoding='utf-8') as f:
-        f.write(content)
+    # 使用save_with_preserve保存文件以保留用户区域
+    CodeGenerator.save_with_preserve(dst_path, content)
 
 
 
@@ -251,32 +249,20 @@ class DeviceSimple(QWidget):
             dst_path = os.path.join(self.project_path, f"User/device/{filename}")
 
             if os.path.exists(src_path):
-                # 头文件和源文件都做变量替换
+                # 读取模板文件内容
                 with open(src_path, 'r', encoding='utf-8') as f:
                     content = f.read()
+                
+                # 替换BSP设备名称
                 for var_name, device_name in bsp_config.items():
                     content = content.replace(var_name, device_name)
-                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                with open(dst_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-
+                
+                # 根据文件类型选择保存方式
                 if file_type == 'header':
                     # 头文件需要保留用户区域
-                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                    with open(src_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
                     CodeGenerator.save_with_preserve(dst_path, content)
-                    
-                elif file_type == 'source':
-                    # 源文件需要替换BSP设备名称
-                    with open(src_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # 替换BSP设备名称
-                    for var_name, device_name in bsp_config.items():
-                        content = content.replace(var_name, device_name)
-                    
-                    # 保存文件
+                else:
+                    # 源文件直接保存（不需要保留用户区域）
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     with open(dst_path, 'w', encoding='utf-8') as f:
                         f.write(content)
