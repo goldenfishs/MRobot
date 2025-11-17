@@ -56,12 +56,12 @@ static int8_t MOTOR_RM_GetLogicalIndex(uint16_t can_id, MOTOR_RM_Module_t module
     switch (module) {
         case MOTOR_M2006:
         case MOTOR_M3508:
-            if (can_id >= M3508_M2006_FB_ID_BASE && can_id < M3508_M2006_FB_ID_BASE + 7) {
+            if (can_id >= M3508_M2006_FB_ID_BASE && can_id <= M3508_M2006_FB_ID_BASE + 7) {
                 return can_id - M3508_M2006_FB_ID_BASE;
             }
             break;
         case MOTOR_GM6020:
-            if (can_id >= GM6020_FB_ID_BASE && can_id < GM6020_FB_ID_BASE + 6) {
+            if (can_id >= GM6020_FB_ID_BASE && can_id <= GM6020_FB_ID_BASE + 6) {
                 return can_id - GM6020_FB_ID_BASE + 4;
             }
             break;
