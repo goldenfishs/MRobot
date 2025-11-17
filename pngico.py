@@ -13,6 +13,9 @@ def png_to_ico(png_path, ico_path=None, sizes=[(256,256), (128,128), (64,64), (3
 
 if __name__ == "__main__":
     # 直接写死路径
-    png = r"C:\Mac\Home\Documents\R\MRobot\img\m1.png"
-    ico = r"c:\Mac\Home\Documents\R\MRobot\img\M1.ico"
+    # png = r"C:\Mac\Home\Documents\R\MRobot\img\rps.png"
+    # ico = r"c:\Mac\Home\Documents\R\MRobot\img\M1.ico"
+    png = "/Users/lvzucheng/Documents/R/MRobot/rps.png"
+    ico = "/Users/lvzucheng/Documents/R/MRobot/rps.ico"
+
     png_to_ico(png, ico)
