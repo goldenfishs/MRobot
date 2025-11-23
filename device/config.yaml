@@ -225,3 +225,13 @@ devices:
     files:
       header: "vofa.h"
       source: "vofa.c"
+  oid:
+    name: "oid编码器"
+    description: "oid编码器驱动"
+    dependencies:
+      bsp: ["time", "can", "mm"]
+      component: ["user_math"]
+    thread_signals: []
+    files:
+      header: "oid.h"
+      source: "oid.c"
