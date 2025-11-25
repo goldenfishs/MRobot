@@ -1,13 +1,13 @@
 {
   "id": "5cf3dc01-8a1c-4418-86b6-1728f1ae47d1",
   "date": "2025-01-10",
-  "amount": -200,
+  "amount": -200.0,
   "trader": "超市",
   "notes": "食材",
-  "invoice_path": null,
+  "invoice_path": "accounts/b87b752a-7fb6-40b6-a0cf-287df1d64e56/5cf3dc01-8a1c-4418-86b6-1728f1ae47d1/invoice/截屏2025-11-25 02.51.14.png",
   "payment_path": null,
   "purchase_path": null,
-  "category": "食品",
+  "category": "NUC",
   "created_at": "2025-11-25T20:44:13.766985",
-  "updated_at": "2025-11-25T20:44:13.766986"
+  "updated_at": "2025-11-25T20:56:17.767227"
 }

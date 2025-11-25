@@ -576,6 +576,45 @@ class FinanceManager:
             return True
         return False
     
+    def rename_category(self, account_id: str, old_name: str, new_name: str) -> bool:
+        """重命名交易分类"""
+        account = self.accounts.get(account_id)
+        if not account:
+            return False
+        
+        if old_name not in account.categories:
+            return False
+        
+        if new_name in account.categories:
+            return False  # 新分类名已存在
+        
+        # 重命名分类
+        idx = account.categories.index(old_name)
+        account.categories[idx] = new_name
+        
+        # 更新所有使用旧分类的交易
+        account_dir = self._get_account_dir(account_id)
+        for trans_dir in account_dir.iterdir():
+            if not trans_dir.is_dir() or trans_dir.name in ['invoice', 'payment', 'purchase']:
+                continue
+            
+            data_file = trans_dir / 'data.json'
+            if data_file.exists():
+                try:
+                    with open(data_file, 'r', encoding='utf-8') as f:
+                        transaction_data = json.load(f)
+                    
+                    if transaction_data.get('category') == old_name:
+                        transaction_data['category'] = new_name
+                        with open(data_file, 'w', encoding='utf-8') as f:
+                            json.dump(transaction_data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"更新交易分类出错: {e}")
+        
+        account.updated_at = datetime.now().isoformat()
+        self._save_account_metadata(account)
+        return True
+    
     def delete_category(self, account_id: str, category: str) -> bool:
         """删除交易分类"""
         account = self.accounts.get(account_id)
@@ -584,6 +623,26 @@ class FinanceManager:
         
         if category in account.categories:
             account.categories.remove(category)
+            
+            # 清除所有使用此分类的交易的分类字段
+            account_dir = self._get_account_dir(account_id)
+            for trans_dir in account_dir.iterdir():
+                if not trans_dir.is_dir() or trans_dir.name in ['invoice', 'payment', 'purchase']:
+                    continue
+                
+                data_file = trans_dir / 'data.json'
+                if data_file.exists():
+                    try:
+                        with open(data_file, 'r', encoding='utf-8') as f:
+                            transaction_data = json.load(f)
+                        
+                        if transaction_data.get('category') == category:
+                            transaction_data['category'] = ""
+                            with open(data_file, 'w', encoding='utf-8') as f:
+                                json.dump(transaction_data, f, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        print(f"清除交易分类出错: {e}")
+            
             account.updated_at = datetime.now().isoformat()
             self._save_account_metadata(account)
             return True

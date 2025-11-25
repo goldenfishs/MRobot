@@ -21,6 +21,7 @@ import json
 import os
 
 from .tools.finance_manager import FinanceManager, TransactionType, Transaction, Account
+from .category_management_dialog import CategoryManagementDialog
 
 
 class CreateTransactionDialog(QDialog):
@@ -502,11 +503,11 @@ class FinanceInterface(QWidget):
         title_layout = QHBoxLayout()
         title_layout.addWidget(SubtitleLabel("交易记录"))
         
-        # 新建分类按钮
-        new_category_btn = PushButton("新建分类")
-        new_category_btn.setFixedWidth(90)
-        new_category_btn.clicked.connect(self.on_create_category_clicked)
-        title_layout.addWidget(new_category_btn)
+        # 管理分类按钮
+        manage_category_btn = PushButton("管理分类")
+        manage_category_btn.setFixedWidth(90)
+        manage_category_btn.clicked.connect(self.on_manage_category_clicked)
+        title_layout.addWidget(manage_category_btn)
         
         title_layout.addStretch()
         
@@ -1224,8 +1225,8 @@ class FinanceInterface(QWidget):
             if trans_id:
                 self.view_record(trans_id)
     
-    def on_create_category_clicked(self):
-        """新建分类按钮点击"""
+    def on_manage_category_clicked(self):
+        """分类管理按钮点击"""
         account_id = self.get_current_account_id()
         if not account_id:
             InfoBar.warning(
@@ -1238,71 +1239,27 @@ class FinanceInterface(QWidget):
             )
             return
         
-        # 创建自定义对话框
-        from PyQt5.QtWidgets import QDialog as QStdDialog, QLabel
+        # 打开分类管理对话框
+        dialog = CategoryManagementDialog(self, self.finance_manager, account_id)
+        if dialog.exec():
+            # 刷新查询页面的分类下拉框
+            self.refresh_query_category_dropdown()
+    
+    def refresh_query_category_dropdown(self):
+        """刷新查询页面的分类下拉框"""
+        account_id = self.get_current_account_id()
+        if not account_id or not hasattr(self, 'query_category'):
+            return
         
-        category_dialog = QStdDialog(self)
-        category_dialog.setWindowTitle("新建分类")
-        category_dialog.setGeometry(100, 100, 400, 150)
+        current_text = self.query_category.currentText()
+        self.query_category.clear()
+        self.query_category.addItem("全部")
         
-        layout = QVBoxLayout(category_dialog)
-        layout.addWidget(BodyLabel("分类名称:"))
+        categories = self.finance_manager.get_categories(account_id)
+        for category in categories:
+            self.query_category.addItem(category)
         
-        input_edit = LineEdit()
-        input_edit.setPlaceholderText("例如：食品、交通、娱乐等")
-        layout.addWidget(input_edit)
-        
-        # 按钮
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        
-        def on_create():
-            category_name = input_edit.text().strip()
-            if not category_name:
-                InfoBar.warning(
-                    title="提示",
-                    content="分类名称不能为空",
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=2000,
-                    parent=self
-                )
-                return
-            
-            if self.finance_manager.add_category(account_id, category_name):
-                InfoBar.success(
-                    title="成功",
-                    content=f"分类 '{category_name}' 创建成功",
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=2000,
-                    parent=self
-                )
-                
-                # 更新查询页面的分类下拉框
-                if hasattr(self, 'query_category'):
-                    # 检查是否已经存在
-                    if self.query_category.findText(category_name) < 0:
-                        self.query_category.addItem(category_name)
-                
-                category_dialog.accept()
-            else:
-                InfoBar.warning(
-                    title="提示",
-                    content="分类已存在",
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=2000,
-                    parent=self
-                )
-        
-        cancel_btn = PushButton("取消")
-        cancel_btn.clicked.connect(category_dialog.reject)
-        btn_layout.addWidget(cancel_btn)
-        
-        create_btn = PrimaryPushButton("创建")
-        create_btn.clicked.connect(on_create)
-        btn_layout.addWidget(create_btn)
-        
-        layout.addLayout(btn_layout)
-        category_dialog.exec()
+        # 恢复之前的选择
+        index = self.query_category.findText(current_text)
+        if index >= 0:
+            self.query_category.setCurrentIndex(index)
