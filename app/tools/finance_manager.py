@@ -654,3 +654,85 @@ class FinanceManager:
         if not account:
             return []
         return account.categories
+    
+    def export_to_mrobot_format(self, account_id: str, transaction_ids: List[str], output_path: str) -> bool:
+        """导出交易为 .mrobot 专用格式（ZIP 文件）
+        
+        格式说明：
+        - 文件扩展名：.mrobot（实际上是 ZIP 文件）
+        - 结构：
+          - metadata.json（交易元数据）
+          - images/（所有相关图片）
+        """
+        try:
+            account = self.accounts.get(account_id)
+            if not account:
+                return False
+            
+            output_file = Path(output_path)
+            if not output_file.parent.exists():
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 创建 ZIP 文件
+            with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # 收集交易数据和图片
+                transactions_data = []
+                image_index = 0
+                
+                for trans_id in transaction_ids:
+                    transaction = self._load_transaction_data(account_id, trans_id)
+                    if not transaction:
+                        continue
+                    
+                    # 转换交易为字典
+                    trans_dict = transaction.to_dict()
+                    
+                    # 处理图片，存储相对路径
+                    image_map = {}
+                    
+                    if transaction.invoice_path:
+                        img_path = self.get_transaction_image_path(account_id, transaction.invoice_path)
+                        if img_path and img_path.exists():
+                            archive_path = f"images/invoice_{image_index}{img_path.suffix}"
+                            zf.write(str(img_path), archive_path)
+                            image_map['invoice'] = archive_path
+                            image_index += 1
+                    
+                    if transaction.payment_path:
+                        img_path = self.get_transaction_image_path(account_id, transaction.payment_path)
+                        if img_path and img_path.exists():
+                            archive_path = f"images/payment_{image_index}{img_path.suffix}"
+                            zf.write(str(img_path), archive_path)
+                            image_map['payment'] = archive_path
+                            image_index += 1
+                    
+                    if transaction.purchase_path:
+                        img_path = self.get_transaction_image_path(account_id, transaction.purchase_path)
+                        if img_path and img_path.exists():
+                            archive_path = f"images/purchase_{image_index}{img_path.suffix}"
+                            zf.write(str(img_path), archive_path)
+                            image_map['purchase'] = archive_path
+                            image_index += 1
+                    
+                    trans_dict['image_map'] = image_map
+                    transactions_data.append(trans_dict)
+                
+                # 创建元数据 JSON
+                metadata = {
+                    'version': '1.0',
+                    'account_name': account.name,
+                    'account_description': account.description,
+                    'export_date': datetime.now().isoformat(),
+                    'transactions': transactions_data,
+                    'transaction_count': len(transactions_data)
+                }
+                
+                # 将元数据写入 ZIP
+                metadata_json = json.dumps(metadata, ensure_ascii=False, indent=2)
+                zf.writestr('metadata.json', metadata_json)
+            
+            return True
+        
+        except Exception as e:
+            print(f"导出失败: {e}")
+            return False

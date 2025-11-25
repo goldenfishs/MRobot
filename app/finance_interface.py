@@ -19,9 +19,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import json
 import os
+import shutil
 
 from .tools.finance_manager import FinanceManager, TransactionType, Transaction, Account
 from .category_management_dialog import CategoryManagementDialog
+from .batch_export_dialog import BatchExportDialog
 
 
 class CreateTransactionDialog(QDialog):
@@ -405,6 +407,10 @@ class RecordViewDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
+        export_images_btn = PushButton("导出图片")
+        export_images_btn.clicked.connect(self.on_export_images)
+        btn_layout.addWidget(export_images_btn)
+        
         close_btn = PushButton("关闭")
         close_btn.clicked.connect(self.reject)
         btn_layout.addWidget(close_btn)
@@ -436,6 +442,95 @@ class RecordViewDialog(QDialog):
             pixmap = QPixmap(str(full_path))
             scaled_pixmap = pixmap.scaledToWidth(150)
             label.setPixmap(scaled_pixmap)
+    
+    def on_export_images(self):
+        """导出交易的所有图片"""
+        if not self.transaction or not self.account_id:
+            InfoBar.warning(
+                title="提示",
+                content="没有可导出的图片",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+        
+        # 检查是否有图片
+        has_images = False
+        image_paths = {}
+        
+        if self.transaction.invoice_path:
+            full_path = self.finance_manager.get_transaction_image_path(self.account_id, self.transaction.invoice_path)
+            if full_path and full_path.exists():
+                image_paths['发票'] = full_path
+                has_images = True
+        
+        if self.transaction.payment_path:
+            full_path = self.finance_manager.get_transaction_image_path(self.account_id, self.transaction.payment_path)
+            if full_path and full_path.exists():
+                image_paths['支付记录'] = full_path
+                has_images = True
+        
+        if self.transaction.purchase_path:
+            full_path = self.finance_manager.get_transaction_image_path(self.account_id, self.transaction.purchase_path)
+            if full_path and full_path.exists():
+                image_paths['购买记录'] = full_path
+                has_images = True
+        
+        if not has_images:
+            InfoBar.warning(
+                title="提示",
+                content="该交易没有关联的图片",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+        
+        # 打开文件夹选择对话框
+        export_dir = QFileDialog.getExistingDirectory(
+            self,
+            "选择导出文件夹",
+            str(Path.home() / "Downloads")
+        )
+        
+        if not export_dir:
+            return
+        
+        export_path = Path(export_dir)
+        
+        # 创建文件夹，命名为 "日期_金额"
+        folder_name = f"{self.transaction.date}_{self.transaction.amount:.2f}"
+        folder_name = folder_name.replace(":", "-")  # 替换不允许的字符
+        transaction_folder = export_path / folder_name
+        transaction_folder.mkdir(parents=True, exist_ok=True)
+        
+        # 复制图片
+        try:
+            for img_name, img_path in image_paths.items():
+                ext = img_path.suffix
+                dest_file = transaction_folder / f"{img_name}{ext}"
+                shutil.copy(str(img_path), str(dest_file))
+            
+            InfoBar.success(
+                title="成功",
+                content=f"图片已导出到 {transaction_folder.name}",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        except Exception as e:
+            InfoBar.warning(
+                title="错误",
+                content=f"导出失败: {str(e)}",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
 
 
 class FinanceInterface(QWidget):
@@ -668,8 +763,8 @@ class FinanceInterface(QWidget):
         
         # 查询结果表格 - 使用 TreeWidget 风格
         self.query_result_table = TreeWidget()
-        self.query_result_table.setHeaderLabels(["日期", "交易人", "分类", "金额 (元)", "备注"])
-        self.query_result_table.setSelectionMode(self.query_result_table.SingleSelection)
+        self.query_result_table.setHeaderLabels(["", "日期", "交易人", "分类", "金额 (元)", "备注"])
+        self.query_result_table.setSelectionMode(self.query_result_table.MultiSelection)
         self.query_result_table.setIndentation(0)
         
         # 设置 TreeWidget 样式
@@ -677,11 +772,12 @@ class FinanceInterface(QWidget):
         if header:
             header.setStretchLastSection(False)
             # 列宽自适应，可拖动调整
-            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(4, QHeaderView.Stretch)
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # 复选框列
+            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # 日期
+            header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # 交易人
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # 分类
+            header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # 金额
+            header.setSectionResizeMode(5, QHeaderView.Stretch)          # 备注
             # 启用列宽可拖动
             header.setSectionsMovable(False)
             header.setStretchLastSection(False)
@@ -695,6 +791,14 @@ class FinanceInterface(QWidget):
         
         # 查询结果操作按钮
         query_btn_layout = QHBoxLayout()
+        
+        # 批量导出按钮
+        self.batch_export_btn = PushButton("批量导出")
+        self.batch_export_btn.setFixedWidth(90)
+        self.batch_export_btn.clicked.connect(self.on_batch_export)
+        self.batch_export_btn.setEnabled(False)
+        query_btn_layout.addWidget(self.batch_export_btn)
+        
         query_btn_layout.addStretch()
         
         self.query_view_btn = PushButton("查看详情")
@@ -1030,12 +1134,17 @@ class FinanceInterface(QWidget):
         for transaction in results:
             # 创建树形项
             item = QTreeWidgetItem()
-            item.setText(0, transaction.date)
-            item.setText(1, transaction.trader)
-            item.setText(2, transaction.category)
-            item.setText(3, f"¥ {transaction.amount:.2f}")
-            item.setText(4, transaction.notes or "")
-            # 存储交易ID
+            # 第一列添加复选框
+            # flags: ItemIsSelectable=1, ItemIsEnabled=2, ItemIsUserCheckable=32
+            item.setFlags(item.flags() | 32)  # 32 = Qt.ItemIsUserCheckable
+            item.setCheckState(0, 0)  # 0 = Qt.Unchecked
+            # 其他列是数据
+            item.setText(1, transaction.date)
+            item.setText(2, transaction.trader)
+            item.setText(3, transaction.category)
+            item.setText(4, f"¥ {transaction.amount:.2f}")
+            item.setText(5, transaction.notes or "")
+            # 存储交易ID（在第一列）
             item.setData(0, 32, transaction.id)
             
             self.query_result_table.addTopLevelItem(item)
@@ -1192,6 +1301,7 @@ class FinanceInterface(QWidget):
         selected_items = self.query_result_table.selectedItems()
         has_selection = len(selected_items) > 0
         self.query_view_btn.setEnabled(has_selection)
+        self.batch_export_btn.setEnabled(has_selection)
     
     def on_view_record_clicked(self):
         """查看记录按钮点击"""
@@ -1216,6 +1326,156 @@ class FinanceInterface(QWidget):
             trans_id = current_item.data(0, 32)  # Qt.UserRole = 32
             if trans_id:
                 self.delete_record(trans_id)
+    
+    def on_batch_export(self):
+        """批量导出选中的交易"""
+        account_id = self.get_current_account_id()
+        if not account_id:
+            InfoBar.warning(
+                title="提示",
+                content="请先选择账户",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+        
+        # 获取选中的项目
+        selected_items = self.query_result_table.selectedItems()
+        if not selected_items:
+            InfoBar.warning(
+                title="提示",
+                content="请先选择要导出的交易",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+        
+        # 提取交易 ID（从任何可用的列）
+        transaction_ids = set()
+        for item in selected_items:
+            trans_id = None
+            for col in range(6):  # 检查所有列
+                trans_id = item.data(col, 32)
+                if trans_id:
+                    break
+            if trans_id:
+                transaction_ids.add(trans_id)
+        
+        if not transaction_ids:
+            InfoBar.warning(
+                title="提示",
+                content="无法获取交易信息",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+        
+        # 打开导出方式选择对话框
+        export_dialog = BatchExportDialog(self)
+        if export_dialog.exec() != QFileDialog.Accepted:
+            return
+        
+        export_type = export_dialog.get_export_type()
+        
+        # 根据导出方式选择
+        if export_type == BatchExportDialog.EXPORT_MROBOT:
+            # MRobot 格式导出
+            file_dialog = QFileDialog()
+            file_path, _ = file_dialog.getSaveFileName(
+                self,
+                "保存为 MRobot 文件",
+                str(Path.home() / "Downloads" / "export.mrobot"),
+                "MRobot Files (*.mrobot)"
+            )
+            
+            if not file_path:
+                return
+            
+            if self.finance_manager.export_to_mrobot_format(account_id, list(transaction_ids), file_path):
+                InfoBar.success(
+                    title="导出成功",
+                    content=f"已导出 {len(transaction_ids)} 个交易到 {Path(file_path).name}",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+            else:
+                InfoBar.warning(
+                    title="导出失败",
+                    content="导出 MRobot 格式文件失败",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+        else:
+            # 普通文件夹导出
+            export_dir = QFileDialog.getExistingDirectory(
+                self,
+                "选择导出文件夹",
+                str(Path.home() / "Downloads")
+            )
+            
+            if not export_dir:
+                return
+            
+            export_path = Path(export_dir)
+            success_count = 0
+            
+            # 遍历选中的交易，导出它们的图片
+            for trans_id in transaction_ids:
+                transaction = self.finance_manager._load_transaction_data(account_id, trans_id)
+                if not transaction:
+                    continue
+                
+                # 创建文件夹，命名为 "日期_金额"
+                folder_name = f"{transaction.date}_{transaction.amount:.2f}"
+                folder_name = folder_name.replace(":", "-")  # 替换不允许的字符
+                transaction_folder = export_path / folder_name
+                transaction_folder.mkdir(parents=True, exist_ok=True)
+                
+                # 收集图片文件
+                images_found = False
+                try:
+                    if transaction.invoice_path:
+                        img_path = self.finance_manager.get_transaction_image_path(account_id, transaction.invoice_path)
+                        if img_path and img_path.exists():
+                            shutil.copy(str(img_path), str(transaction_folder / f"发票{img_path.suffix}"))
+                            images_found = True
+                    
+                    if transaction.payment_path:
+                        img_path = self.finance_manager.get_transaction_image_path(account_id, transaction.payment_path)
+                        if img_path and img_path.exists():
+                            shutil.copy(str(img_path), str(transaction_folder / f"支付记录{img_path.suffix}"))
+                            images_found = True
+                    
+                    if transaction.purchase_path:
+                        img_path = self.finance_manager.get_transaction_image_path(account_id, transaction.purchase_path)
+                        if img_path and img_path.exists():
+                            shutil.copy(str(img_path), str(transaction_folder / f"购买记录{img_path.suffix}"))
+                            images_found = True
+                    
+                    if images_found:
+                        success_count += 1
+                except Exception as e:
+                    print(f"导出交易 {trans_id} 失败: {e}")
+                    continue
+            
+            InfoBar.success(
+                title="导出完成",
+                content=f"成功导出 {success_count} 个交易",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
     
     def on_query_view_clicked(self):
         """查询结果查看详情按钮点击"""

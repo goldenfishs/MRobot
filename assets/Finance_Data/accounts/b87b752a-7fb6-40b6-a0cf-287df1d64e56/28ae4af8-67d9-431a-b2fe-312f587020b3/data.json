@@ -4,10 +4,10 @@
   "amount": 5000.0,
   "trader": "工作",
   "notes": "1月工资",
-  "invoice_path": null,
+  "invoice_path": "accounts/b87b752a-7fb6-40b6-a0cf-287df1d64e56/28ae4af8-67d9-431a-b2fe-312f587020b3/invoice/截屏2025-11-25 02.51.14.png",
   "payment_path": null,
   "purchase_path": null,
   "category": "NUC",
   "created_at": "2025-11-25T20:44:13.766681",
-  "updated_at": "2025-11-25T20:54:10.845738"
+  "updated_at": "2025-11-25T21:11:13.405339"
 }
