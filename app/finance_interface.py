@@ -38,12 +38,26 @@ class CreateTransactionDialog(QDialog):
         
         if transaction:
             self.load_transaction_data(transaction)
+        else:
+            # 新建时默认为"入账"
+            self.transaction_type_combo.setCurrentIndex(0)
     
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
+        
+        # 交易类型
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(BodyLabel("交易类型:"))
+        self.transaction_type_combo = ComboBox()
+        self.transaction_type_combo.addItem("入账 (正数)")
+        self.transaction_type_combo.addItem("支出 (负数)")
+        self.transaction_type_combo.setMaximumWidth(200)
+        type_layout.addWidget(self.transaction_type_combo)
+        type_layout.addStretch()
+        layout.addLayout(type_layout)
         
         # 日期
         date_layout = QHBoxLayout()
@@ -156,8 +170,15 @@ class CreateTransactionDialog(QDialog):
     
     def load_transaction_data(self, transaction: Transaction):
         """加载交易记录数据到表单"""
+        # 根据金额的正负设置交易类型
+        if transaction.amount >= 0:
+            self.transaction_type_combo.setCurrentIndex(0)  # 入账
+        else:
+            self.transaction_type_combo.setCurrentIndex(1)  # 支出
+        
         self.date_edit.setDate(QDate.fromString(transaction.date, "yyyy-MM-dd"))
-        self.amount_spin.setValue(transaction.amount)
+        # 显示绝对值
+        self.amount_spin.setValue(abs(transaction.amount))
         self.trader_edit.setText(transaction.trader)
         self.notes_edit.setText(transaction.notes)
         
@@ -208,18 +229,22 @@ class CreateTransactionDialog(QDialog):
             dialog.exec()
             return
         
+        # 根据交易类型设置金额符号：入账为正数，支出为负数
+        is_income = self.transaction_type_combo.currentIndex() == 0
+        final_amount = amount if is_income else -amount
+        
         if self.transaction:
             # 编辑现有交易记录
             trans_id = self.transaction.id
             self.finance_manager.update_transaction(
                 self.account_id, trans_id,
-                date=date_str, amount=amount,
+                date=date_str, amount=final_amount,
                 trader=trader, notes=notes
             )
         else:
             # 创建新交易记录
             transaction = Transaction(
-                date=date_str, amount=amount,
+                date=date_str, amount=final_amount,
                 trader=trader, notes=notes
             )
             self.finance_manager.add_transaction(self.account_id, transaction)
@@ -527,44 +552,45 @@ class FinanceInterface(QWidget):
         date_layout.addWidget(BodyLabel("日期范围:"))
         self.query_date_start = DateEdit()
         self.query_date_start.setDate(QDate.currentDate().addMonths(-1))
-        self.query_date_start.setMaximumWidth(150)
-        date_layout.addWidget(self.query_date_start)
+        date_layout.addWidget(self.query_date_start, 1)
         date_layout.addWidget(BodyLabel("至"))
         self.query_date_end = DateEdit()
         self.query_date_end.setDate(QDate.currentDate())
-        self.query_date_end.setMaximumWidth(150)
-        date_layout.addWidget(self.query_date_end)
-        date_layout.addSpacing(20)
+        date_layout.addWidget(self.query_date_end, 1)
+        filter_layout.addLayout(date_layout)
         
-        # 金额范围
-        date_layout.addWidget(BodyLabel("金额范围:"))
+        # 第二行：交易类型和金额范围
+        type_amount_layout = QHBoxLayout()
+        type_amount_layout.addWidget(BodyLabel("交易类型:"))
+        self.query_transaction_type = ComboBox()
+        self.query_transaction_type.addItem("全部")
+        self.query_transaction_type.addItem("收入 (正数)")
+        self.query_transaction_type.addItem("支出 (负数)")
+        type_amount_layout.addWidget(self.query_transaction_type, 1)
+        
+        type_amount_layout.addWidget(BodyLabel("金额范围:"))
         self.query_amount_min = DoubleSpinBox()
         self.query_amount_min.setRange(0, 999999999)
         self.query_amount_min.setPrefix("¥ ")
-        self.query_amount_min.setMaximumWidth(120)
-        date_layout.addWidget(self.query_amount_min)
-        date_layout.addWidget(BodyLabel("至"))
+        type_amount_layout.addWidget(self.query_amount_min, 1)
+        type_amount_layout.addWidget(BodyLabel("至"))
         self.query_amount_max = DoubleSpinBox()
         self.query_amount_max.setRange(0, 999999999)
         self.query_amount_max.setValue(999999999)
         self.query_amount_max.setPrefix("¥ ")
-        self.query_amount_max.setMaximumWidth(120)
-        date_layout.addWidget(self.query_amount_max)
-        date_layout.addStretch()
-        filter_layout.addLayout(date_layout)
+        type_amount_layout.addWidget(self.query_amount_max, 1)
+        filter_layout.addLayout(type_amount_layout)
         
-        # 第二行：交易人搜索和查询按钮
+        # 第三行：交易人搜索和查询按钮
         trader_layout = QHBoxLayout()
         trader_layout.addWidget(BodyLabel("交易人:"))
         self.query_trader_edit = SearchLineEdit()
         self.query_trader_edit.setPlaceholderText("输入交易人名称...")
-        self.query_trader_edit.setMaximumWidth(250)
-        trader_layout.addWidget(self.query_trader_edit)
+        trader_layout.addWidget(self.query_trader_edit, 1)
         
         query_btn = PrimaryPushButton("查询")
         query_btn.clicked.connect(self.perform_query)
         trader_layout.addWidget(query_btn)
-        trader_layout.addStretch()
         filter_layout.addLayout(trader_layout)
         
         layout.addWidget(filter_card)
@@ -876,6 +902,14 @@ class FinanceInterface(QWidget):
             amount_min=amount_min, amount_max=amount_max,
             trader=trader
         )
+        
+        # 根据交易类型过滤
+        transaction_type_index = self.query_transaction_type.currentIndex()
+        if transaction_type_index == 1:  # 收入（正数）
+            results = [t for t in results if t.amount >= 0]
+        elif transaction_type_index == 2:  # 支出（负数）
+            results = [t for t in results if t.amount < 0]
+        # 如果是 0（全部），不进行过滤
         
         self.query_result_table.clear()
         
