@@ -4,20 +4,17 @@
 """
 
 from typing import Optional
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout, 
-                             QLabel, QLineEdit, QDateEdit, QSpinBox, QDoubleSpinBox,
-                             QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-                             QFileDialog, QMessageBox, QScrollArea, QTabWidget, QFrame,
-                             QComboBox, QCheckBox, QInputDialog, QDialog, QTextEdit)
-from PyQt5.QtCore import Qt, QDate, pyqtSignal, QMimeData, QRect, QSize
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QStackedLayout, QStackedWidget,
+                             QFileDialog, QScrollArea, QFrame,
+                             QDialog, QTableWidget, QTableWidgetItem, QHeaderView, QTreeWidget, QTreeWidgetItem)
+from PyQt5.QtCore import Qt, QDate, pyqtSignal, QMimeData, QRect, QSize, QItemSelectionModel
 from PyQt5.QtGui import QIcon, QPixmap, QDrag, QFont, QColor
-from PyQt5.QtCore import Qt as QtEnum
-from PyQt5.QtWidgets import QApplication, QListWidget, QListWidgetItem
 from qfluentwidgets import (TitleLabel, BodyLabel, SubtitleLabel, StrongBodyLabel, 
                            HorizontalSeparator, CardWidget, PushButton, LineEdit, 
                            SpinBox, CheckBox, TextEdit, PrimaryPushButton, 
                            InfoBar, InfoBarPosition, FluentIcon as FIF, ComboBox,
-                           DoubleSpinBox, DateEdit, SearchLineEdit, StateToolTip)
+                           DoubleSpinBox, DateEdit, SearchLineEdit, StateToolTip,
+                           Dialog, SegmentedWidget, TreeWidget)
 from pathlib import Path
 from datetime import datetime, timedelta
 import json
@@ -50,7 +47,7 @@ class CreateTransactionDialog(QDialog):
         
         # 日期
         date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("日期:"))
+        date_layout.addWidget(BodyLabel("日期:"))
         self.date_edit = DateEdit()
         self.date_edit.setDate(QDate.currentDate())
         date_layout.addWidget(self.date_edit)
@@ -59,7 +56,7 @@ class CreateTransactionDialog(QDialog):
         
         # 金额
         amount_layout = QHBoxLayout()
-        amount_layout.addWidget(QLabel("金额 (元):"))
+        amount_layout.addWidget(BodyLabel("金额 (元):"))
         self.amount_spin = DoubleSpinBox()
         self.amount_spin.setRange(0, 999999999)
         self.amount_spin.setDecimals(2)
@@ -69,14 +66,14 @@ class CreateTransactionDialog(QDialog):
         
         # 交易人
         trader_layout = QHBoxLayout()
-        trader_layout.addWidget(QLabel("交易人:"))
+        trader_layout.addWidget(BodyLabel("交易人:"))
         self.trader_edit = LineEdit()
         trader_layout.addWidget(self.trader_edit)
         layout.addLayout(trader_layout)
         
         # 备注
         notes_layout = QHBoxLayout()
-        notes_layout.addWidget(QLabel("备注:"))
+        notes_layout.addWidget(BodyLabel("备注:"))
         self.notes_edit = TextEdit()
         self.notes_edit.setMaximumHeight(80)
         notes_layout.addWidget(self.notes_edit)
@@ -88,8 +85,8 @@ class CreateTransactionDialog(QDialog):
         
         # 发票
         invoice_layout = QHBoxLayout()
-        invoice_layout.addWidget(QLabel("发票图片:"))
-        self.invoice_label = QLabel("未选择")
+        invoice_layout.addWidget(BodyLabel("发票图片:"))
+        self.invoice_label = BodyLabel("未选择")
         invoice_layout.addWidget(self.invoice_label)
         invoice_btn = PushButton("选择")
         invoice_btn.clicked.connect(lambda: self.select_image("invoice"))
@@ -98,8 +95,8 @@ class CreateTransactionDialog(QDialog):
         
         # 支付记录
         payment_layout = QHBoxLayout()
-        payment_layout.addWidget(QLabel("支付记录:"))
-        self.payment_label = QLabel("未选择")
+        payment_layout.addWidget(BodyLabel("支付记录:"))
+        self.payment_label = BodyLabel("未选择")
         payment_layout.addWidget(self.payment_label)
         payment_btn = PushButton("选择")
         payment_btn.clicked.connect(lambda: self.select_image("payment"))
@@ -108,8 +105,8 @@ class CreateTransactionDialog(QDialog):
         
         # 购买记录
         purchase_layout = QHBoxLayout()
-        purchase_layout.addWidget(QLabel("购买记录:"))
-        self.purchase_label = QLabel("未选择")
+        purchase_layout.addWidget(BodyLabel("购买记录:"))
+        self.purchase_label = BodyLabel("未选择")
         purchase_layout.addWidget(self.purchase_label)
         purchase_btn = PushButton("选择")
         purchase_btn.clicked.connect(lambda: self.select_image("purchase"))
@@ -174,7 +171,14 @@ class CreateTransactionDialog(QDialog):
     def save_transaction(self):
         """保存交易记录"""
         if not self.account_id:
-            QMessageBox.warning(self, "错误", "账户ID未设置")
+            dialog = Dialog(
+                title="错误",
+                content="账户ID未设置",
+                parent=self
+            )
+            dialog.yesButton.setText("确定")
+            dialog.cancelButton.hide()
+            dialog.exec()
             return
         
         date_str = self.date_edit.date().toString("yyyy-MM-dd")
@@ -183,11 +187,25 @@ class CreateTransactionDialog(QDialog):
         notes = self.notes_edit.toPlainText().strip()
         
         if not trader:
-            QMessageBox.warning(self, "验证错误", "请输入交易人")
+            dialog = Dialog(
+                title="验证错误",
+                content="请输入交易人",
+                parent=self
+            )
+            dialog.yesButton.setText("确定")
+            dialog.cancelButton.hide()
+            dialog.exec()
             return
         
         if amount <= 0:
-            QMessageBox.warning(self, "验证错误", "金额必须大于0")
+            dialog = Dialog(
+                title="验证错误",
+                content="金额必须大于0",
+                parent=self
+            )
+            dialog.yesButton.setText("确定")
+            dialog.cancelButton.hide()
+            dialog.exec()
             return
         
         if self.transaction:
@@ -249,29 +267,29 @@ class RecordViewDialog(QDialog):
         info_layout = QVBoxLayout()
         
         date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("日期:"))
-        self.date_label = QLabel()
+        date_layout.addWidget(BodyLabel("日期:"))
+        self.date_label = BodyLabel()
         date_layout.addWidget(self.date_label)
         date_layout.addStretch()
         info_layout.addLayout(date_layout)
         
         amount_layout = QHBoxLayout()
-        amount_layout.addWidget(QLabel("金额:"))
-        self.amount_label = QLabel()
+        amount_layout.addWidget(BodyLabel("金额:"))
+        self.amount_label = BodyLabel()
         amount_layout.addWidget(self.amount_label)
         amount_layout.addStretch()
         info_layout.addLayout(amount_layout)
         
         trader_layout = QHBoxLayout()
-        trader_layout.addWidget(QLabel("交易人:"))
-        self.trader_label = QLabel()
+        trader_layout.addWidget(BodyLabel("交易人:"))
+        self.trader_label = BodyLabel()
         trader_layout.addWidget(self.trader_label)
         trader_layout.addStretch()
         info_layout.addLayout(trader_layout)
         
         notes_layout = QHBoxLayout()
-        notes_layout.addWidget(QLabel("备注:"))
-        self.notes_label = QLabel()
+        notes_layout.addWidget(BodyLabel("备注:"))
+        self.notes_label = BodyLabel()
         self.notes_label.setWordWrap(True)
         notes_layout.addWidget(self.notes_label)
         info_layout.addLayout(notes_layout)
@@ -286,31 +304,25 @@ class RecordViewDialog(QDialog):
         
         # 发票
         invoice_layout = QVBoxLayout()
-        invoice_layout.addWidget(QLabel("发票:"))
-        self.invoice_preview = QLabel("无")
+        invoice_layout.addWidget(BodyLabel("发票:"))
+        self.invoice_preview = BodyLabel("无")
         self.invoice_preview.setMinimumSize(150, 150)
-        self.invoice_preview.setAlignment(Qt.AlignCenter)
-        self.invoice_preview.setStyleSheet("border: 1px solid #ddd;")
         invoice_layout.addWidget(self.invoice_preview)
         preview_layout.addLayout(invoice_layout)
         
         # 支付记录
         payment_layout = QVBoxLayout()
-        payment_layout.addWidget(QLabel("支付记录:"))
-        self.payment_preview = QLabel("无")
+        payment_layout.addWidget(BodyLabel("支付记录:"))
+        self.payment_preview = BodyLabel("无")
         self.payment_preview.setMinimumSize(150, 150)
-        self.payment_preview.setAlignment(Qt.AlignCenter)
-        self.payment_preview.setStyleSheet("border: 1px solid #ddd;")
         payment_layout.addWidget(self.payment_preview)
         preview_layout.addLayout(payment_layout)
         
         # 购买记录
         purchase_layout = QVBoxLayout()
-        purchase_layout.addWidget(QLabel("购买记录:"))
-        self.purchase_preview = QLabel("无")
+        purchase_layout.addWidget(BodyLabel("购买记录:"))
+        self.purchase_preview = BodyLabel("无")
         self.purchase_preview.setMinimumSize(150, 150)
-        self.purchase_preview.setAlignment(Qt.AlignCenter)
-        self.purchase_preview.setStyleSheet("border: 1px solid #ddd;")
         purchase_layout.addWidget(self.purchase_preview)
         preview_layout.addLayout(purchase_layout)
         
@@ -342,7 +354,7 @@ class RecordViewDialog(QDialog):
         self._load_image_preview('payment', self.transaction.payment_path if self.transaction else None, self.payment_preview)
         self._load_image_preview('purchase', self.transaction.purchase_path if self.transaction else None, self.purchase_preview)
     
-    def _load_image_preview(self, image_type: str, relative_path: Optional[str], label: QLabel):
+    def _load_image_preview(self, image_type: str, relative_path: Optional[str], label: BodyLabel):
         """加载并显示图片预览"""
         if not relative_path:
             return
@@ -370,30 +382,43 @@ class FinanceInterface(QWidget):
     
     def init_ui(self):
         """初始化UI"""
-        # 标签页
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setStyleSheet("""
-            QTabBar::tab {
-                padding: 8px 20px;
-            }
-        """)
+        # 创建顶部标签切换器
+        top_layout = QHBoxLayout()
+        top_layout.addStretch()
+        self.segmented_widget = SegmentedWidget()
+        self.segmented_widget.insertItem(0, "bookkeeping", "做账")
+        self.segmented_widget.insertItem(1, "query", "查询")
+        self.segmented_widget.insertItem(2, "export", "导出")
+        self.segmented_widget.currentItemChanged.connect(self.on_tab_changed)
+        top_layout.addWidget(self.segmented_widget)
+        top_layout.addStretch()
+        self.layout_main.addLayout(top_layout)
+        
+        # 内容堆叠
+        self.stacked_widget = QStackedWidget()
         
         # 做账标签页
         self.bookkeeping_tab = self.create_bookkeeping_tab()
-        self.tab_widget.addTab(self.bookkeeping_tab, "做账")
+        self.stacked_widget.addWidget(self.bookkeeping_tab)
         
         # 查询标签页
         self.query_tab = self.create_query_tab()
-        self.tab_widget.addTab(self.query_tab, "查询")
+        self.stacked_widget.addWidget(self.query_tab)
         
         # 导出标签页
         self.export_tab = self.create_export_tab()
-        self.tab_widget.addTab(self.export_tab, "导出")
+        self.stacked_widget.addWidget(self.export_tab)
         
-        self.layout_main.addWidget(self.tab_widget)
+        self.layout_main.addWidget(self.stacked_widget)
         
         # 初始化时获取默认账户
         self.init_default_account()
+    
+    def on_tab_changed(self, route_key: str):
+        """标签切换时更新显示"""
+        tab_index = {"bookkeeping": 0, "query": 1, "export": 2}
+        index = tab_index.get(route_key, 0)
+        self.stacked_widget.setCurrentIndex(index)
     
     def create_bookkeeping_tab(self) -> QWidget:
         """创建做账标签页"""
@@ -413,34 +438,74 @@ class FinanceInterface(QWidget):
         
         layout.addLayout(title_layout)
         
-        # 记录表格
-        self.records_table = QTableWidget()
-        self.records_table.setColumnCount(6)
-        self.records_table.setHorizontalHeaderLabels(["日期", "交易人", "金额 (元)", "备注", "操作", ""])
-        header = self.records_table.horizontalHeader()
+        # 记录表格 - 使用 TreeWidget 风格
+        self.records_table = TreeWidget()
+        self.records_table.setHeaderLabels(["日期", "交易人", "金额 (元)", "备注"])
+        self.records_table.setSelectionMode(self.records_table.SingleSelection)
+        self.records_table.setIndentation(0)
+        
+        # 设置 TreeWidget 样式
+        header = self.records_table.header()
         if header:
             header.setStretchLastSection(False)
-        self.records_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.records_table.setAlternatingRowColors(True)
-        self.records_table.setMaximumHeight(600)
+            # 列宽自适应，可拖动调整
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(3, QHeaderView.Stretch)
+            # 启用列宽可拖动
+            header.setSectionsMovable(False)
+            header.setStretchLastSection(False)
+        
+        self.records_table.setCheckedColor("#0078d4", "#2d7d9a")
+        self.records_table.setBorderRadius(8)
+        self.records_table.setBorderVisible(True)
+        self.records_table.itemSelectionChanged.connect(self.on_record_selection_changed)
         
         layout.addWidget(self.records_table)
         
-        # 统计信息
-        stats_layout = QHBoxLayout()
-        stats_layout.addWidget(QLabel("总额:"))
-        self.total_amount_label = QLabel("¥ 0.00")
-        self.total_amount_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #d32f2f;")
+        # 操作按钮区
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        self.view_record_btn = PushButton("查看详情")
+        self.view_record_btn.setFixedWidth(90)
+        self.view_record_btn.clicked.connect(self.on_view_record_clicked)
+        self.view_record_btn.setEnabled(False)
+        btn_layout.addWidget(self.view_record_btn)
+        
+        self.edit_record_btn = PushButton("编辑")
+        self.edit_record_btn.setFixedWidth(75)
+        self.edit_record_btn.clicked.connect(self.on_edit_record_clicked)
+        self.edit_record_btn.setEnabled(False)
+        btn_layout.addWidget(self.edit_record_btn)
+        
+        self.delete_record_btn = PushButton("删除")
+        self.delete_record_btn.setFixedWidth(75)
+        self.delete_record_btn.clicked.connect(self.on_delete_record_clicked)
+        self.delete_record_btn.setEnabled(False)
+        btn_layout.addWidget(self.delete_record_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        # 统计信息卡片
+        stats_card = CardWidget()
+        stats_layout = QHBoxLayout(stats_card)
+        stats_layout.setContentsMargins(20, 15, 20, 15)
+        stats_layout.setSpacing(30)
+        
+        stats_layout.addWidget(BodyLabel("总额:"))
+        self.total_amount_label = StrongBodyLabel("¥ 0.00")
+        self.total_amount_label.setStyleSheet("color: #d32f2f;")
         stats_layout.addWidget(self.total_amount_label)
         
         stats_layout.addSpacing(30)
-        stats_layout.addWidget(QLabel("记录数:"))
-        self.record_count_label = QLabel("0")
-        self.record_count_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        stats_layout.addWidget(BodyLabel("记录数:"))
+        self.record_count_label = StrongBodyLabel("0")
         stats_layout.addWidget(self.record_count_label)
         
         stats_layout.addStretch()
-        layout.addLayout(stats_layout)
+        layout.addWidget(stats_card)
         
         return widget
     
@@ -451,60 +516,97 @@ class FinanceInterface(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
         
-        # 搜索过滤区
-        filter_layout = QHBoxLayout()
+        # 搜索过滤区 - 卡片样式
+        filter_card = CardWidget()
+        filter_layout = QVBoxLayout(filter_card)
+        filter_layout.setContentsMargins(20, 15, 20, 15)
+        filter_layout.setSpacing(12)
         
-        filter_layout.addWidget(QLabel("日期范围:"))
+        # 第一行：日期范围
+        date_layout = QHBoxLayout()
+        date_layout.addWidget(BodyLabel("日期范围:"))
         self.query_date_start = DateEdit()
         self.query_date_start.setDate(QDate.currentDate().addMonths(-1))
-        filter_layout.addWidget(self.query_date_start)
-        
-        filter_layout.addWidget(QLabel("至"))
+        self.query_date_start.setMaximumWidth(150)
+        date_layout.addWidget(self.query_date_start)
+        date_layout.addWidget(BodyLabel("至"))
         self.query_date_end = DateEdit()
         self.query_date_end.setDate(QDate.currentDate())
-        filter_layout.addWidget(self.query_date_end)
+        self.query_date_end.setMaximumWidth(150)
+        date_layout.addWidget(self.query_date_end)
+        date_layout.addSpacing(20)
         
-        filter_layout.addSpacing(20)
-        filter_layout.addWidget(QLabel("金额范围:"))
+        # 金额范围
+        date_layout.addWidget(BodyLabel("金额范围:"))
         self.query_amount_min = DoubleSpinBox()
         self.query_amount_min.setRange(0, 999999999)
         self.query_amount_min.setPrefix("¥ ")
-        filter_layout.addWidget(self.query_amount_min)
-        
-        filter_layout.addWidget(QLabel("至"))
+        self.query_amount_min.setMaximumWidth(120)
+        date_layout.addWidget(self.query_amount_min)
+        date_layout.addWidget(BodyLabel("至"))
         self.query_amount_max = DoubleSpinBox()
         self.query_amount_max.setRange(0, 999999999)
         self.query_amount_max.setValue(999999999)
         self.query_amount_max.setPrefix("¥ ")
-        filter_layout.addWidget(self.query_amount_max)
+        self.query_amount_max.setMaximumWidth(120)
+        date_layout.addWidget(self.query_amount_max)
+        date_layout.addStretch()
+        filter_layout.addLayout(date_layout)
         
-        layout.addLayout(filter_layout)
-        
-        # 交易人搜索
+        # 第二行：交易人搜索和查询按钮
         trader_layout = QHBoxLayout()
-        trader_layout.addWidget(QLabel("交易人:"))
+        trader_layout.addWidget(BodyLabel("交易人:"))
         self.query_trader_edit = SearchLineEdit()
         self.query_trader_edit.setPlaceholderText("输入交易人名称...")
+        self.query_trader_edit.setMaximumWidth(250)
         trader_layout.addWidget(self.query_trader_edit)
         
         query_btn = PrimaryPushButton("查询")
         query_btn.clicked.connect(self.perform_query)
         trader_layout.addWidget(query_btn)
+        trader_layout.addStretch()
+        filter_layout.addLayout(trader_layout)
         
-        layout.addLayout(trader_layout)
+        layout.addWidget(filter_card)
         layout.addWidget(HorizontalSeparator())
         
-        # 查询结果表格
-        self.query_result_table = QTableWidget()
-        self.query_result_table.setColumnCount(6)
-        self.query_result_table.setHorizontalHeaderLabels(["日期", "交易人", "金额 (元)", "备注", "查看详情", ""])
-        header = self.query_result_table.horizontalHeader()
+        # 查询结果表格 - 使用 TreeWidget 风格
+        self.query_result_table = TreeWidget()
+        self.query_result_table.setHeaderLabels(["日期", "交易人", "金额 (元)", "备注"])
+        self.query_result_table.setSelectionMode(self.query_result_table.SingleSelection)
+        self.query_result_table.setIndentation(0)
+        
+        # 设置 TreeWidget 样式
+        header = self.query_result_table.header()
         if header:
             header.setStretchLastSection(False)
-        self.query_result_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.query_result_table.setAlternatingRowColors(True)
+            # 列宽自适应，可拖动调整
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(3, QHeaderView.Stretch)
+            # 启用列宽可拖动
+            header.setSectionsMovable(False)
+            header.setStretchLastSection(False)
+        
+        self.query_result_table.setCheckedColor("#0078d4", "#2d7d9a")
+        self.query_result_table.setBorderRadius(8)
+        self.query_result_table.setBorderVisible(True)
+        self.query_result_table.itemSelectionChanged.connect(self.on_query_result_selection_changed)
         
         layout.addWidget(self.query_result_table)
+        
+        # 查询结果操作按钮
+        query_btn_layout = QHBoxLayout()
+        query_btn_layout.addStretch()
+        
+        self.query_view_btn = PushButton("查看详情")
+        self.query_view_btn.setFixedWidth(90)
+        self.query_view_btn.clicked.connect(self.on_query_view_clicked)
+        self.query_view_btn.setEnabled(False)
+        query_btn_layout.addWidget(self.query_view_btn)
+        
+        layout.addLayout(query_btn_layout)
         
         return widget
     
@@ -525,7 +627,7 @@ class FinanceInterface(QWidget):
         
         # 导出账户为压缩包
         account_export_layout = QHBoxLayout()
-        account_export_layout.addWidget(QLabel("导出当前账户:"))
+        account_export_layout.addWidget(BodyLabel("导出当前账户:"))
         account_export_layout.addStretch()
         export_account_btn = PrimaryPushButton("导出为ZIP包")
         export_account_btn.clicked.connect(self.export_account)
@@ -534,7 +636,7 @@ class FinanceInterface(QWidget):
         
         # 导出为CSV
         csv_export_layout = QHBoxLayout()
-        csv_export_layout.addWidget(QLabel("导出为Excel格式:"))
+        csv_export_layout.addWidget(BodyLabel("导出为Excel格式:"))
         csv_export_layout.addStretch()
         export_csv_btn = PrimaryPushButton("导出CSV")
         export_csv_btn.clicked.connect(self.export_csv)
@@ -543,7 +645,7 @@ class FinanceInterface(QWidget):
         
         # 备份所有账户
         backup_layout = QHBoxLayout()
-        backup_layout.addWidget(QLabel("备份所有账户:"))
+        backup_layout.addWidget(BodyLabel("备份所有账户:"))
         backup_layout.addStretch()
         backup_btn = PrimaryPushButton("创建备份")
         backup_btn.clicked.connect(self.backup_all)
@@ -560,7 +662,7 @@ class FinanceInterface(QWidget):
         
         # 导入账户
         account_import_layout = QHBoxLayout()
-        account_import_layout.addWidget(QLabel("导入账户ZIP包:"))
+        account_import_layout.addWidget(BodyLabel("导入账户ZIP包:"))
         account_import_layout.addStretch()
         import_account_btn = PrimaryPushButton("导入账户")
         import_account_btn.clicked.connect(self.import_account)
@@ -607,6 +709,8 @@ class FinanceInterface(QWidget):
         if not account_id:
             return
         
+        # 重新加载所有账户，从磁盘获取最新数据
+        self.finance_manager.load_all_accounts()
         account = self.finance_manager.get_account(account_id)
         if not account:
             return
@@ -614,31 +718,16 @@ class FinanceInterface(QWidget):
         self.clear_records_table()
         
         for transaction in account.transactions:
-            row = self.records_table.rowCount()
-            self.records_table.insertRow(row)
+            # 创建树形项
+            item = QTreeWidgetItem()
+            item.setText(0, transaction.date)
+            item.setText(1, transaction.trader)
+            item.setText(2, f"¥ {transaction.amount:.2f}")
+            item.setText(3, transaction.notes or "")
+            # 存储交易ID到第一列的 UserRole (Qt.UserRole = 32)
+            item.setData(0, 32, transaction.id)
             
-            self.records_table.setItem(row, 0, QTableWidgetItem(transaction.date))
-            self.records_table.setItem(row, 1, QTableWidgetItem(transaction.trader))
-            self.records_table.setItem(row, 2, QTableWidgetItem(f"¥ {transaction.amount:.2f}"))
-            self.records_table.setItem(row, 3, QTableWidgetItem(transaction.notes or ""))
-            
-            # 操作按钮
-            btn_layout = QHBoxLayout()
-            edit_btn = PushButton("编辑")
-            edit_btn.clicked.connect(lambda checked, tid=transaction.id: self.edit_record(tid))
-            btn_layout.addWidget(edit_btn)
-            
-            delete_btn = PushButton("删除")
-            delete_btn.clicked.connect(lambda checked, tid=transaction.id: self.delete_record(tid))
-            btn_layout.addWidget(delete_btn)
-            
-            view_btn = PushButton("查看")
-            view_btn.clicked.connect(lambda checked, tid=transaction.id: self.view_record(tid))
-            btn_layout.addWidget(view_btn)
-            
-            btn_widget = QWidget()
-            btn_widget.setLayout(btn_layout)
-            self.records_table.setCellWidget(row, 4, btn_widget)
+            self.records_table.addTopLevelItem(item)
         
         # 更新统计信息
         total_amount = sum(t.amount for t in account.transactions)
@@ -647,7 +736,7 @@ class FinanceInterface(QWidget):
     
     def clear_records_table(self):
         """清空记录表格"""
-        self.records_table.setRowCount(0)
+        self.records_table.clear()
         self.total_amount_label.setText("¥ 0.00")
         self.record_count_label.setText("0")
     
@@ -663,13 +752,33 @@ class FinanceInterface(QWidget):
         """创建新记录"""
         account_id = self.get_current_account_id()
         if not account_id:
-            QMessageBox.warning(self, "错误", "请先创建或选择一个账户")
+            InfoBar.warning(
+                title="提示",
+                content="请先创建或选择一个账户",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
             return
         
         dialog = CreateTransactionDialog(self, account_id=account_id)
-        if dialog.exec_():
+        result = dialog.exec_()
+        # 无论是否成功，都尝试刷新表格
+        if result == QDialog.Accepted:
+            # 对话框正常关闭（保存）
             self.refresh_records_display()
-            InfoBar.success("记录已添加", "", duration=2000, parent=self)
+            InfoBar.success(
+                title="成功",
+                content="记录已添加",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        else:
+            # 对话框被取消，也刷新以防万一
+            self.refresh_records_display()
     
     def edit_record(self, trans_id: str):
         """编辑记录"""
@@ -682,9 +791,20 @@ class FinanceInterface(QWidget):
             return
         
         dialog = CreateTransactionDialog(self, transaction=transaction, account_id=account_id)
-        if dialog.exec_():
+        result = dialog.exec_()
+        if result == QDialog.Accepted:
             self.refresh_records_display()
-            InfoBar.success("记录已更新", "", duration=2000, parent=self)
+            InfoBar.success(
+                title="成功",
+                content="记录已更新",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        else:
+            # 对话框被取消，也刷新以防万一
+            self.refresh_records_display()
     
     def delete_record(self, trans_id: str):
         """删除记录"""
@@ -692,16 +812,27 @@ class FinanceInterface(QWidget):
         if not account_id:
             return
         
-        reply = QMessageBox.question(
-            self, "确认删除",
-            "确定要删除这条记录吗?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
+        def on_delete_confirm():
             self.finance_manager.delete_transaction(account_id, trans_id)
             self.refresh_records_display()
-            InfoBar.success("记录已删除", "", duration=2000, parent=self)
+            InfoBar.success(
+                title="成功",
+                content="记录已删除",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        
+        dialog = Dialog(
+            title="确认删除",
+            content="确定要删除这条记录吗?",
+            parent=self
+        )
+        dialog.yesButton.setText("删除")
+        dialog.cancelButton.setText("取消")
+        dialog.yesButton.clicked.connect(on_delete_confirm)
+        dialog.exec()
     
     def view_record(self, trans_id: str):
         """查看记录详情"""
@@ -720,8 +851,18 @@ class FinanceInterface(QWidget):
         """执行查询"""
         account_id = self.get_current_account_id()
         if not account_id:
-            QMessageBox.warning(self, "错误", "请先创建或选择一个账户")
+            InfoBar.warning(
+                title="提示",
+                content="请先创建或选择一个账户",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
             return
+        
+        # 重新加载最新数据
+        self.finance_manager.load_all_accounts()
         
         date_start = self.query_date_start.date().toString("yyyy-MM-dd")
         date_end = self.query_date_end.date().toString("yyyy-MM-dd")
@@ -736,36 +877,63 @@ class FinanceInterface(QWidget):
             trader=trader
         )
         
-        self.query_result_table.setRowCount(0)
+        self.query_result_table.clear()
         
         for transaction in results:
-            row = self.query_result_table.rowCount()
-            self.query_result_table.insertRow(row)
+            # 创建树形项
+            item = QTreeWidgetItem()
+            item.setText(0, transaction.date)
+            item.setText(1, transaction.trader)
+            item.setText(2, f"¥ {transaction.amount:.2f}")
+            item.setText(3, transaction.notes or "")
+            # 存储交易ID
+            item.setData(0, 32, transaction.id)
             
-            self.query_result_table.setItem(row, 0, QTableWidgetItem(transaction.date))
-            self.query_result_table.setItem(row, 1, QTableWidgetItem(transaction.trader))
-            self.query_result_table.setItem(row, 2, QTableWidgetItem(f"¥ {transaction.amount:.2f}"))
-            self.query_result_table.setItem(row, 3, QTableWidgetItem(transaction.notes or ""))
-            
-            view_btn = PushButton("查看详情")
-            view_btn.clicked.connect(lambda checked, tid=transaction.id: self.view_record(tid))
-            self.query_result_table.setCellWidget(row, 4, view_btn)
+            self.query_result_table.addTopLevelItem(item)
         
-        InfoBar.success(f"找到 {len(results)} 条记录", "", duration=2000, parent=self)
+        InfoBar.success(
+            title="查询成功",
+            content=f"找到 {len(results)} 条记录",
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=self
+        )
     
     def export_account(self):
         """导出账户为ZIP包"""
         account_id = self.get_current_account_id()
         if not account_id:
-            QMessageBox.warning(self, "错误", "请先选择一个账户")
+            InfoBar.warning(
+                title="提示",
+                content="请先选择一个账户",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
             return
         
         export_dir = QFileDialog.getExistingDirectory(self, "选择导出目录")
         if export_dir:
             if self.finance_manager.export_account_package(account_id, export_dir):
-                InfoBar.success("账户导出成功", "", duration=2000, parent=self)
+                InfoBar.success(
+                    title="成功",
+                    content="账户导出成功",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
             else:
-                QMessageBox.warning(self, "错误", "导出账户失败")
+                InfoBar.error(
+                    title="失败",
+                    content="导出账户失败",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self
+                )
     
     def import_account(self):
         """导入账户ZIP包"""
@@ -779,15 +947,36 @@ class FinanceInterface(QWidget):
             if account_id:
                 # 重新初始化默认账户
                 self.init_default_account()
-                InfoBar.success("账户导入成功", "", duration=2000, parent=self)
+                InfoBar.success(
+                    title="成功",
+                    content="账户导入成功",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
             else:
-                QMessageBox.warning(self, "错误", "导入账户失败")
+                InfoBar.error(
+                    title="失败",
+                    content="导入账户失败",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self
+                )
     
     def export_csv(self):
         """导出为CSV"""
         account_id = self.get_current_account_id()
         if not account_id:
-            QMessageBox.warning(self, "错误", "请先选择一个账户")
+            InfoBar.warning(
+                title="提示",
+                content="请先选择一个账户",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
             return
         
         account = self.finance_manager.get_account(account_id)
@@ -802,13 +991,87 @@ class FinanceInterface(QWidget):
         
         if file_path:
             if self.finance_manager.export_to_csv(account_id, file_path):
-                InfoBar.success("已导出为CSV", "", duration=2000, parent=self)
+                InfoBar.success(
+                    title="成功",
+                    content="已导出为CSV",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
             else:
-                QMessageBox.warning(self, "错误", "导出CSV失败")
+                InfoBar.error(
+                    title="失败",
+                    content="导出CSV失败",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=3000,
+                    parent=self
+                )
     
     def backup_all(self):
         """备份所有账户"""
         if self.finance_manager.backup_all_accounts():
-            InfoBar.success("备份创建成功", "已保存到 assets/Finance_Data/backups", duration=3000, parent=self)
+            InfoBar.success(
+                title="成功",
+                content="备份创建成功，已保存到 assets/Finance_Data/backups",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
         else:
-            QMessageBox.warning(self, "错误", "创建备份失败")
+            InfoBar.error(
+                title="失败",
+                content="创建备份失败",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
+    
+    def on_record_selection_changed(self):
+        """记录表格选择改变时"""
+        selected_items = self.records_table.selectedItems()
+        has_selection = len(selected_items) > 0
+        self.view_record_btn.setEnabled(has_selection)
+        self.edit_record_btn.setEnabled(has_selection)
+        self.delete_record_btn.setEnabled(has_selection)
+    
+    def on_query_result_selection_changed(self):
+        """查询结果表格选择改变时"""
+        selected_items = self.query_result_table.selectedItems()
+        has_selection = len(selected_items) > 0
+        self.query_view_btn.setEnabled(has_selection)
+    
+    def on_view_record_clicked(self):
+        """查看记录按钮点击"""
+        current_item = self.records_table.currentItem()
+        if current_item:
+            trans_id = current_item.data(0, 32)  # Qt.UserRole = 32
+            if trans_id:
+                self.view_record(trans_id)
+    
+    def on_edit_record_clicked(self):
+        """编辑记录按钮点击"""
+        current_item = self.records_table.currentItem()
+        if current_item:
+            trans_id = current_item.data(0, 32)  # Qt.UserRole = 32
+            if trans_id:
+                self.edit_record(trans_id)
+    
+    def on_delete_record_clicked(self):
+        """删除记录按钮点击"""
+        current_item = self.records_table.currentItem()
+        if current_item:
+            trans_id = current_item.data(0, 32)  # Qt.UserRole = 32
+            if trans_id:
+                self.delete_record(trans_id)
+    
+    def on_query_view_clicked(self):
+        """查询结果查看详情按钮点击"""
+        current_item = self.query_result_table.currentItem()
+        if current_item:
+            trans_id = current_item.data(0, 32)  # Qt.UserRole = 32
+            if trans_id:
+                self.view_record(trans_id)
