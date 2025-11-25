@@ -1,0 +1,179 @@
+/*
+  自定义的数学运算。
+*/
+
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <float.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+#define M_DEG2RAD_MULT (0.01745329251f)
+#define M_RAD2DEG_MULT (57.2957795131f)
+
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679f
+#endif
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
+
+#ifndef M_2PI
+#define M_2PI 6.28318530717958647692f
+#endif
+
+#ifndef __packed
+  #define __packed __attribute__((__packed__))
+#endif /* __packed */
+
+#define max(a, b)           \
+  ({                        \
+    __typeof__(a) _a = (a); \
+    __typeof__(b) _b = (b); \
+    _a > _b ? _a : _b;      \
+  })
+
+#define min(a, b)           \
+  ({                        \
+    __typeof__(a) _a = (a); \
+    __typeof__(b) _b = (b); \
+    _a < _b ? _a : _b;      \
+  })
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
+
+
+/* 移动向量 */
+typedef struct {
+  float vx; /* 前后平移 */
+  float vy; /* 左右平移 */
+  float wz; /* 转动 */
+} MoveVector_t;
+
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
+float InvSqrt(float x);
+
+float AbsClip(float in, float limit);
+
+float fAbs(float in);
+
+void Clip(float *origin, float min, float max);
+
+float Sign(float in);
+
+/**
+ * \brief 将运动向量置零
+ *
+ * \param mv 被操作的值
+ */
+void ResetMoveVector(MoveVector_t *mv);
+
+/**
+ * \brief 计算循环值的误差，适用于设定值与反馈值均在（x,y）范围内循环的情况，range应设定为y-x
+ * 例如：（-M_PI,M_PI）range=M_2PI;(0,M_2PI)range=M_2PI;（a,a+b）range=b;
+ * \param sp 设定值
+ * \param fb 反馈值
+ * \param range 被操作的值变化范围，正数时起效
+ * \return 函数运行结果
+ */
+float CircleError(float sp, float fb, float range);
+
+/**
+ * \brief 循环加法，适用于被操作的值在（0,range）范围内循环的情况
+ * \param origin 被操作的值
+ * \param delta 变化量
+ * \param range 被操作的值变化范围，正数时起效
+ */
+void CircleAdd(float *origin, float delta, float range);
+
+/**
+ * @brief 循环值取反
+ *
+ * @param origin 被操作的值
+ */
+void CircleReverse(float *origin);
+
+/**
+ * @brief 根据目标弹丸速度计算摩擦轮转速
+ *
+ * @param bullet_speed 弹丸速度
+ * @param fric_radius 摩擦轮半径
+ * @param is17mm 是否为17mm
+ * @return 摩擦轮转速
+ */
+float CalculateRpm(float bullet_speed, float fric_radius, bool is17mm);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef DEBUG
+
+/**
+ * @brief 如果表达式的值为假则运行处理函数
+ *
+ */
+#define ASSERT(expr)                    \
+  do {                                  \
+    if (!(expr)) {                      \
+      VerifyFailed(__FILE__, __LINE__); \
+    }                                   \
+  } while (0)
+#else
+
+/**
+ * @brief 未定DEBUG，表达式不会运行，断言被忽略
+ *
+ */
+#define ASSERT(expr) ((void)(0))
+#endif
+
+#ifdef DEBUG
+
+/**
+ * @brief 如果表达式的值为假则运行处理函数
+ *
+ */
+#define VERIFY(expr)                    \
+  do {                                  \
+    if (!(expr)) {                      \
+      VerifyFailed(__FILE__, __LINE__); \
+    }                                   \
+  } while (0)
+#else
+
+/**
+ * @brief 表达式会运行，忽略表达式结果
+ *
+ */
+#define VERIFY(expr) ((void)(expr))
+#endif
+
+// /**
+//  * @brief 断言失败处理
+//  *
+//  * @param file 文件名
+//  * @param line 行号
+//  */
+// void VerifyFailed(const char *file, uint32_t line);
+
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */

@@ -1,0 +1,178 @@
+/*
+    IST8310 地磁传感器。
+*/
+
+/* Includes ----------------------------------------------------------------- */
+#include "ist8310.h"
+
+#include <gpio.h>
+#include <stdbool.h>
+#include <string.h>
+
+#include "bsp/time.h"
+#include "bsp/gpio.h"
+#include "bsp/i2c.h"
+
+/* USER INCLUDE BEGIN */
+
+/* USER INCLUDE END */
+
+/* Private define ----------------------------------------------------------- */
+#define IST8310_WAI (0x00)
+#define IST8310_STAT1 (0x02)
+#define IST8310_DATAXL (0x03)
+#define IST8310_STAT2 (0x09)
+#define IST8310_CNTL1 (0x0A)
+#define IST8310_CNTL2 (0x0B)
+#define IST8310_STR (0x0C)
+#define IST8310_TEMPL (0x1C)
+#define IST8310_TEMPH (0x1D)
+#define IST8310_AVGCNTL (0x41)
+#define IST8310_PDCNTL (0x42)
+
+#define IST8310_CHIP_ID (0x10)
+
+#define IST8310_IIC_ADDRESS (0x0E << 1)
+
+#define IST8310_LEN_RX_BUFF (6)
+
+/* USER DEFINE BEGIN */
+
+/* USER DEFINE END */
+
+/* Private macro ------------------------------------------------------------ */
+#define IST8310_SET() \
+  BSP_GPIO_WritePin(CMPS_RST_Pin, GPIO_PIN_SET)
+#define IST8310_RESET() \
+  BSP_GPIO_WritePin(CMPS_RST_Pin, GPIO_PIN_RESET)
+
+/* Private typedef ---------------------------------------------------------- */
+/* USER STRUCT BEGIN */
+
+/* USER STRUCT END */
+
+/* Private variables -------------------------------------------------------- */
+uint8_t ist8310_rxbuf[IST8310_LEN_RX_BUFF];
+
+static osThreadId_t thread_alert;
+static bool inited = false;
+
+/* Private function  -------------------------------------------------------- */
+/* USER FUNCTION BEGIN */
+
+/* USER FUNCTION END */
+
+static void IST8310_WriteSingle(uint8_t reg, uint8_t data) {
+  BSP_I2C_MemWriteByte(BSP_I2C_COMP, IST8310_IIC_ADDRESS, reg, data);
+}
+
+static uint8_t IST8310_ReadSingle(uint8_t reg) {
+  return BSP_I2C_MemReadByte(BSP_I2C_COMP, IST8310_IIC_ADDRESS, reg);
+}
+
+
+static void IST8310_Read(uint8_t reg, uint8_t *data, uint8_t len) {
+  if (data == NULL) return;
+  BSP_I2C_MemRead(BSP_I2C_COMP, IST8310_IIC_ADDRESS, reg, data, len, true);
+}
+
+static void IST8310_MemRxCpltCallback(void) {
+  osThreadFlagsSet(thread_alert, SIGNAL_IST8310_MAGN_RAW_REDY);
+}
+
+static void IST8310_IntCallback(void) {
+  osThreadFlagsSet(thread_alert, SIGNAL_IST8310_MAGN_NEW_DATA);
+}
+
+/* Exported functions ------------------------------------------------------- */
+int8_t IST8310_Init(IST8310_t *ist8310, const IST8310_Cali_t *cali) {
+  if (ist8310 == NULL) return DEVICE_ERR_NULL;
+  if (cali == NULL) return DEVICE_ERR_NULL;
+  if (inited) return DEVICE_ERR_INITED;
+  if ((thread_alert = osThreadGetId()) == NULL) return DEVICE_ERR_NULL;
+
+  ist8310->cali = cali;
+
+  IST8310_RESET();
+  BSP_TIME_Delay(50);
+  IST8310_SET();
+  BSP_TIME_Delay(50);
+
+  if (IST8310_ReadSingle(IST8310_WAI) != IST8310_CHIP_ID)
+    return DEVICE_ERR_NO_DEV;
+
+  BSP_GPIO_DisableIRQ(CMPS_INT_Pin);
+
+  BSP_I2C_RegisterCallback(BSP_I2C_COMP, HAL_I2C_MEM_RX_CPLT_CB,
+                           IST8310_MemRxCpltCallback);
+  BSP_GPIO_RegisterCallback(CMPS_INT_Pin, IST8310_IntCallback);
+
+  /* Init. */
+  /* 0x00: Stand-By mode. 0x01: Single measurement mode. */
+
+  /* 0x08: Data ready function enable. DRDY signal active low*/
+  IST8310_WriteSingle(IST8310_CNTL2, 0x08);
+
+  IST8310_WriteSingle(IST8310_AVGCNTL, 0x09);
+  IST8310_WriteSingle(IST8310_PDCNTL, 0xC0);
+  IST8310_WriteSingle(IST8310_CNTL1, 0x0B);
+  BSP_TIME_Delay(10);
+
+  inited = true;
+
+  BSP_GPIO_EnableIRQ(CMPS_INT_Pin);
+  return DEVICE_OK;
+}
+
+bool IST8310_WaitNew(uint32_t timeout) {
+  return (osThreadFlagsWait(SIGNAL_IST8310_MAGN_NEW_DATA, osFlagsWaitAll,
+                            timeout) == SIGNAL_IST8310_MAGN_NEW_DATA);
+}
+
+int8_t IST8310_StartDmaRecv() {
+  IST8310_Read(IST8310_DATAXL, ist8310_rxbuf, IST8310_LEN_RX_BUFF);
+  return DEVICE_OK;
+}
+
+uint32_t IST8310_WaitDmaCplt() {
+  return osThreadFlagsWait(SIGNAL_IST8310_MAGN_RAW_REDY, osFlagsWaitAll,
+                           osWaitForever);
+}
+
+int8_t IST8310_Parse(IST8310_t *ist8310) {
+  if (ist8310 == NULL) return DEVICE_ERR_NULL;
+
+#if 1
+  /* Magn -> T */
+  int16_t raw_x, raw_y, raw_z;
+  memcpy(&raw_x, ist8310_rxbuf + 0, sizeof(raw_x));
+  memcpy(&raw_y, ist8310_rxbuf + 2, sizeof(raw_y));
+  memcpy(&raw_z, ist8310_rxbuf + 4, sizeof(raw_z));
+
+  ist8310->magn.x = (float)raw_x;
+  ist8310->magn.y = (float)raw_y;
+  ist8310->magn.z = (float)-raw_z;
+
+#else
+  const int16_t *raw_x = (int16_t *)(ist8310_rxbuf + 0);
+  const int16_t *raw_y = (int16_t *)(ist8310_rxbuf + 2);
+  const int16_t *raw_z = (int16_t *)(ist8310_rxbuf + 4);
+
+  ist8310->magn.x = (float)*raw_x;
+  ist8310->magn.y = (float)*raw_y;
+  ist8310->magn.z = -(float)*raw_z;
+#endif
+
+  ist8310->magn.x *= 3.0f / 20.0f;
+  ist8310->magn.y *= 3.0f / 20.0f;
+  ist8310->magn.z *= 3.0f / 20.0f;
+
+  ist8310->magn.x = (ist8310->magn.x - ist8310->cali->magn_offset.x) *
+                    ist8310->cali->magn_scale.x;
+  ist8310->magn.y = (ist8310->magn.y - ist8310->cali->magn_offset.y) *
+                    ist8310->cali->magn_scale.y;
+  ist8310->magn.z = (ist8310->magn.z - ist8310->cali->magn_offset.y) *
+                    ist8310->cali->magn_scale.z;
+
+  return DEVICE_OK;
+}
