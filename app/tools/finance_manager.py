@@ -26,7 +26,8 @@ class Transaction:
     
     def __init__(self, trans_id: Optional[str] = None, date: Optional[str] = None, amount: float = 0.0,
                  trader: str = "", notes: str = "", invoice_path: Optional[str] = None,
-                 payment_path: Optional[str] = None, purchase_path: Optional[str] = None):
+                 payment_path: Optional[str] = None, purchase_path: Optional[str] = None,
+                 category: str = ""):
         self.id = trans_id or str(uuid.uuid4())
         self.date = date or datetime.now().strftime("%Y-%m-%d")
         self.amount = amount
@@ -35,6 +36,7 @@ class Transaction:
         self.invoice_path = invoice_path  # 相对路径
         self.payment_path = payment_path
         self.purchase_path = purchase_path
+        self.category = category  # 交易分类，用户自定义
         self.created_at = datetime.now().isoformat()
         self.updated_at = datetime.now().isoformat()
     
@@ -49,6 +51,7 @@ class Transaction:
             'invoice_path': self.invoice_path,
             'payment_path': self.payment_path,
             'purchase_path': self.purchase_path,
+            'category': self.category,
             'created_at': self.created_at,
             'updated_at': self.updated_at
         }
@@ -64,7 +67,8 @@ class Transaction:
             notes=data.get('notes', ''),
             invoice_path=data.get('invoice_path'),
             payment_path=data.get('payment_path'),
-            purchase_path=data.get('purchase_path')
+            purchase_path=data.get('purchase_path'),
+            category=data.get('category', '')
         )
         if 'created_at' in data:
             trans.created_at = data['created_at']
@@ -81,6 +85,7 @@ class Account:
         self.name = account_name
         self.description = description
         self.transactions: List[Transaction] = []
+        self.categories: List[str] = []  # 空列表，用户自定义分类
         self.created_at = datetime.now().isoformat()
         self.updated_at = datetime.now().isoformat()
     
@@ -111,6 +116,7 @@ class Account:
             'id': self.id,
             'name': self.name,
             'description': self.description,
+            'categories': self.categories,
             'transactions': [t.to_dict() for t in self.transactions],
             'created_at': self.created_at,
             'updated_at': self.updated_at
@@ -124,6 +130,7 @@ class Account:
             account_name=data.get('name', ''),
             description=data.get('description', '')
         )
+        account.categories = data.get('categories', [])  # 使用存储的分类，如果没有则为空列表
         account.transactions = [Transaction.from_dict(t) for t in data.get('transactions', [])]
         if 'created_at' in data:
             account.created_at = data['created_at']
@@ -152,6 +159,13 @@ class FinanceManager:
         self._ensure_directory_structure()
         self.accounts: Dict[str, Account] = {}
         self.load_all_accounts()
+        
+        # 如果没有账户，自动创建 admin 账户
+        if len(self.accounts) == 0:
+            self.create_account(
+                account_name="admin",
+                description="默认管理账户"
+            )
     
     def _ensure_directory_structure(self) -> None:
         """确保目录结构完整"""
@@ -183,6 +197,7 @@ class FinanceManager:
             'id': account.id,
             'name': account.name,
             'description': account.description,
+            'categories': account.categories,
             'created_at': account.created_at,
             'updated_at': account.updated_at
         }
@@ -325,7 +340,7 @@ class FinanceManager:
         
         # 更新允许的字段
         allowed_fields = ['date', 'amount', 'trader', 'notes', 'invoice_path', 
-                         'payment_path', 'purchase_path']
+                         'payment_path', 'purchase_path', 'category']
         for field, value in kwargs.items():
             if field in allowed_fields:
                 setattr(transaction, field, value)
@@ -343,7 +358,8 @@ class FinanceManager:
     
     def query_transactions(self, account_id: str, date_start: Optional[str] = None, 
                           date_end: Optional[str] = None, amount_min: Optional[float] = None,
-                          amount_max: Optional[float] = None, trader: Optional[str] = None) -> List[Transaction]:
+                          amount_max: Optional[float] = None, trader: Optional[str] = None,
+                          category: Optional[str] = None) -> List[Transaction]:
         """查询交易记录（支持多条件筛选）"""
         account = self.accounts.get(account_id)
         if not account:
@@ -365,6 +381,10 @@ class FinanceManager:
             
             # 交易人筛选（模糊匹配）
             if trader and trader.lower() not in trans.trader.lower():
+                continue
+            
+            # 分类筛选
+            if category and trans.category != category:
                 continue
             
             results.append(trans)
@@ -498,6 +518,7 @@ class FinanceManager:
                 account_name=metadata['name'],
                 description=metadata.get('description', '')
             )
+            account.categories = metadata.get('categories', [])  # 从元数据加载分类
             account.created_at = metadata.get('created_at')
             account.updated_at = metadata.get('updated_at')
             
@@ -525,13 +546,14 @@ class FinanceManager:
             import csv
             with open(csv_path, 'w', newline='', encoding='utf-8-sig') as f:
                 writer = csv.writer(f)
-                writer.writerow(['日期', '金额', '交易人', '备注', '创建时间'])
+                writer.writerow(['日期', '金额', '交易人', '分类', '备注', '创建时间'])
                 
                 for trans in account.transactions:
                     writer.writerow([
                         trans.date,
                         trans.amount,
                         trans.trader,
+                        trans.category,
                         trans.notes,
                         trans.created_at
                     ])
@@ -540,3 +562,36 @@ class FinanceManager:
         except Exception as e:
             print(f"导出CSV出错: {e}")
             return False
+    
+    def add_category(self, account_id: str, category: str) -> bool:
+        """添加交易分类"""
+        account = self.accounts.get(account_id)
+        if not account:
+            return False
+        
+        if category not in account.categories:
+            account.categories.append(category)
+            account.updated_at = datetime.now().isoformat()
+            self._save_account_metadata(account)
+            return True
+        return False
+    
+    def delete_category(self, account_id: str, category: str) -> bool:
+        """删除交易分类"""
+        account = self.accounts.get(account_id)
+        if not account:
+            return False
+        
+        if category in account.categories:
+            account.categories.remove(category)
+            account.updated_at = datetime.now().isoformat()
+            self._save_account_metadata(account)
+            return True
+        return False
+    
+    def get_categories(self, account_id: str) -> List[str]:
+        """获取账户的所有分类"""
+        account = self.accounts.get(account_id)
+        if not account:
+            return []
+        return account.categories

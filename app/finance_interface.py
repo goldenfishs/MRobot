@@ -26,11 +26,11 @@ from .tools.finance_manager import FinanceManager, TransactionType, Transaction,
 class CreateTransactionDialog(QDialog):
     """创建/编辑交易记录对话框"""
     
-    def __init__(self, parent=None, transaction: Optional[Transaction] = None, account_id: Optional[str] = None):
+    def __init__(self, parent=None, transaction: Optional[Transaction] = None, account_id: Optional[str] = None, finance_manager=None):
         super().__init__(parent)
         self.transaction = transaction
         self.account_id = account_id
-        self.finance_manager = FinanceManager()
+        self.finance_manager = finance_manager if finance_manager else FinanceManager()
         
         self.setWindowTitle("新建交易记录" if not transaction else "编辑交易记录")
         self.setGeometry(100, 100, 600, 500)
@@ -58,6 +58,32 @@ class CreateTransactionDialog(QDialog):
         type_layout.addWidget(self.transaction_type_combo)
         type_layout.addStretch()
         layout.addLayout(type_layout)
+        
+        # 分类
+        category_layout = QHBoxLayout()
+        category_layout.addWidget(BodyLabel("分类:"))
+        self.category_combo = ComboBox()
+        # 从财务管理器获取分类列表
+        categories = []
+        if self.account_id:
+            # 确保账户数据已加载
+            account = self.finance_manager.get_account(self.account_id)
+            if account:
+                categories = account.categories
+        
+        # 如果没有分类，提示用户创建
+        if not categories:
+            self.category_combo.addItem("请先在做账页创建分类")
+            self.category_combo.setEnabled(False)
+        else:
+            for cat in categories:
+                self.category_combo.addItem(cat)
+            self.category_combo.setEnabled(True)
+        
+        self.category_combo.setMaximumWidth(200)
+        category_layout.addWidget(self.category_combo)
+        category_layout.addStretch()
+        layout.addLayout(category_layout)
         
         # 日期
         date_layout = QHBoxLayout()
@@ -176,6 +202,13 @@ class CreateTransactionDialog(QDialog):
         else:
             self.transaction_type_combo.setCurrentIndex(1)  # 支出
         
+        # 设置分类
+        category_index = self.category_combo.findText(transaction.category)
+        if category_index >= 0:
+            self.category_combo.setCurrentIndex(category_index)
+        else:
+            self.category_combo.setCurrentIndex(0)  # 默认为第一个
+        
         self.date_edit.setDate(QDate.fromString(transaction.date, "yyyy-MM-dd"))
         # 显示绝对值
         self.amount_spin.setValue(abs(transaction.amount))
@@ -206,6 +239,19 @@ class CreateTransactionDialog(QDialog):
         amount = self.amount_spin.value()
         trader = self.trader_edit.text().strip()
         notes = self.notes_edit.toPlainText().strip()
+        category = self.category_combo.currentText()
+        
+        # 检查分类是否有效
+        if not category or category == "请先在做账页创建分类":
+            dialog = Dialog(
+                title="验证错误",
+                content="请先创建分类后再添加交易",
+                parent=self
+            )
+            dialog.yesButton.setText("确定")
+            dialog.cancelButton.hide()
+            dialog.exec()
+            return
         
         if not trader:
             dialog = Dialog(
@@ -239,13 +285,13 @@ class CreateTransactionDialog(QDialog):
             self.finance_manager.update_transaction(
                 self.account_id, trans_id,
                 date=date_str, amount=final_amount,
-                trader=trader, notes=notes
+                trader=trader, notes=notes, category=category
             )
         else:
             # 创建新交易记录
             transaction = Transaction(
                 date=date_str, amount=final_amount,
-                trader=trader, notes=notes
+                trader=trader, notes=notes, category=category
             )
             self.finance_manager.add_transaction(self.account_id, transaction)
             trans_id = transaction.id
@@ -455,6 +501,13 @@ class FinanceInterface(QWidget):
         # 标题和操作按钮
         title_layout = QHBoxLayout()
         title_layout.addWidget(SubtitleLabel("交易记录"))
+        
+        # 新建分类按钮
+        new_category_btn = PushButton("新建分类")
+        new_category_btn.setFixedWidth(90)
+        new_category_btn.clicked.connect(self.on_create_category_clicked)
+        title_layout.addWidget(new_category_btn)
+        
         title_layout.addStretch()
         
         new_record_btn = PrimaryPushButton("新建记录")
@@ -465,7 +518,7 @@ class FinanceInterface(QWidget):
         
         # 记录表格 - 使用 TreeWidget 风格
         self.records_table = TreeWidget()
-        self.records_table.setHeaderLabels(["日期", "交易人", "金额 (元)", "备注"])
+        self.records_table.setHeaderLabels(["日期", "交易人", "分类", "金额 (元)", "备注"])
         self.records_table.setSelectionMode(self.records_table.SingleSelection)
         self.records_table.setIndentation(0)
         
@@ -477,7 +530,8 @@ class FinanceInterface(QWidget):
             header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
             header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
             header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(3, QHeaderView.Stretch)
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.Stretch)
             # 启用列宽可拖动
             header.setSectionsMovable(False)
             header.setStretchLastSection(False)
@@ -545,7 +599,7 @@ class FinanceInterface(QWidget):
         filter_card = CardWidget()
         filter_layout = QVBoxLayout(filter_card)
         filter_layout.setContentsMargins(20, 15, 20, 15)
-        filter_layout.setSpacing(12)
+        filter_layout.setSpacing(15)  # 增加间距为15
         
         # 第一行：日期范围
         date_layout = QHBoxLayout()
@@ -559,29 +613,44 @@ class FinanceInterface(QWidget):
         date_layout.addWidget(self.query_date_end, 1)
         filter_layout.addLayout(date_layout)
         
-        # 第二行：交易类型和金额范围
-        type_amount_layout = QHBoxLayout()
-        type_amount_layout.addWidget(BodyLabel("交易类型:"))
+        # 第二行：交易类型和分类
+        type_category_layout = QHBoxLayout()
+        type_category_layout.addWidget(BodyLabel("交易类型:"))
         self.query_transaction_type = ComboBox()
         self.query_transaction_type.addItem("全部")
         self.query_transaction_type.addItem("收入 (正数)")
         self.query_transaction_type.addItem("支出 (负数)")
-        type_amount_layout.addWidget(self.query_transaction_type, 1)
+        type_category_layout.addWidget(self.query_transaction_type, 1)
         
-        type_amount_layout.addWidget(BodyLabel("金额范围:"))
+        type_category_layout.addWidget(BodyLabel("分类:"))
+        self.query_category = ComboBox()
+        self.query_category.addItem("全部")
+        # 初始化时加载现有分类
+        account_id = self.get_current_account_id()
+        if account_id:
+            account = self.finance_manager.get_account(account_id)
+            if account:
+                for cat in account.categories:
+                    self.query_category.addItem(cat)
+        type_category_layout.addWidget(self.query_category, 1)
+        filter_layout.addLayout(type_category_layout)
+        
+        # 第三行：金额范围
+        amount_layout = QHBoxLayout()
+        amount_layout.addWidget(BodyLabel("金额范围:"))
         self.query_amount_min = DoubleSpinBox()
-        self.query_amount_min.setRange(0, 999999999)
+        self.query_amount_min.setRange(0, 999999)
         self.query_amount_min.setPrefix("¥ ")
-        type_amount_layout.addWidget(self.query_amount_min, 1)
-        type_amount_layout.addWidget(BodyLabel("至"))
+        amount_layout.addWidget(self.query_amount_min, 1)
+        amount_layout.addWidget(BodyLabel("至"))
         self.query_amount_max = DoubleSpinBox()
-        self.query_amount_max.setRange(0, 999999999)
-        self.query_amount_max.setValue(999999999)
+        self.query_amount_max.setRange(0, 999999)
+        self.query_amount_max.setValue(999999)
         self.query_amount_max.setPrefix("¥ ")
-        type_amount_layout.addWidget(self.query_amount_max, 1)
-        filter_layout.addLayout(type_amount_layout)
+        amount_layout.addWidget(self.query_amount_max, 1)
+        filter_layout.addLayout(amount_layout)
         
-        # 第三行：交易人搜索和查询按钮
+        # 第四行：交易人搜索和查询按钮
         trader_layout = QHBoxLayout()
         trader_layout.addWidget(BodyLabel("交易人:"))
         self.query_trader_edit = SearchLineEdit()
@@ -598,7 +667,7 @@ class FinanceInterface(QWidget):
         
         # 查询结果表格 - 使用 TreeWidget 风格
         self.query_result_table = TreeWidget()
-        self.query_result_table.setHeaderLabels(["日期", "交易人", "金额 (元)", "备注"])
+        self.query_result_table.setHeaderLabels(["日期", "交易人", "分类", "金额 (元)", "备注"])
         self.query_result_table.setSelectionMode(self.query_result_table.SingleSelection)
         self.query_result_table.setIndentation(0)
         
@@ -610,7 +679,8 @@ class FinanceInterface(QWidget):
             header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
             header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
             header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(3, QHeaderView.Stretch)
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.Stretch)
             # 启用列宽可拖动
             header.setSectionsMovable(False)
             header.setStretchLastSection(False)
@@ -701,14 +771,31 @@ class FinanceInterface(QWidget):
         return widget
     
     def init_default_account(self):
-        """初始化默认账户"""
+        """初始化默认账户为 'admin'"""
         accounts = self.finance_manager.get_all_accounts()
-        if accounts:
+        
+        # 查找 admin 账户（通常应该存在，因为 FinanceManager 会自动创建）
+        admin_account = None
+        for account in accounts:
+            if account.name == "admin":
+                admin_account = account
+                break
+        
+        # 设置为当前账户
+        if admin_account:
+            self.default_account_id = admin_account.id
+        elif accounts:
+            # 备用方案：如果找不到 admin，使用第一个账户
             self.default_account_id = accounts[0].id
-            self.refresh_records_display()
         else:
-            self.default_account_id = None
-            self.clear_records_table()
+            # 如果没有任何账户（不应该发生），创建 admin
+            admin_account = self.finance_manager.create_account(
+                account_name="admin",
+                description="默认管理账户"
+            )
+            self.default_account_id = admin_account.id
+        
+        self.refresh_records_display()
     
     def refresh_account_list(self):
         """刷新账户列表（已移除，保留兼容性）"""
@@ -748,8 +835,9 @@ class FinanceInterface(QWidget):
             item = QTreeWidgetItem()
             item.setText(0, transaction.date)
             item.setText(1, transaction.trader)
-            item.setText(2, f"¥ {transaction.amount:.2f}")
-            item.setText(3, transaction.notes or "")
+            item.setText(2, transaction.category)
+            item.setText(3, f"¥ {transaction.amount:.2f}")
+            item.setText(4, transaction.notes or "")
             # 存储交易ID到第一列的 UserRole (Qt.UserRole = 32)
             item.setData(0, 32, transaction.id)
             
@@ -788,7 +876,7 @@ class FinanceInterface(QWidget):
             )
             return
         
-        dialog = CreateTransactionDialog(self, account_id=account_id)
+        dialog = CreateTransactionDialog(self, account_id=account_id, finance_manager=self.finance_manager)
         result = dialog.exec_()
         # 无论是否成功，都尝试刷新表格
         if result == QDialog.Accepted:
@@ -816,7 +904,7 @@ class FinanceInterface(QWidget):
         if not transaction:
             return
         
-        dialog = CreateTransactionDialog(self, transaction=transaction, account_id=account_id)
+        dialog = CreateTransactionDialog(self, transaction=transaction, account_id=account_id, finance_manager=self.finance_manager)
         result = dialog.exec_()
         if result == QDialog.Accepted:
             self.refresh_records_display()
@@ -890,17 +978,42 @@ class FinanceInterface(QWidget):
         # 重新加载最新数据
         self.finance_manager.load_all_accounts()
         
+        # 更新分类下拉框（如果分类列表发生变化）
+        account = self.finance_manager.get_account(account_id)
+        if account:
+            # 检查分类是否已经存在于下拉框中
+            current_count = self.query_category.count()
+            expected_count = len(account.categories) + 1  # +1 是因为有"全部"选项
+            
+            # 只有在分类数量变化时才重新加载
+            if current_count != expected_count:
+                current_category = self.query_category.currentText()
+                self.query_category.clear()
+                self.query_category.addItem("全部")
+                for cat in account.categories:
+                    self.query_category.addItem(cat)
+                # 尽量恢复之前的选择
+                index = self.query_category.findText(current_category)
+                if index >= 0:
+                    self.query_category.setCurrentIndex(index)
+                else:
+                    self.query_category.setCurrentIndex(0)  # 默认选择"全部"
+        
         date_start = self.query_date_start.date().toString("yyyy-MM-dd")
         date_end = self.query_date_end.date().toString("yyyy-MM-dd")
         amount_min = self.query_amount_min.value() if self.query_amount_min.value() > 0 else None
         amount_max = self.query_amount_max.value() if self.query_amount_max.value() < 999999999 else None
         trader = self.query_trader_edit.text().strip() or None
         
+        # 分类查询 - 获取当前选择的分类
+        category_text = self.query_category.currentText()
+        category = None if category_text == "全部" else category_text
+        
         results = self.finance_manager.query_transactions(
             account_id,
             date_start=date_start, date_end=date_end,
             amount_min=amount_min, amount_max=amount_max,
-            trader=trader
+            trader=trader, category=category
         )
         
         # 根据交易类型过滤
@@ -918,8 +1031,9 @@ class FinanceInterface(QWidget):
             item = QTreeWidgetItem()
             item.setText(0, transaction.date)
             item.setText(1, transaction.trader)
-            item.setText(2, f"¥ {transaction.amount:.2f}")
-            item.setText(3, transaction.notes or "")
+            item.setText(2, transaction.category)
+            item.setText(3, f"¥ {transaction.amount:.2f}")
+            item.setText(4, transaction.notes or "")
             # 存储交易ID
             item.setData(0, 32, transaction.id)
             
@@ -1109,3 +1223,86 @@ class FinanceInterface(QWidget):
             trans_id = current_item.data(0, 32)  # Qt.UserRole = 32
             if trans_id:
                 self.view_record(trans_id)
+    
+    def on_create_category_clicked(self):
+        """新建分类按钮点击"""
+        account_id = self.get_current_account_id()
+        if not account_id:
+            InfoBar.warning(
+                title="提示",
+                content="请先创建或选择一个账户",
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self
+            )
+            return
+        
+        # 创建自定义对话框
+        from PyQt5.QtWidgets import QDialog as QStdDialog, QLabel
+        
+        category_dialog = QStdDialog(self)
+        category_dialog.setWindowTitle("新建分类")
+        category_dialog.setGeometry(100, 100, 400, 150)
+        
+        layout = QVBoxLayout(category_dialog)
+        layout.addWidget(BodyLabel("分类名称:"))
+        
+        input_edit = LineEdit()
+        input_edit.setPlaceholderText("例如：食品、交通、娱乐等")
+        layout.addWidget(input_edit)
+        
+        # 按钮
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        def on_create():
+            category_name = input_edit.text().strip()
+            if not category_name:
+                InfoBar.warning(
+                    title="提示",
+                    content="分类名称不能为空",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+                return
+            
+            if self.finance_manager.add_category(account_id, category_name):
+                InfoBar.success(
+                    title="成功",
+                    content=f"分类 '{category_name}' 创建成功",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+                
+                # 更新查询页面的分类下拉框
+                if hasattr(self, 'query_category'):
+                    # 检查是否已经存在
+                    if self.query_category.findText(category_name) < 0:
+                        self.query_category.addItem(category_name)
+                
+                category_dialog.accept()
+            else:
+                InfoBar.warning(
+                    title="提示",
+                    content="分类已存在",
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+        
+        cancel_btn = PushButton("取消")
+        cancel_btn.clicked.connect(category_dialog.reject)
+        btn_layout.addWidget(cancel_btn)
+        
+        create_btn = PrimaryPushButton("创建")
+        create_btn.clicked.connect(on_create)
+        btn_layout.addWidget(create_btn)
+        
+        layout.addLayout(btn_layout)
+        category_dialog.exec()
