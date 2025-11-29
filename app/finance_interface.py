@@ -36,7 +36,17 @@ class CreateTransactionDialog(QDialog):
         self.finance_manager = finance_manager if finance_manager else FinanceManager()
         
         self.setWindowTitle("新建交易记录" if not transaction else "编辑交易记录")
-        self.setGeometry(100, 100, 600, 500)
+        self.setGeometry(100, 100, 700, 650)
+        self.setMinimumWidth(650)
+        self.setMinimumHeight(580)
+        
+        # 设置背景色跟随主题
+        from qfluentwidgets import theme, Theme
+        if theme() == Theme.DARK:
+            self.setStyleSheet("background-color: #232323;")
+        else:
+            self.setStyleSheet("background-color: #f7f9fc;")
+        
         self.init_ui()
         
         if transaction:
@@ -48,23 +58,45 @@ class CreateTransactionDialog(QDialog):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # 标题区域
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(6)
+        title_label = TitleLabel("交易记录" if not self.transaction else "编辑交易")
+        title_layout.addWidget(title_label)
+        desc_label = BodyLabel("请填写交易的相关信息")
+        title_layout.addWidget(desc_label)
+        layout.addLayout(title_layout)
+        layout.addWidget(HorizontalSeparator())
+        
+        # 使用ScrollArea实现可滚动的内容区
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setSpacing(12)
         
         # 交易类型
         type_layout = QHBoxLayout()
-        type_layout.addWidget(BodyLabel("交易类型:"))
+        type_label = BodyLabel("交易类型:")
+        type_label.setMinimumWidth(80)
+        type_layout.addWidget(type_label)
         self.transaction_type_combo = ComboBox()
         self.transaction_type_combo.addItem("入账 (正数)")
         self.transaction_type_combo.addItem("支出 (负数)")
-        self.transaction_type_combo.setMaximumWidth(200)
+        self.transaction_type_combo.setMaximumWidth(250)
         type_layout.addWidget(self.transaction_type_combo)
         type_layout.addStretch()
-        layout.addLayout(type_layout)
+        scroll_layout.addLayout(type_layout)
         
         # 分类
         category_layout = QHBoxLayout()
-        category_layout.addWidget(BodyLabel("分类:"))
+        cat_label = BodyLabel("分类:")
+        cat_label.setMinimumWidth(80)
+        category_layout.addWidget(cat_label)
         self.category_combo = ComboBox()
         # 从财务管理器获取分类列表
         categories = []
@@ -83,90 +115,116 @@ class CreateTransactionDialog(QDialog):
                 self.category_combo.addItem(cat)
             self.category_combo.setEnabled(True)
         
-        self.category_combo.setMaximumWidth(200)
+        self.category_combo.setMaximumWidth(250)
         category_layout.addWidget(self.category_combo)
         category_layout.addStretch()
-        layout.addLayout(category_layout)
+        scroll_layout.addLayout(category_layout)
         
         # 日期
         date_layout = QHBoxLayout()
-        date_layout.addWidget(BodyLabel("日期:"))
+        date_label = BodyLabel("日期:")
+        date_label.setMinimumWidth(80)
+        date_layout.addWidget(date_label)
         self.date_edit = DateEdit()
         self.date_edit.setDate(QDate.currentDate())
+        self.date_edit.setMaximumWidth(250)
         date_layout.addWidget(self.date_edit)
         date_layout.addStretch()
-        layout.addLayout(date_layout)
+        scroll_layout.addLayout(date_layout)
         
         # 金额
         amount_layout = QHBoxLayout()
-        amount_layout.addWidget(BodyLabel("金额 (元):"))
+        amt_label = BodyLabel("金额 (元):")
+        amt_label.setMinimumWidth(80)
+        amount_layout.addWidget(amt_label)
         self.amount_spin = DoubleSpinBox()
         self.amount_spin.setRange(0, 999999999)
         self.amount_spin.setDecimals(2)
+        self.amount_spin.setMaximumWidth(250)
         amount_layout.addWidget(self.amount_spin)
         amount_layout.addStretch()
-        layout.addLayout(amount_layout)
+        scroll_layout.addLayout(amount_layout)
         
         # 交易人
         trader_layout = QHBoxLayout()
-        trader_layout.addWidget(BodyLabel("交易人:"))
+        trader_label = BodyLabel("交易人:")
+        trader_label.setMinimumWidth(80)
+        trader_layout.addWidget(trader_label)
         self.trader_edit = LineEdit()
+        self.trader_edit.setMaximumWidth(250)
         trader_layout.addWidget(self.trader_edit)
-        layout.addLayout(trader_layout)
+        trader_layout.addStretch()
+        scroll_layout.addLayout(trader_layout)
         
         # 备注
-        notes_layout = QHBoxLayout()
-        notes_layout.addWidget(BodyLabel("备注:"))
+        notes_layout = QVBoxLayout()
+        notes_label = BodyLabel("备注:")
+        notes_layout.addWidget(notes_label)
         self.notes_edit = TextEdit()
-        self.notes_edit.setMaximumHeight(80)
+        self.notes_edit.setMaximumHeight(100)
+        self.notes_edit.setMinimumHeight(70)
         notes_layout.addWidget(self.notes_edit)
-        layout.addLayout(notes_layout)
+        scroll_layout.addLayout(notes_layout)
         
         # 图片部分
-        layout.addWidget(HorizontalSeparator())
-        layout.addWidget(SubtitleLabel("相关文件 (可选)"))
+        scroll_layout.addWidget(HorizontalSeparator())
+        scroll_layout.addWidget(SubtitleLabel("相关文件 (可选)"))
         
         # 发票
         invoice_layout = QHBoxLayout()
-        invoice_layout.addWidget(BodyLabel("发票图片:"))
+        invoice_label = BodyLabel("发票图片:")
+        invoice_label.setMinimumWidth(80)
+        invoice_layout.addWidget(invoice_label)
         self.invoice_label = BodyLabel("未选择")
-        invoice_layout.addWidget(self.invoice_label)
+        invoice_layout.addWidget(self.invoice_label, 1)
         invoice_btn = PushButton("选择")
+        invoice_btn.setMaximumWidth(100)
         invoice_btn.clicked.connect(lambda: self.select_image("invoice"))
         invoice_layout.addWidget(invoice_btn)
-        layout.addLayout(invoice_layout)
+        scroll_layout.addLayout(invoice_layout)
         
         # 支付记录
         payment_layout = QHBoxLayout()
-        payment_layout.addWidget(BodyLabel("支付记录:"))
+        payment_label = BodyLabel("支付记录:")
+        payment_label.setMinimumWidth(80)
+        payment_layout.addWidget(payment_label)
         self.payment_label = BodyLabel("未选择")
-        payment_layout.addWidget(self.payment_label)
+        payment_layout.addWidget(self.payment_label, 1)
         payment_btn = PushButton("选择")
+        payment_btn.setMaximumWidth(100)
         payment_btn.clicked.connect(lambda: self.select_image("payment"))
         payment_layout.addWidget(payment_btn)
-        layout.addLayout(payment_layout)
+        scroll_layout.addLayout(payment_layout)
         
         # 购买记录
         purchase_layout = QHBoxLayout()
-        purchase_layout.addWidget(BodyLabel("购买记录:"))
+        purchase_label = BodyLabel("购买记录:")
+        purchase_label.setMinimumWidth(80)
+        purchase_layout.addWidget(purchase_label)
         self.purchase_label = BodyLabel("未选择")
-        purchase_layout.addWidget(self.purchase_label)
+        purchase_layout.addWidget(self.purchase_label, 1)
         purchase_btn = PushButton("选择")
+        purchase_btn.setMaximumWidth(100)
         purchase_btn.clicked.connect(lambda: self.select_image("purchase"))
         purchase_layout.addWidget(purchase_btn)
-        layout.addLayout(purchase_layout)
+        scroll_layout.addLayout(purchase_layout)
         
-        layout.addStretch()
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_widget)
+        layout.addWidget(scroll_area, 1)
         
-        # 按钮
+        # 按钮区域
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
         btn_layout.addStretch()
         
         cancel_btn = PushButton("取消")
+        cancel_btn.setMinimumWidth(110)
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         
         save_btn = PrimaryPushButton("保存")
+        save_btn.setMinimumWidth(110)
         save_btn.clicked.connect(self.save_transaction)
         btn_layout.addWidget(save_btn)
         
@@ -325,7 +383,17 @@ class RecordViewDialog(QDialog):
         self.finance_manager = FinanceManager()
         
         self.setWindowTitle("记录详情")
-        self.setGeometry(100, 100, 700, 600)
+        self.setGeometry(100, 100, 750, 650)
+        self.setMinimumWidth(700)
+        self.setMinimumHeight(580)
+        
+        # 设置背景色跟随主题
+        from qfluentwidgets import theme, Theme
+        if theme() == Theme.DARK:
+            self.setStyleSheet("background-color: #232323;")
+        else:
+            self.setStyleSheet("background-color: #f7f9fc;")
+        
         self.init_ui()
         
         if transaction:
@@ -334,52 +402,117 @@ class RecordViewDialog(QDialog):
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # 标题区域
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(6)
+        title_label = TitleLabel("交易记录详情")
+        title_layout.addWidget(title_label)
+        desc_label = BodyLabel("查看交易的完整信息和相关文件")
+        title_layout.addWidget(desc_label)
+        layout.addLayout(title_layout)
+        layout.addWidget(HorizontalSeparator())
+        
+        # 使用ScrollArea实现可滚动的内容区
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setSpacing(12)
         
         # 基本信息
-        info_layout = QVBoxLayout()
-        
         date_layout = QHBoxLayout()
-        date_layout.addWidget(BodyLabel("日期:"))
+        date_label = BodyLabel("日期:")
+        date_label.setMinimumWidth(80)
+        date_layout.addWidget(date_label)
         self.date_label = BodyLabel()
-        date_layout.addWidget(self.date_label)
+        date_layout.addWidget(self.date_label, 1)
         date_layout.addStretch()
-        info_layout.addLayout(date_layout)
+        scroll_layout.addLayout(date_layout)
         
         amount_layout = QHBoxLayout()
-        amount_layout.addWidget(BodyLabel("金额:"))
+        amount_label = BodyLabel("金额:")
+        amount_label.setMinimumWidth(80)
+        amount_layout.addWidget(amount_label)
         self.amount_label = BodyLabel()
-        amount_layout.addWidget(self.amount_label)
+        amount_layout.addWidget(self.amount_label, 1)
         amount_layout.addStretch()
-        info_layout.addLayout(amount_layout)
+        scroll_layout.addLayout(amount_layout)
         
         trader_layout = QHBoxLayout()
-        trader_layout.addWidget(BodyLabel("交易人:"))
+        trader_label = BodyLabel("交易人:")
+        trader_label.setMinimumWidth(80)
+        trader_layout.addWidget(trader_label)
         self.trader_label = BodyLabel()
-        trader_layout.addWidget(self.trader_label)
+        trader_layout.addWidget(self.trader_label, 1)
         trader_layout.addStretch()
-        info_layout.addLayout(trader_layout)
+        scroll_layout.addLayout(trader_layout)
         
-        notes_layout = QHBoxLayout()
-        notes_layout.addWidget(BodyLabel("备注:"))
+        notes_layout = QVBoxLayout()
+        notes_title = BodyLabel("备注:")
+        notes_layout.addWidget(notes_title)
         self.notes_label = BodyLabel()
         self.notes_label.setWordWrap(True)
         notes_layout.addWidget(self.notes_label)
-        info_layout.addLayout(notes_layout)
+        scroll_layout.addLayout(notes_layout)
         
-        layout.addLayout(info_layout)
-        layout.addWidget(HorizontalSeparator())
+        scroll_layout.addWidget(HorizontalSeparator())
         
         # 图片预览
-        layout.addWidget(SubtitleLabel("相关文件预览"))
+        scroll_layout.addWidget(SubtitleLabel("相关文件预览"))
         
         preview_layout = QHBoxLayout()
+        preview_layout.setSpacing(16)
         
         # 发票
         invoice_layout = QVBoxLayout()
         invoice_layout.addWidget(BodyLabel("发票:"))
         self.invoice_preview = BodyLabel("无")
+        self.invoice_preview.setMinimumSize(140, 140)
+        invoice_layout.addWidget(self.invoice_preview)
+        preview_layout.addLayout(invoice_layout)
+        
+        # 支付记录
+        payment_layout = QVBoxLayout()
+        payment_layout.addWidget(BodyLabel("支付记录:"))
+        self.payment_preview = BodyLabel("无")
+        self.payment_preview.setMinimumSize(140, 140)
+        payment_layout.addWidget(self.payment_preview)
+        preview_layout.addLayout(payment_layout)
+        
+        # 购买记录
+        purchase_layout = QVBoxLayout()
+        purchase_layout.addWidget(BodyLabel("购买记录:"))
+        self.purchase_preview = BodyLabel("无")
+        self.purchase_preview.setMinimumSize(140, 140)
+        purchase_layout.addWidget(self.purchase_preview)
+        preview_layout.addLayout(purchase_layout)
+        
+        scroll_layout.addLayout(preview_layout)
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_widget)
+        layout.addWidget(scroll_area, 1)
+        
+        # 按钮区域
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
+        btn_layout.addStretch()
+        
+        export_images_btn = PushButton()
+        export_images_btn.setText("导出图片")
+        export_images_btn.setMinimumWidth(120)
+        export_images_btn.clicked.connect(self.on_export_images)
+        btn_layout.addWidget(export_images_btn)
+        
+        close_btn = PushButton("关闭")
+        close_btn.setMinimumWidth(110)
+        close_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(close_btn)
+        
+        layout.addLayout(btn_layout)
         self.invoice_preview.setMinimumSize(150, 150)
         invoice_layout.addWidget(self.invoice_preview)
         preview_layout.addLayout(invoice_layout)

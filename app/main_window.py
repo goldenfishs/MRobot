@@ -1,10 +1,10 @@
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
 from contextlib import redirect_stdout
 with redirect_stdout(None):
-    from qfluentwidgets import NavigationItemPosition, FluentWindow, SplashScreen, setThemeColor, NavigationBarPushButton, toggleTheme, setTheme, Theme, NavigationAvatarWidget, NavigationToolButton ,NavigationPushButton
+    from qfluentwidgets import NavigationItemPosition, FluentWindow, SplashScreen, setThemeColor, NavigationBarPushButton, toggleTheme, setTheme, Theme, NavigationAvatarWidget, NavigationToolButton ,NavigationPushButton, theme
     from qfluentwidgets import FluentIcon as FIF
     from qfluentwidgets import InfoBar, InfoBarPosition
 
@@ -69,13 +69,43 @@ class MainWindow(FluentWindow):
 
 
         self.themeBtn = NavigationPushButton(FIF.BRUSH, "切换主题", False, self.navigationInterface)
-        self.themeBtn.clicked.connect(lambda: toggleTheme(lazy=True))
+        self.themeBtn.clicked.connect(self._safe_toggle_theme)
         self.navigationInterface.addWidget(
             'themeButton',
             self.themeBtn,
             None,
             NavigationItemPosition.BOTTOM
         )
+    
+    def _safe_toggle_theme(self):
+        """安全地切换主题，避免字典迭代异常"""
+        def safe_toggle():
+            try:
+                import sys
+                from io import StringIO
+                
+                # 捕获 stderr 以抑制库内的异常消息
+                old_stderr = sys.stderr
+                sys.stderr = StringIO()
+                
+                try:
+                    # 获取当前主题
+                    current_theme = theme()
+                    # 根据当前主题切换到另一个
+                    new_theme = Theme.LIGHT if current_theme == Theme.DARK else Theme.DARK
+                    setTheme(new_theme, save=True, lazy=True)
+                finally:
+                    # 恢复 stderr
+                    sys.stderr = old_stderr
+                    
+            except Exception as e:
+                # 其他异常仍然打印，但忽略字典迭代异常
+                error_msg = str(e)
+                if "dictionary changed size during iteration" not in error_msg:
+                    print(f"主题切换失败: {e}")
+        
+        # 在下一个事件循环中执行切换，让 Qt 完成当前事件处理
+        QTimer.singleShot(50, safe_toggle)
     
     def check_updates_in_background(self):
         """后台检查更新"""
