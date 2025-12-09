@@ -235,3 +235,12 @@ devices:
     files:
       header: "oid.h"
       source: "oid.c"
+  lcd_driver:
+    name: "lcd显示屏"
+    description: "lcd驱动(SPI)"
+    dependencies:
+      bsp: ["gpio", "spi"]
+    thread_signals: []
+    files:
+      header: "lcd.h"
+      source: "lcd.c"
