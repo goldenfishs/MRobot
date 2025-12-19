@@ -263,14 +263,24 @@ class DataInterface(QWidget):
 
     def update_user_template(self):
         from app.tools.update_code import update_code
+        from app.tools.code_generator import CodeGenerator
         
         def info_callback(parent):
+            # 清除 CodeGenerator 的缓存，强制重新读取更新后的文件
+            CodeGenerator._assets_dir_cache = None
+            CodeGenerator._assets_dir_initialized = False
+            CodeGenerator._template_dir_logged = False
+            
             InfoBar.success(
                 title="更新成功",
                 content="用户模板已更新到最新版本！",
                 parent=parent,
                 duration=2000
             )
+            
+            # 如果当前在代码生成页面，刷新文件列表
+            if self.stacked_layout.currentWidget() == self.codegen_page:
+                self.show_user_code_files()
         
         def error_callback(parent, msg):
             InfoBar.error(
@@ -287,6 +297,10 @@ class DataInterface(QWidget):
         file_tree = self.codegen_page.file_tree
         file_tree.clear()
         base_dir = CodeGenerator.get_assets_dir("User_code")
+        print(f"显示用户代码文件：base_dir = {base_dir}")
+        print(f"目录是否存在: {os.path.exists(base_dir)}")
+        if os.path.exists(base_dir):
+            print(f"目录内容: {os.listdir(base_dir)}")
         user_dir = os.path.join(self.project_path, "User")
         sub_dirs = ["bsp", "component", "device", "module"]
 

@@ -100,26 +100,41 @@ class CodeGenerator:
                 # 打包后的环境
                 print("检测到打包环境")
                 
-                # 优先使用sys._MEIPASS（PyInstaller的临时解包目录）
-                if hasattr(sys, '_MEIPASS'):
+                # 优先使用可执行文件所在目录（支持更新后的文件）
+                exe_dir = os.path.dirname(sys.executable)
+                exe_assets = os.path.join(exe_dir, "assets")
+                
+                # 如果exe目录下不存在assets，但_MEIPASS中有，则首次复制过去
+                if not os.path.exists(exe_assets) and hasattr(sys, '_MEIPASS'):
+                    base_path = getattr(sys, '_MEIPASS')
+                    meipass_assets = os.path.join(base_path, "assets")
+                    if os.path.exists(meipass_assets):
+                        try:
+                            import shutil
+                            print(f"首次运行：从 {meipass_assets} 复制到 {exe_assets}")
+                            shutil.copytree(meipass_assets, exe_assets)
+                            print("初始资源复制成功")
+                        except Exception as e:
+                            print(f"复制初始资源失败: {e}")
+                
+                # 优先使用exe目录下的assets（这样可以读取更新后的文件）
+                if os.path.exists(exe_assets):
+                    assets_dir = exe_assets
+                    print(f"使用可执行文件目录: {assets_dir}")
+                # 后备方案：使用PyInstaller的临时解包目录
+                elif hasattr(sys, '_MEIPASS'):
                     base_path = getattr(sys, '_MEIPASS')
                     assets_dir = os.path.join(base_path, "assets")
-                    print(f"使用PyInstaller临时目录: {assets_dir}")
+                    print(f"后备：使用PyInstaller临时目录: {assets_dir}")
+                # 最后尝试工作目录
                 else:
-                    # 后备方案：使用可执行文件所在目录
-                    exe_dir = os.path.dirname(sys.executable)
-                    assets_dir = os.path.join(exe_dir, "assets")
-                    print(f"使用可执行文件目录: {assets_dir}")
-                
-                # 如果都不存在，尝试其他可能的位置
-                if not os.path.exists(assets_dir):
-                    # 尝试从当前工作目录查找
                     cwd_assets = os.path.join(os.getcwd(), "assets")
                     if os.path.exists(cwd_assets):
                         assets_dir = cwd_assets
                         print(f"从工作目录找到assets: {assets_dir}")
                     else:
-                        print(f"警告：无法找到assets目录，使用默认路径: {assets_dir}")
+                        assets_dir = exe_assets  # 即使不存在也使用exe目录，后续会创建
+                        print(f"使用默认路径（将创建）: {assets_dir}")
             else:
                 # 开发环境
                 current_dir = os.path.dirname(os.path.abspath(__file__))

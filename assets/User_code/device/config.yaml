@@ -225,3 +225,22 @@ devices:
     files:
       header: "vofa.h"
       source: "vofa.c"
+  oid:
+    name: "oid编码器"
+    description: "oid编码器驱动"
+    dependencies:
+      bsp: ["time", "can", "mm"]
+      component: ["user_math"]
+    thread_signals: []
+    files:
+      header: "oid.h"
+      source: "oid.c"
+  lcd_driver:
+    name: "lcd显示屏"
+    description: "lcd驱动(SPI)"
+    dependencies:
+      bsp: ["gpio", "spi"]
+    thread_signals: []
+    files:
+      header: "lcd.h"
+      source: "lcd.c"

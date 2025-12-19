@@ -10,21 +10,45 @@ import time
 def update_code(parent=None, info_callback=None, error_callback=None):
     url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
     
-    # 使用与CodeGenerator.get_assets_dir相同的逻辑确定assets目录
-    if getattr(sys, 'frozen', False):
-        # 打包后的环境 - 使用可执行文件所在目录
-        exe_dir = os.path.dirname(sys.executable)
-        assets_dir = os.path.join(exe_dir, "assets")
-        print(f"更新代码：打包环境，使用路径: {assets_dir}")
-        
-        # 如果exe_dir/assets不存在，尝试使用相对路径作为后备
-        if not os.path.exists(assets_dir):
-            assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets")
-            print(f"更新代码：后备路径: {assets_dir}")
-    else:
-        # 开发环境
-        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets")
-        print(f"更新代码：开发环境，使用路径: {assets_dir}")
+    # 导入 CodeGenerator 以使用统一的路径获取逻辑
+    try:
+        from app.tools.code_generator import CodeGenerator
+        # 直接使用 CodeGenerator 的路径获取方法，确保路径一致
+        assets_dir = CodeGenerator.get_assets_dir("")
+        print(f"更新代码：使用 CodeGenerator 路径: {assets_dir}")
+    except Exception as e:
+        print(f"无法导入 CodeGenerator，使用后备路径逻辑: {e}")
+        # 后备方案：使用与CodeGenerator.get_assets_dir相同的逻辑确定assets目录
+        if getattr(sys, 'frozen', False):
+            # 打包后的环境
+            if hasattr(sys, '_MEIPASS'):
+                base_path = getattr(sys, '_MEIPASS')
+                assets_dir = os.path.join(base_path, "assets")
+                print(f"更新代码：使用PyInstaller临时目录: {assets_dir}")
+            else:
+                # 使用可执行文件所在目录
+                exe_dir = os.path.dirname(sys.executable)
+                assets_dir = os.path.join(exe_dir, "assets")
+                print(f"更新代码：打包环境，使用路径: {assets_dir}")
+            
+            # 如果不存在，尝试工作目录
+            if not os.path.exists(assets_dir):
+                cwd_assets = os.path.join(os.getcwd(), "assets")
+                if os.path.exists(cwd_assets):
+                    assets_dir = cwd_assets
+                    print(f"更新代码：使用工作目录: {assets_dir}")
+        else:
+            # 开发环境
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            while current_dir != os.path.dirname(current_dir):
+                if os.path.basename(current_dir) == 'MRobot':
+                    break
+                parent_dir = os.path.dirname(current_dir)
+                if parent_dir == current_dir:
+                    break
+                current_dir = parent_dir
+            assets_dir = os.path.join(current_dir, "assets")
+            print(f"更新代码：开发环境，使用路径: {assets_dir}")
     
     local_dir = os.path.join(assets_dir, "User_code")
     print(f"更新代码：最终目标目录: {local_dir}")
@@ -92,6 +116,16 @@ def update_code(parent=None, info_callback=None, error_callback=None):
                 # 删除备份目录（更新成功）
                 if backup_dir and os.path.exists(backup_dir):
                     shutil.rmtree(backup_dir, ignore_errors=True)
+                
+                # 清除 CodeGenerator 的缓存，确保后续读取更新后的文件
+                try:
+                    from app.tools.code_generator import CodeGenerator
+                    CodeGenerator._assets_dir_cache = None
+                    CodeGenerator._assets_dir_initialized = False
+                    CodeGenerator._template_dir_logged = False
+                    print("已清除 CodeGenerator 缓存")
+                except Exception as e:
+                    print(f"清除缓存失败（可忽略）: {e}")
                 
                 if info_callback:
                     info_callback(parent)
