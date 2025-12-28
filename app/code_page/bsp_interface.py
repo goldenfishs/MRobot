@@ -318,6 +318,14 @@ def get_available_can(project_path):
         return analyzing_ioc.get_enabled_can_from_ioc(ioc_path)
     return []
 
+def get_available_fdcan(project_path):
+    """获取可用的FDCAN列表"""
+    ioc_files = [f for f in os.listdir(project_path) if f.endswith('.ioc')]
+    if ioc_files:
+        ioc_path = os.path.join(project_path, ioc_files[0])
+        return analyzing_ioc.get_enabled_fdcan_from_ioc(ioc_path)
+    return []
+
 def get_available_spi(project_path):
     ioc_files = [f for f in os.listdir(project_path) if f.endswith('.ioc')]
     if ioc_files:
@@ -604,6 +612,183 @@ class bsp_can(BspPeripheralBase):
                 ""
             ])
             filter_bank += 1  # 为下一个CAN分配不同的过滤器组
+
+class bsp_fdcan(BspPeripheralBase):
+    def __init__(self, project_path):
+        super().__init__(
+            project_path,
+            "FDCAN",
+            {'header': 'fdcan.h', 'source': 'fdcan.c'},
+            "BSP_FDCAN",
+            "hfdcan",
+            "fdcan",
+            get_available_fdcan
+        )
+
+    def _generate_header_file(self, configs, template_dir):
+        """重写头文件生成，添加 FDCAN 使能和 FIFO 分配定义"""
+        template_path = os.path.join(template_dir, self.template_names['header'])
+        template_content = CodeGenerator.load_template(template_path)
+        if not template_content:
+            return False
+        
+        # 生成枚举
+        enum_lines = [f"  {self.enum_prefix}_{name}," for name, _ in configs]
+        content = CodeGenerator.replace_auto_generated(
+            template_content, f"AUTO GENERATED {self.enum_prefix}_NAME", "\n".join(enum_lines)
+        )
+        
+        # 生成 FDCAN 使能宏和 FIFO 分配
+        enable_lines = []
+        fdcan_count = len(configs)
+        
+        # 根据 FDCAN 数量分配 FIFO（与 _generate_source_file 中的逻辑一致）
+        if fdcan_count == 1:
+            fifo_map = {0: 0}
+        elif fdcan_count == 2:
+            fifo_map = {0: 0, 1: 1}
+        else:  # >= 3
+            fifo_map = {0: 0, 1: 0, 2: 1}
+        
+        for idx, (name, instance) in enumerate(configs):
+            num = ''.join(filter(str.isdigit, instance))
+            fifo_idx = fifo_map.get(idx, 1)
+            enable_lines.append(f"#define FDCAN{num}_EN")
+            enable_lines.append(f"#define FDCAN{num}_RX_FIFO  {fifo_idx}")
+        
+        content = CodeGenerator.replace_auto_generated(
+            content, "AUTO GENERATED FDCAN_ENABLE", "\n".join(enable_lines)
+        )
+        
+        output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['header']}")
+        CodeGenerator.save_with_preserve(output_path, content)
+        return True
+
+    def _generate_source_file(self, configs, template_dir):
+        template_path = os.path.join(template_dir, self.template_names['source'])
+        template_content = CodeGenerator.load_template(template_path)
+        if not template_content:
+            return False
+            
+        # FDCAN_Get函数
+        get_lines = []
+        for idx, (name, instance) in enumerate(configs):
+            if idx == 0:
+                get_lines.append(f"  if (hfdcan->Instance == {instance})")
+            else:
+                get_lines.append(f"  else if (hfdcan->Instance == {instance})")
+            get_lines.append(f"    return {self.enum_prefix}_{name};")
+        content = CodeGenerator.replace_auto_generated(
+            template_content, "AUTO GENERATED FDCAN_GET", "\n".join(get_lines)
+        )
+        
+        # Handle函数
+        handle_lines = []
+        for name, instance in configs:
+            num = ''.join(filter(str.isdigit, instance))  # 提取数字
+            handle_lines.append(f"    case {self.enum_prefix}_{name}:")
+            handle_lines.append(f"      return &hfdcan{num};")
+        content = CodeGenerator.replace_auto_generated(
+            content, f"AUTO GENERATED {self.enum_prefix}_GET_HANDLE", "\n".join(handle_lines)
+        )
+        
+        # 生成FDCAN初始化代码（类似CAN的策略）
+        init_lines = []
+        fdcan_instances = [instance for _, instance in configs]
+        fdcan_count = len(fdcan_instances)
+        
+        # 根据FDCAN数量分配FIFO
+        if fdcan_count == 1:
+            self._generate_single_fdcan_init(init_lines, configs, 0)
+        elif fdcan_count == 2:
+            self._generate_dual_fdcan_init(init_lines, configs)
+        elif fdcan_count >= 3:
+            self._generate_multi_fdcan_init(init_lines, configs)
+        
+        content = CodeGenerator.replace_auto_generated(
+            content, "AUTO GENERATED FDCAN_INIT", "\n".join(init_lines)
+        )
+        
+        output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['source']}")
+        CodeGenerator.save_with_preserve(output_path, content)
+        return True
+
+    def _generate_single_fdcan_init(self, init_lines, configs, fifo_idx):
+        """单个FDCAN：使用指定的FIFO"""
+        for name, instance in configs:
+            num = ''.join(filter(str.isdigit, instance))
+            init_lines.append(f"#ifdef FDCAN{num}_EN")
+            init_lines.append(f"  {{")
+            init_lines.append(f"    FDCAN_HandleTypeDef hfdcan = hfdcan{num};")
+            init_lines.append(f"    FDCAN_FilterTypeDef sFilterConfig = {{0}};")
+            init_lines.append(f"    #define FDCANX_RX_FIFO {fifo_idx}")
+            init_lines.append(f"    #ifdef FDCAN{num}_FILTER_CONFIG_TABLE")
+            init_lines.append(f"      FDCAN{num}_FILTER_CONFIG_TABLE(FDCAN_CONFIG_FILTER)")
+            init_lines.append(f"    #endif")
+            init_lines.append(f"    #ifdef FDCAN{num}_GLOBAL_FILTER")
+            init_lines.append(f"      HAL_FDCAN_ConfigGlobalFilter(&hfdcan{num}, FDCAN{num}_GLOBAL_FILTER);")
+            init_lines.append(f"    #endif")
+            init_lines.append(f"    HAL_FDCAN_ActivateNotification(&hfdcan{num}, FDCANx_NOTIFY_FLAGS(FDCANX_RX_FIFO), 0);")
+            init_lines.append(f"    BSP_FDCAN_RegisterCallback({self.enum_prefix}_{name}, FDCANX_MSG_PENDING_CB(FDCANX_RX_FIFO), BSP_FDCAN_RxFifo{fifo_idx}Callback);")
+            init_lines.append(f"    BSP_FDCAN_RegisterCallback({self.enum_prefix}_{name}, HAL_FDCAN_TX_BUFFER_COMPLETE_CB, BSP_FDCAN_TxCompleteCallback);")
+            init_lines.append(f"    #undef FDCANX_RX_FIFO")
+            init_lines.append(f"    HAL_FDCAN_Start(&hfdcan{num});")
+            init_lines.append(f"  }}")
+            init_lines.append(f"#endif")
+            init_lines.append("")
+
+    def _generate_dual_fdcan_init(self, init_lines, configs):
+        """双FDCAN：FDCAN1用FIFO0，FDCAN2用FIFO1"""
+        fifo_map = {0: 0, 1: 1}
+        for idx, (name, instance) in enumerate(configs):
+            num = ''.join(filter(str.isdigit, instance))
+            fifo_idx = fifo_map[idx]
+            init_lines.append(f"#ifdef FDCAN{num}_EN")
+            init_lines.append(f"  {{")
+            init_lines.append(f"    FDCAN_HandleTypeDef hfdcan = hfdcan{num};")
+            init_lines.append(f"    FDCAN_FilterTypeDef sFilterConfig = {{0}};")
+            init_lines.append(f"    #define FDCANX_RX_FIFO {fifo_idx}")
+            init_lines.append(f"    #ifdef FDCAN{num}_FILTER_CONFIG_TABLE")
+            init_lines.append(f"      FDCAN{num}_FILTER_CONFIG_TABLE(FDCAN_CONFIG_FILTER)")
+            init_lines.append(f"    #endif")
+            init_lines.append(f"    #ifdef FDCAN{num}_GLOBAL_FILTER")
+            init_lines.append(f"      HAL_FDCAN_ConfigGlobalFilter(&hfdcan{num}, FDCAN{num}_GLOBAL_FILTER);")
+            init_lines.append(f"    #endif")
+            init_lines.append(f"    HAL_FDCAN_ActivateNotification(&hfdcan{num}, FDCANx_NOTIFY_FLAGS(FDCANX_RX_FIFO), 0);")
+            init_lines.append(f"    BSP_FDCAN_RegisterCallback({self.enum_prefix}_{name}, FDCANX_MSG_PENDING_CB(FDCANX_RX_FIFO), BSP_FDCAN_RxFifo{fifo_idx}Callback);")
+            init_lines.append(f"    BSP_FDCAN_RegisterCallback({self.enum_prefix}_{name}, HAL_FDCAN_TX_BUFFER_COMPLETE_CB, BSP_FDCAN_TxCompleteCallback);")
+            init_lines.append(f"    #undef FDCANX_RX_FIFO")
+            init_lines.append(f"    HAL_FDCAN_Start(&hfdcan{num});")
+            init_lines.append(f"  }}")
+            init_lines.append(f"#endif")
+            init_lines.append("")
+
+    def _generate_multi_fdcan_init(self, init_lines, configs):
+        """多FDCAN：FDCAN1和FDCAN2用FIFO0，FDCAN3用FIFO1"""
+        fifo_map = {0: 0, 1: 0, 2: 1}
+        for idx, (name, instance) in enumerate(configs):
+            num = ''.join(filter(str.isdigit, instance))
+            fifo_idx = fifo_map.get(idx, 1)
+            init_lines.append(f"#ifdef FDCAN{num}_EN")
+            init_lines.append(f"  {{")
+            init_lines.append(f"    FDCAN_HandleTypeDef hfdcan = hfdcan{num};")
+            init_lines.append(f"    FDCAN_FilterTypeDef sFilterConfig = {{0}};")
+            init_lines.append(f"    #define FDCANX_RX_FIFO {fifo_idx}")
+            init_lines.append(f"    #ifdef FDCAN{num}_FILTER_CONFIG_TABLE")
+            init_lines.append(f"      FDCAN{num}_FILTER_CONFIG_TABLE(FDCAN_CONFIG_FILTER)")
+            init_lines.append(f"    #endif")
+            init_lines.append(f"    #ifdef FDCAN{num}_GLOBAL_FILTER")
+            init_lines.append(f"      HAL_FDCAN_ConfigGlobalFilter(&hfdcan{num}, FDCAN{num}_GLOBAL_FILTER);")
+            init_lines.append(f"    #endif")
+            init_lines.append(f"    HAL_FDCAN_ActivateNotification(&hfdcan{num}, FDCANx_NOTIFY_FLAGS(FDCANX_RX_FIFO), 0);")
+            init_lines.append(f"    BSP_FDCAN_RegisterCallback({self.enum_prefix}_{name}, FDCANX_MSG_PENDING_CB(FDCANX_RX_FIFO), BSP_FDCAN_RxFifo{fifo_idx}Callback);")
+            init_lines.append(f"    BSP_FDCAN_RegisterCallback({self.enum_prefix}_{name}, HAL_FDCAN_TX_BUFFER_COMPLETE_CB, BSP_FDCAN_TxCompleteCallback);")
+            init_lines.append(f"    #undef FDCANX_RX_FIFO")
+            init_lines.append(f"    HAL_FDCAN_Start(&hfdcan{num});")
+            init_lines.append(f"  }}")
+            init_lines.append(f"#endif")
+            init_lines.append("")
+
 
 class bsp_spi(BspPeripheralBase):
     def __init__(self, project_path):
@@ -1166,6 +1351,7 @@ def get_bsp_page(peripheral_name, project_path):
     special_classes = {
         "i2c": bsp_i2c,
         "can": bsp_can,
+        "fdcan": bsp_fdcan,
         "spi": bsp_spi,
         "uart": bsp_uart,
         "gpio": bsp_gpio,
