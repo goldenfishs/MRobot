@@ -97,29 +97,19 @@ class CodeGenerator:
             assets_dir = ""
             
             if getattr(sys, 'frozen', False):
-                # 打包后的环境
-                print("检测到打包环境")
+                # 打包后的环境 - 始终使用可执行文件所在目录
+                # 这样可以使用安装目录下的文件，而不是打包进去的文件
+                exe_dir = os.path.dirname(sys.executable)
+                assets_dir = os.path.join(exe_dir, "assets")
+                print(f"打包环境：使用可执行文件目录: {assets_dir}")
                 
-                # 优先使用sys._MEIPASS（PyInstaller的临时解包目录）
-                if hasattr(sys, '_MEIPASS'):
-                    base_path = getattr(sys, '_MEIPASS')
-                    assets_dir = os.path.join(base_path, "assets")
-                    print(f"使用PyInstaller临时目录: {assets_dir}")
-                else:
-                    # 后备方案：使用可执行文件所在目录
-                    exe_dir = os.path.dirname(sys.executable)
-                    assets_dir = os.path.join(exe_dir, "assets")
-                    print(f"使用可执行文件目录: {assets_dir}")
-                
-                # 如果都不存在，尝试其他可能的位置
+                # 如果assets目录不存在，创建它
                 if not os.path.exists(assets_dir):
-                    # 尝试从当前工作目录查找
-                    cwd_assets = os.path.join(os.getcwd(), "assets")
-                    if os.path.exists(cwd_assets):
-                        assets_dir = cwd_assets
-                        print(f"从工作目录找到assets: {assets_dir}")
-                    else:
-                        print(f"警告：无法找到assets目录，使用默认路径: {assets_dir}")
+                    try:
+                        os.makedirs(assets_dir, exist_ok=True)
+                        print(f"创建assets目录: {assets_dir}")
+                    except Exception as e:
+                        print(f"创建assets目录失败: {e}")
             else:
                 # 开发环境
                 current_dir = os.path.dirname(os.path.abspath(__file__))

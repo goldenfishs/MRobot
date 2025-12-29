@@ -5,10 +5,20 @@ import sys
 import os
 
 def resource_path(relative_path):
-    """获取资源文件的绝对路径，兼容打包和开发环境"""
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller 打包后的临时目录
-        return os.path.join(sys._MEIPASS, relative_path)
+    """获取资源文件的绝对路径，兼容打包和开发环境
+    对于 logo 文件，使用打包的临时目录（只有 logo 被打包）
+    对于其他资源，使用可执行文件所在目录
+    """
+    if getattr(sys, 'frozen', False):
+        # 打包环境
+        if 'logo' in relative_path:
+            # logo 文件使用打包的临时目录
+            if hasattr(sys, '_MEIPASS'):
+                return os.path.join(sys._MEIPASS, relative_path)
+        # 其他资源使用可执行文件所在目录
+        exe_dir = os.path.dirname(sys.executable)
+        return os.path.join(exe_dir, relative_path)
+    # 开发环境
     return os.path.join(os.path.abspath("."), relative_path)
 
 class HomeInterface(QWidget):
