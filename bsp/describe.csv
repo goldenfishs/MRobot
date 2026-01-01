@@ -1,5 +1,6 @@
 uart,请开启uart的dma和中断
 can,请开启can中断，使用函数前请确保can已经初始化。一定要开启can发送中断！！！
+fdcan,请开启fdcan中断，支持经典CAN和FDCAN模式。会自动根据IOC配置生成对应的宏定义。
 gpio,会自动读取cubemx中配置为gpio的引脚，并自动区分输入输出和中断。
 spi,请开启spi的dma和中断
 i2c,要求开始spi中断
@@ -8,4 +9,4 @@ time,获取时间戳函数，需要开启freerots
 dwt,需要开启dwt，获取时间
 i2c,请开启i2c的dma和中断
 pwm,用于选择那些勇于输出pwm
-
+flash,自动识别MCU型号并配置Flash，支持STM32F1(Page)/F4(Sector)/H7(Sector)，自动处理单Bank/双Bank配置
