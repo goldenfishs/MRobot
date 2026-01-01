@@ -61,9 +61,17 @@ class BspSimplePeripheral(QWidget):
                     return "skipped"  # 返回特殊值表示跳过
             return "not_needed"  # 返回特殊值表示不需要生成
         
-        template_dir = CodeGenerator.get_template_dir()
+        # 使用外设名称作为子文件夹名（小写）
+        periph_folder = self.peripheral_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        
         for key, filename in self.template_names.items():
-            template_path = os.path.join(template_dir, filename)
+            # 先尝试从子文件夹加载
+            template_path = os.path.join(template_base_dir, periph_folder, filename)
+            if not os.path.exists(template_path):
+                # 如果子文件夹不存在，尝试从根目录加载（向后兼容）
+                template_path = os.path.join(template_base_dir, filename)
+            
             template_content = CodeGenerator.load_template(template_path)
             if not template_content:
                 return False
@@ -206,7 +214,15 @@ class BspPeripheralBase(QWidget):
         return True
 
     def _generate_header_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, self.template_names['header'])
+        # 构建模板路径，优先从子文件夹读取
+        periph_folder = self.peripheral_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, self.template_names['header'])
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：尝试从根目录读取
+            template_path = os.path.join(template_base_dir, self.template_names['header'])
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False

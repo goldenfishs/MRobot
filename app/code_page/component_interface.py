@@ -107,9 +107,17 @@ class ComponentSimple(QWidget):
                     return "skipped"  # 返回特殊值表示跳过
             return "not_needed"  # 返回特殊值表示不需要生成
         
-        template_dir = self._get_component_template_dir()
+        # 使用组件名称作为子文件夹名（小写）
+        comp_folder = self.component_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/component")
+        
         for key, filename in self.template_names.items():
-            template_path = os.path.join(template_dir, filename)
+            # 先尝试从子文件夹加载
+            template_path = os.path.join(template_base_dir, comp_folder, filename)
+            if not os.path.exists(template_path):
+                # 如果子文件夹不存在，尝试从根目录加载（向后兼容）
+                template_path = os.path.join(template_base_dir, filename)
+            
             template_content = CodeGenerator.load_template(template_path)
             if not template_content:
                 print(f"模板文件不存在或为空: {template_path}")

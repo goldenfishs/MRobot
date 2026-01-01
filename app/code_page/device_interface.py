@@ -240,12 +240,18 @@ class DeviceSimple(QWidget):
         # 获取BSP配置
         bsp_config = self.get_bsp_config()
         
-        # 复制并修改文件
-        template_dir = self._get_device_template_dir()
+        # 使用设备名称作为子文件夹名（小写）
+        device_folder = self.device_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/device")
         files = self.device_config.get('files', {})
         
         for file_type, filename in files.items():
-            src_path = os.path.join(template_dir, filename)
+            # 先尝试从子文件夹加载
+            src_path = os.path.join(template_base_dir, device_folder, filename)
+            if not os.path.exists(src_path):
+                # 如果子文件夹不存在，尝试从根目录加载（向后兼容）
+                src_path = os.path.join(template_base_dir, filename)
+            
             dst_path = os.path.join(self.project_path, f"User/device/{filename}")
 
             if os.path.exists(src_path):
