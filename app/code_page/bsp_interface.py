@@ -643,7 +643,15 @@ class bsp_fdcan(BspPeripheralBase):
 
     def _generate_header_file(self, configs, template_dir):
         """重写头文件生成，添加 FDCAN 使能和 FIFO 分配定义"""
-        template_path = os.path.join(template_dir, self.template_names['header'])
+        # 从子文件夹加载模板
+        periph_folder = self.peripheral_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, self.template_names['header'])
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：尝试从根目录读取
+            template_path = os.path.join(template_base_dir, self.template_names['header'])
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -681,7 +689,15 @@ class bsp_fdcan(BspPeripheralBase):
         return True
 
     def _generate_source_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, self.template_names['source'])
+        # 从子文件夹加载模板
+        periph_folder = self.peripheral_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, self.template_names['source'])
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：尝试从根目录读取
+            template_path = os.path.join(template_base_dir, self.template_names['source'])
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -817,92 +833,6 @@ class bsp_spi(BspPeripheralBase):
             "spi",
             get_available_spi
         )
-
-
-class bsp_fdcan(BspPeripheralBase):
-    def __init__(self, project_path):
-        super().__init__(
-            project_path,
-            "FDCAN",
-            {'header': 'fdcan.h', 'source': 'fdcan.c'},
-            "BSP_FDCAN",
-            "hfdcan",
-            "fdcan",
-            get_available_fdcan
-        )
-
-    def _generate_header_file(self, configs, template_dir):
-        """生成FDCAN头文件，包含动态宏定义"""
-        template_path = os.path.join(template_dir, self.template_names['header'])
-        template_content = CodeGenerator.load_template(template_path)
-        if not template_content:
-            return False
-        
-        # 生成枚举
-        enum_lines = [f"  {self.enum_prefix}_{name}," for name, _ in configs]
-        content = CodeGenerator.replace_auto_generated(
-            template_content, f"AUTO GENERATED {self.enum_prefix}_NAME", "\n".join(enum_lines)
-        )
-        
-        # 生成FDCAN实例使能宏定义
-        macro_lines = []
-        for name, instance in configs:
-            fdcan_num = ''.join(filter(str.isdigit, instance))  # 提取数字，如FDCAN1 -> 1
-            macro_lines.append(f"#define {instance}_EN")
-        
-        # 替换宏定义区域
-        content = CodeGenerator.replace_auto_generated(
-            content, "AUTO GENERATED FDCAN_EN", "\n".join(macro_lines)
-        )
-        
-        # 生成FIFO配置宏定义
-        fifo_lines = []
-        fdcan_count = len(configs)
-        for idx, (name, instance) in enumerate(configs):
-            fdcan_num = ''.join(filter(str.isdigit, instance))
-            # FDCAN1使用FIFO0，其他使用FIFO1
-            if instance == 'FDCAN1':
-                fifo_lines.append(f"#define {instance}_RX_FIFO  0")
-            else:
-                fifo_lines.append(f"#define {instance}_RX_FIFO  1")
-        
-        content = CodeGenerator.replace_auto_generated(
-            content, "AUTO GENERATED FDCAN_RX_FIFO", "\n".join(fifo_lines)
-        )
-        
-        output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['header']}")
-        CodeGenerator.save_with_preserve(output_path, content)
-        return True
-
-    def _generate_source_file(self, configs, template_dir):
-        """生成FDCAN源文件"""
-        template_path = os.path.join(template_dir, self.template_names['source'])
-        template_content = CodeGenerator.load_template(template_path)
-        if not template_content:
-            return False
-            
-        # Get函数
-        get_lines = []
-        for idx, (name, instance) in enumerate(configs):
-            get_lines.append(f"      case {idx}: return {self.enum_prefix}_{name};")
-        content = CodeGenerator.replace_auto_generated(
-            template_content, "AUTO GENERATED FDCAN_GET", "\n".join(get_lines)
-        )
-        
-        # Handle函数
-        handle_lines = []
-        for name, instance in configs:
-            fdcan_num = ''.join(filter(str.isdigit, instance))
-            handle_lines.append(f"#ifdef {instance}_EN")
-            handle_lines.append(f"        case {self.enum_prefix}_{name}: return &{self.handle_prefix}{fdcan_num};")
-            handle_lines.append(f"#endif")
-        content = CodeGenerator.replace_auto_generated(
-            content, f"AUTO GENERATED {self.enum_prefix}_GET_HANDLE", "\n".join(handle_lines)
-        )
-        
-        output_path = os.path.join(self.project_path, f"User/bsp/{self.template_names['source']}")
-        CodeGenerator.save_with_preserve(output_path, content)
-        return True
 
 
 def patch_uart_interrupts(project_path, uart_instances):
