@@ -1,24 +1,20 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QTableWidgetItem, QApplication
 from PyQt5.QtCore import Qt
 from qfluentwidgets import TitleLabel, BodyLabel, TableWidget, PushButton, SubtitleLabel, SpinBox, ComboBox, InfoBar,InfoBarPosition, FluentIcon
-from openpyxl import load_workbook, Workbook
+import pyqtgraph as pg
 
-import numpy as np
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-import plotly.graph_objs as go
-import plotly.io as pio
-
-import matplotlib
-matplotlib.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Source Han Sans', 'STHeiti', 'Heiti TC']
-matplotlib.rcParams['axes.unicode_minus'] = False
+# 延迟导入：这些库只在需要时才导入，加快应用启动速度
+# import numpy as np
+# from openpyxl import load_workbook, Workbook
 
 
 class FunctionFitInterface(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 延迟导入标志
+        self._libs_loaded = False
         self.setObjectName("functionFitInterface")
+
 
         main_layout = QHBoxLayout(self)
         main_layout.setSpacing(24)
@@ -67,9 +63,11 @@ class FunctionFitInterface(QWidget):
         right_layout.setSpacing(12)
         right_layout.addWidget(SubtitleLabel("函数图像预览"))
 
-        self.figure = Figure(figsize=(5, 4))
-        self.canvas = FigureCanvas(self.figure)
-        right_layout.addWidget(self.canvas, stretch=1)
+        # 占位符，实际的canvas会在_load_heavy_libraries中创建
+        self.canvas_placeholder = QWidget()
+        self.canvas_layout = QVBoxLayout(self.canvas_placeholder)
+        self.canvas_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addWidget(self.canvas_placeholder, stretch=1)
 
         self.resultLabel = BodyLabel("")
         self.resultLabel.setWordWrap(True)  # 自动换行
@@ -110,12 +108,29 @@ class FunctionFitInterface(QWidget):
 
         main_layout.addLayout(right_layout, 2)
 
-        # 默认显示空图像
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        self.canvas.draw()
+    def _load_heavy_libraries(self):
+        """延迟加载大型库，提高应用启动速度"""
+        if self._libs_loaded:
+            return
+        
+        global np, load_workbook, Workbook
+        
+        import numpy as np
+        from openpyxl import load_workbook, Workbook
+        
+        # 创建 PyQtGraph 画布
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.setBackground('w')  # 白色背景
+        self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self.plot_widget.setLabel('left', 'y')
+        self.plot_widget.setLabel('bottom', 'x')
+        self.plot_widget.setTitle('graph of a function')
+        
+        # 将 plot_widget 添加到占位符布局中
+        if hasattr(self, 'canvas_layout'):
+            self.canvas_layout.addWidget(self.plot_widget)
+        
+        self._libs_loaded = True
 
     def add_row(self):
         row = self.dataTable.rowCount()
@@ -132,6 +147,7 @@ class FunctionFitInterface(QWidget):
                 self.dataTable.removeRow(row)
 
     def import_excel(self):
+        self._load_heavy_libraries()  # 延迟加载库
         path, _ = QFileDialog.getOpenFileName(self, "导入 Excel", "", "Excel Files (*.xlsx)")
         if path:
             wb = load_workbook(path)
@@ -146,6 +162,7 @@ class FunctionFitInterface(QWidget):
 
 
     def export_excel(self):
+        self._load_heavy_libraries()  # 延迟加载库
         path, _ = QFileDialog.getSaveFileName(self, "导出 Excel", "", "Excel Files (*.xlsx)")
         if path:
             data = self.parse_data()
@@ -174,6 +191,7 @@ class FunctionFitInterface(QWidget):
         return data if data else None
 
     def fit_and_plot(self):
+        self._load_heavy_libraries()  # 延迟加载库
         data = self.parse_data()
         if not data:
             self.resultLabel.setText("数据格式错误或为空")
@@ -189,15 +207,29 @@ class FunctionFitInterface(QWidget):
         x_fit = np.linspace(x.min(), x.max(), 100)
         y_fit = np.polyval(coeffs, x_fit)
 
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        ax.scatter(x, y, color='blue', label='raw data')
-        ax.plot(x_fit, y_fit, color='red', label=f'Fitted curve')
-        ax.set_title('graph of a function')
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.legend()
-        self.canvas.draw()
+        # 清空并重新绘图
+        self.plot_widget.clear()
+        
+        # 绘制原始数据点（蓝色散点）
+        scatter = pg.ScatterPlotItem(
+            x=x, y=y, 
+            pen=None, 
+            brush=pg.mkBrush(0, 0, 255, 120),  # 蓝色半透明
+            size=10,
+            name='raw data'
+        )
+        self.plot_widget.addItem(scatter)
+        
+        # 绘制拟合曲线（红色线条）
+        pen = pg.mkPen(color=(255, 0, 0), width=2)  # 红色线条
+        curve = self.plot_widget.plot(
+            x_fit, y_fit, 
+            pen=pen,
+            name='Fitted curve'
+        )
+
+        # 添加图例
+        self.plot_widget.addLegend()
 
         formula = self.poly_formula(coeffs)
         self.resultLabel.setText(f"拟合公式: {formula}")

@@ -2,13 +2,18 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QSizePolicy
 from PyQt5.QtCore import Qt
 from qfluentwidgets import PushSettingCard, FluentIcon, TabBar
 
-from .function_fit_interface import FunctionFitInterface
+# 延迟导入：避免在启动时加载大型库
+# from .function_fit_interface import FunctionFitInterface
 from .ai_interface import AIInterface
 
 class MiniToolInterface(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("minitoolInterface")
+        
+        # 延迟加载的接口引用
+        self.functionFitInterface = None
+        
         self.vBoxLayout = QVBoxLayout(self)
         self.vBoxLayout.setAlignment(Qt.AlignTop)
         self.vBoxLayout.setContentsMargins(10, 0, 10, 10) # 设置外边距
@@ -88,9 +93,15 @@ class MiniToolInterface(QWidget):
                 self.stackedWidget.setCurrentWidget(widget)
                 self.tabBar.setCurrentTab("fitPage")
                 return
-        fit_page = FunctionFitInterface(self)
-        self.addSubInterface(fit_page, "fitPage", "曲线拟合")
-        self.stackedWidget.setCurrentWidget(fit_page)
+        
+        # 延迟导入和创建FunctionFitInterface
+        if self.functionFitInterface is None:
+            from .function_fit_interface import FunctionFitInterface
+            self.functionFitInterface = FunctionFitInterface(self)
+            self.functionFitInterface.setObjectName("fitPage")
+        
+        self.addSubInterface(self.functionFitInterface, "fitPage", "曲线拟合")
+        self.stackedWidget.setCurrentWidget(self.functionFitInterface)
         self.tabBar.setCurrentTab("fitPage")
 
     def open_ai_tab(self):
