@@ -15,6 +15,7 @@ from .data_interface import DataInterface
 from .mini_tool_interface import MiniToolInterface
 from .code_configuration_interface import CodeConfigurationInterface
 from .finance_interface import FinanceInterface
+from .mech_design_interface import MechDesignInterface
 from .about_interface import AboutInterface
 import base64
 
@@ -54,6 +55,7 @@ class MainWindow(FluentWindow):
         self.miniToolInterface = MiniToolInterface(self)
         self.codeConfigurationInterface = CodeConfigurationInterface(self)
         self.financeInterface = FinanceInterface(self)
+        self.mechDesignInterface = MechDesignInterface(self)
 
 
     def initNavigation(self):
@@ -62,7 +64,8 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.codeConfigurationInterface, FIF.CODE, self.tr('代码生成'))
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
         self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
-        self.addSubInterface(self.financeInterface, FIF.DOCUMENT, self.tr('财务做账'))
+        self.addSubInterface(self.mechDesignInterface, FIF.SETTING, self.tr('机械设计'))
+        # self.addSubInterface(self.financeInterface, FIF.DOCUMENT, self.tr('财务做账'))
         self.addSubInterface(self.miniToolInterface, FIF.LIBRARY, self.tr('迷你工具箱'))
         self.addSubInterface(AboutInterface(self), FIF.INFO, self.tr('关于'), position=NavigationItemPosition.BOTTOM)
 
