@@ -1,0 +1,3 @@
+module_name,description
+cmd,命令系统，用于机器人指令处理和行为控制
+2_axis_gimbal,双轴云台控制模块，支持pitch和yaw轴控制

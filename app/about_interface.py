@@ -15,7 +15,7 @@ from app.tools.check_update import check_update
 from app.tools.auto_updater import AutoUpdater, check_update_availability
 from app.tools.update_check_thread import UpdateCheckThread
 
-__version__ = "1.0.6"
+__version__ = "1.1.0"
 
 class AboutInterface(QWidget):
     def __init__(self, parent=None):

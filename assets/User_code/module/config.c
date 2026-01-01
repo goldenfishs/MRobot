@@ -13,10 +13,17 @@
 
 /* Exported variables ------------------------------------------------------- */
 
-// 机器人参数配置
+/**
+ * @brief 机器人参数配置
+ * @note 在此配置机器人参数
+ */
 Config_RobotParam_t robot_config = {
-
-
+    /* USER CODE BEGIN robot_config */
+    .example_param = 0,  // 示例参数初始化
+    
+    // 在此添加您的配置参数初始化
+    
+    /* USER CODE END robot_config */
 };
 
 /* Private function prototypes ---------------------------------------------- */

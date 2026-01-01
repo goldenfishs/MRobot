@@ -360,17 +360,76 @@ class CodeGenerateInterface(QWidget):
                     continue
                 main_title = row[0]
                 main_item = QTreeWidgetItem([main_title])
-                for sub in row[1:]:
-                    sub_item = QTreeWidgetItem([sub])
-                    main_item.addChild(sub_item)
+                
+                # 特殊处理 module
+                if main_title == 'module':
+                    # 扫描 module 目录
+                    module_dir = CodeGenerator.get_assets_dir("User_code/module")
+                    if os.path.exists(module_dir):
+                        for item in os.listdir(module_dir):
+                            item_path = os.path.join(module_dir, item)
+                            if not os.path.isdir(item_path):
+                                continue
+                            if item.startswith('.') or item == 'config':
+                                continue
+                            
+                            # 检查是否直接包含代码
+                            has_direct_code = any(
+                                f.endswith(('.c', '.h'))
+                                for f in os.listdir(item_path)
+                                if os.path.isfile(os.path.join(item_path, f))
+                            )
+                            
+                            if has_direct_code:
+                                # 直接的模块（如 cmd）
+                                sub_item = QTreeWidgetItem([item])
+                                main_item.addChild(sub_item)
+                            else:
+                                # 有子类型的模块（如 gimbal）
+                                module_type_item = QTreeWidgetItem([item])
+                                has_subtypes = False
+                                for subitem in os.listdir(item_path):
+                                    subitem_path = os.path.join(item_path, subitem)
+                                    if not os.path.isdir(subitem_path):
+                                        continue
+                                    if subitem.startswith('.'):
+                                        continue
+                                    has_code = any(
+                                        f.endswith(('.c', '.h'))
+                                        for f in os.listdir(subitem_path)
+                                        if os.path.isfile(os.path.join(subitem_path, f))
+                                    )
+                                    if has_code:
+                                        subtype_item = QTreeWidgetItem([subitem])
+                                        module_type_item.addChild(subtype_item)
+                                        has_subtypes = True
+                                
+                                if has_subtypes:
+                                    main_item.addChild(module_type_item)
+                else:
+                    # 其他模块保持原逻辑
+                    for sub in row[1:]:
+                        sub_item = QTreeWidgetItem([sub])
+                        main_item.addChild(sub_item)
+                
                 self.tree.addTopLevelItem(main_item)
         self.tree.repaint()
 
     def on_tree_item_clicked(self, item, column):
         if item.parent():
-            main_title = item.parent().text(0)
-            sub_title = item.text(0)
-            class_name = f"{main_title}_{sub_title}".replace("-", "_")
+            # 判断层级
+            if item.parent().parent():
+                # 三级树（module/type/instance）
+                root_title = item.parent().parent().text(0)
+                type_title = item.parent().text(0)
+                instance_title = item.text(0)
+                class_name = f"{root_title}_{type_title}_{instance_title}".replace("-", "_")
+            else:
+                # 二级树（category/item）
+                main_title = item.parent().text(0)
+                sub_title = item.text(0)
+                class_name = f"{main_title}_{sub_title}".replace("-", "_")
+            
             widget = self._get_or_create_page(class_name)
             if widget:
                 self.stack.setCurrentWidget(widget)
@@ -402,6 +461,18 @@ class CodeGenerateInterface(QWidget):
                 from app.code_page.device_interface import get_device_page
                 device_name = class_name[len('device_'):]  # 移除 device_ 前缀
                 page = get_device_page(device_name, self.project_path)
+            elif class_name.startswith('module_'):
+                # Module页面
+                from app.code_page.module_interface import get_module_page
+                # 解析: module_type 或 module_type_instance
+                parts = class_name[len('module_'):].split('_', 1)
+                if len(parts) == 2:
+                    module_type = parts[0]
+                    instance = parts[1]
+                    page = get_module_page(module_type, instance, self.project_path, self)
+                else:
+                    module_type = parts[0]
+                    page = get_module_page(module_type, None, self.project_path, self)
             else:
                 print(f"未知的页面类型: {class_name}")
                 return None
@@ -411,4 +482,6 @@ class CodeGenerateInterface(QWidget):
             return page
         except Exception as e:
             print(f"创建页面 {class_name} 失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None
