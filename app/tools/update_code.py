@@ -8,7 +8,9 @@ import tempfile
 import time
 
 def update_code(parent=None, info_callback=None, error_callback=None):
-    url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
+    # 优先使用 GitHub，备用 Gitea
+    github_url = "https://github.com/lvzucheng/MRobot/archive/refs/heads/User_code.zip"
+    gitea_url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
     
     # 导入 CodeGenerator 以使用统一的路径获取逻辑
     try:
@@ -53,10 +55,39 @@ def update_code(parent=None, info_callback=None, error_callback=None):
     local_dir = os.path.join(assets_dir, "User_code")
     print(f"更新代码：最终目标目录: {local_dir}")
     
+    # 尝试从 GitHub 下载，失败则使用 Gitea
+    download_successful = False
+    resp = None
+    
+    # 首先尝试 GitHub
     try:
-        # 下载远程代码库
-        resp = requests.get(url, timeout=30)
+        print("尝试从 GitHub 下载代码...")
+        resp = requests.get(github_url, timeout=15)
         resp.raise_for_status()
+        download_successful = True
+        print("成功从 GitHub 下载")
+    except Exception as github_error:
+        print(f"GitHub 下载失败: {github_error}")
+        print("切换到备用源 Gitea...")
+        
+        # 切换到 Gitea
+        try:
+            resp = requests.get(gitea_url, timeout=30)
+            resp.raise_for_status()
+            download_successful = True
+            print("成功从 Gitea 下载")
+        except Exception as gitea_error:
+            print(f"Gitea 下载也失败: {gitea_error}")
+            if error_callback:
+                error_callback(parent, f"所有下载源均失败\nGitHub: {github_error}\nGitea: {gitea_error}")
+            return False
+    
+    if not download_successful or resp is None:
+        if error_callback:
+            error_callback(parent, "下载失败")
+        return False
+    
+    try:
         
         # 创建临时目录进行操作
         with tempfile.TemporaryDirectory() as temp_dir:
