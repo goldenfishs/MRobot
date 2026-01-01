@@ -342,3 +342,241 @@ class analyzing_ioc:
                         })
         
         return pwm_channels
+    
+    @staticmethod
+    def get_mcu_name_from_ioc(ioc_path):
+        """
+        从.ioc文件中获取MCU型号
+        返回格式: 'STM32F407IGHx' 等
+        """
+        with open(ioc_path, encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    # 查找MCU名称
+                    if key == 'Mcu.UserName' or key == 'Mcu.Name':
+                        return value
+        return None
+    
+    @staticmethod
+    def get_flash_config_from_mcu(mcu_name):
+        """
+        根据MCU型号返回Flash配置
+        支持STM32F1/F4/H7系列
+        返回格式: {
+            'sectors': [...],  # Sector/Page配置列表
+            'dual_bank': False,  # 是否双Bank
+            'end_address': 0x08100000,  # Flash结束地址
+            'type': 'sector' or 'page'  # Flash类型
+        }
+        """
+        if not mcu_name:
+            return None
+        
+        mcu_upper = mcu_name.upper()
+        
+        # STM32F1系列 - 使用Page而不是Sector
+        if mcu_upper.startswith('STM32F1'):
+            return analyzing_ioc._get_stm32f1_flash_config(mcu_upper)
+        
+        # STM32F4系列 - 使用Sector
+        elif mcu_upper.startswith('STM32F4'):
+            return analyzing_ioc._get_stm32f4_flash_config(mcu_upper)
+        
+        # STM32H7系列 - 使用Sector
+        elif mcu_upper.startswith('STM32H7'):
+            return analyzing_ioc._get_stm32h7_flash_config(mcu_upper)
+        
+        return None
+    
+    @staticmethod
+    def _get_stm32f1_flash_config(mcu_upper):
+        """
+        STM32F1系列Flash配置
+        F1使用Page而不是Sector
+        - 小/中容量设备: 1KB/page
+        - 大容量/互联型设备: 2KB/page
+        容量代码: 4/6=16/32KB, 8/B=64/128KB, C=256KB, D/E=384/512KB, F/G=768KB/1MB
+        """
+        flash_size_map_f1 = {
+            '4': 16,    # 16KB
+            '6': 32,    # 32KB
+            '8': 64,    # 64KB
+            'B': 128,   # 128KB
+            'C': 256,   # 256KB
+            'D': 384,   # 384KB
+            'E': 512,   # 512KB
+            'F': 768,   # 768KB (互联型)
+            'G': 1024,  # 1MB (互联型)
+        }
+        
+        # F1命名: STM32F103C8T6, C在索引9
+        if len(mcu_upper) < 10:
+            return None
+        
+        flash_code = mcu_upper[9]
+        flash_size = flash_size_map_f1.get(flash_code)
+        
+        if not flash_size:
+            return None
+        
+        # 判断页大小: <=128KB用1KB页, >128KB用2KB页
+        page_size = 1 if flash_size <= 128 else 2
+        num_pages = flash_size // page_size
+        
+        config = {
+            'type': 'page',
+            'dual_bank': False,
+            'sectors': [],  # F1中这里存的是Page
+            'page_size': page_size,
+        }
+        
+        # 生成所有页
+        current_address = 0x08000000
+        for page_id in range(num_pages):
+            config['sectors'].append({
+                'id': page_id,
+                'address': current_address,
+                'size': page_size
+            })
+            current_address += page_size * 1024
+        
+        config['end_address'] = current_address
+        return config
+    
+    @staticmethod
+    def _get_stm32f4_flash_config(mcu_upper):
+        """
+        STM32F4系列Flash配置
+        容量代码: C=256KB, E=512KB, G=1MB, I=2MB
+        """
+        flash_size_map = {
+            'C': 256,   # 256KB
+            'E': 512,   # 512KB
+            'G': 1024,  # 1MB
+            'I': 2048,  # 2MB
+        }
+        
+        # F4命名: STM32F407IGHx, I在索引9
+        if len(mcu_upper) < 10:
+            return None
+        
+        flash_code = mcu_upper[9]
+        flash_size = flash_size_map.get(flash_code)
+        
+        if not flash_size:
+            return None
+        
+        config = {
+            'type': 'sector',
+            'dual_bank': False,
+            'sectors': [],
+        }
+        
+        # STM32F4系列单Bank Flash布局
+        # Sector 0-3: 16KB each
+        # Sector 4: 64KB
+        # Sector 5-11: 128KB each (如果有)
+        
+        base_sectors = [
+            {'id': 0, 'address': 0x08000000, 'size': 16},
+            {'id': 1, 'address': 0x08004000, 'size': 16},
+            {'id': 2, 'address': 0x08008000, 'size': 16},
+            {'id': 3, 'address': 0x0800C000, 'size': 16},
+            {'id': 4, 'address': 0x08010000, 'size': 64},
+        ]
+        
+        config['sectors'] = base_sectors.copy()
+        current_address = 0x08020000
+        current_id = 5
+        remaining_kb = flash_size - (16 * 4 + 64)  # 减去前5个sector
+        
+        # 添加128KB的sectors
+        while remaining_kb > 0 and current_id < 12:
+            config['sectors'].append({
+                'id': current_id,
+                'address': current_address,
+                'size': 128
+            })
+            current_address += 0x20000  # 128KB
+            remaining_kb -= 128
+            current_id += 1
+        
+        # 设置结束地址
+        config['end_address'] = current_address
+        
+        # 2MB Flash需要双Bank (Sector 12-23)
+        if flash_size >= 2048:
+            config['dual_bank'] = True
+            # Bank 2 的sectors (12-15: 16KB, 16: 64KB, 17-23: 128KB)
+            bank2_sectors = [
+                {'id': 12, 'address': 0x08100000, 'size': 16},
+                {'id': 13, 'address': 0x08104000, 'size': 16},
+                {'id': 14, 'address': 0x08108000, 'size': 16},
+                {'id': 15, 'address': 0x0810C000, 'size': 16},
+                {'id': 16, 'address': 0x08110000, 'size': 64},
+                {'id': 17, 'address': 0x08120000, 'size': 128},
+                {'id': 18, 'address': 0x08140000, 'size': 128},
+                {'id': 19, 'address': 0x08160000, 'size': 128},
+                {'id': 20, 'address': 0x08180000, 'size': 128},
+                {'id': 21, 'address': 0x081A0000, 'size': 128},
+                {'id': 22, 'address': 0x081C0000, 'size': 128},
+                {'id': 23, 'address': 0x081E0000, 'size': 128},
+            ]
+            config['sectors'].extend(bank2_sectors)
+            config['end_address'] = 0x08200000
+        
+        return config
+    
+    @staticmethod
+    def _get_stm32h7_flash_config(mcu_upper):
+        """
+        STM32H7系列Flash配置
+        - 每个Sector 128KB
+        - 单Bank: 8个Sector (1MB)
+        - 双Bank: 16个Sector (2MB), 每个Bank 8个Sector
+        容量代码: B=128KB, G=1MB, I=2MB
+        命名格式: STM32H7 + 23 + V(引脚) + G(容量) + T(封装) + 6
+        """
+        flash_size_map_h7 = {
+            'B': 128,   # 128KB (1个Sector)
+            'G': 1024,  # 1MB (8个Sector, 单Bank)
+            'I': 2048,  # 2MB (16个Sector, 双Bank)
+        }
+        
+        # H7命名: STM32H723VGT6, G在索引10
+        if len(mcu_upper) < 11:
+            return None
+        
+        flash_code = mcu_upper[10]
+        flash_size = flash_size_map_h7.get(flash_code)
+        
+        if not flash_size:
+            return None
+        
+        config = {
+            'type': 'sector',
+            'dual_bank': flash_size >= 2048,
+            'sectors': [],
+        }
+        
+        num_sectors = flash_size // 128  # 每个Sector 128KB
+        
+        # 生成Sector配置
+        current_address = 0x08000000
+        for sector_id in range(num_sectors):
+            config['sectors'].append({
+                'id': sector_id,
+                'address': current_address,
+                'size': 128,
+                'bank': 1 if sector_id < 8 else 2  # Bank信息
+            })
+            current_address += 0x20000  # 128KB
+        
+        config['end_address'] = current_address
+        return config

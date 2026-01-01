@@ -1376,7 +1376,225 @@ class bsp_pwm(QWidget):
                         if name_widget:
                             name_widget.setText(saved_config['custom_name'])
 
-# 更新get_bsp_page函数以包含PWM
+
+class bsp_flash(QWidget):
+    """Flash BSP配置界面 - 自动识别MCU型号并生成对应的Flash配置"""
+    def __init__(self, project_path):
+        super().__init__()
+        self.project_path = project_path
+        self.mcu_name = None
+        self.flash_config = None
+        # 加载描述
+        describe_path = os.path.join(CodeGenerator.get_assets_dir("User_code/bsp"), "describe.csv")
+        self.descriptions = CodeGenerator.load_descriptions(describe_path)
+        self._detect_mcu()
+        self._init_ui()
+        self._load_config()
+
+    def _detect_mcu(self):
+        """自动检测MCU型号并获取Flash配置"""
+        ioc_files = [f for f in os.listdir(self.project_path) if f.endswith('.ioc')]
+        if ioc_files:
+            ioc_path = os.path.join(self.project_path, ioc_files[0])
+            self.mcu_name = analyzing_ioc.get_mcu_name_from_ioc(ioc_path)
+            if self.mcu_name:
+                self.flash_config = analyzing_ioc.get_flash_config_from_mcu(self.mcu_name)
+
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # 顶部布局
+        top_layout = QHBoxLayout()
+        top_layout.setAlignment(Qt.AlignVCenter)
+
+        self.generate_checkbox = CheckBox("生成 Flash 代码")
+        self.generate_checkbox.stateChanged.connect(self._on_generate_changed)
+        top_layout.addWidget(self.generate_checkbox, alignment=Qt.AlignLeft)
+
+        top_layout.addStretch()
+
+        title = SubtitleLabel("Flash 配置             ")
+        title.setAlignment(Qt.AlignHCenter)
+        top_layout.addWidget(title, alignment=Qt.AlignHCenter)
+
+        top_layout.addStretch()
+
+        layout.addLayout(top_layout)
+
+        desc = self.descriptions.get("flash", "自动根据MCU型号配置Flash扇区")
+        if desc:
+            desc_label = BodyLabel(desc)
+            desc_label.setWordWrap(True)
+            layout.addWidget(desc_label)
+
+        # 内容区域
+        self.content_widget = QWidget()
+        content_layout = QVBoxLayout(self.content_widget)
+
+        if not self.flash_config:
+            no_config_label = BodyLabel("❌ 无法识别MCU型号或不支持的MCU")
+            content_layout.addWidget(no_config_label)
+        else:
+            # 显示检测到的MCU信息
+            mcu_info = BodyLabel(f"✅ 检测到MCU: {self.mcu_name}")
+            content_layout.addWidget(mcu_info)
+            
+            flash_size = (self.flash_config['end_address'] - 0x08000000) // 1024
+            flash_type = self.flash_config.get('type', 'sector')
+            
+            if flash_type == 'page':
+                # F1系列 - Page模式
+                page_size = self.flash_config.get('page_size', 1)
+                flash_info = BodyLabel(f"Flash容量: {flash_size} KB ({len(self.flash_config['sectors'])} 个页，每页 {page_size}KB)")
+                content_layout.addWidget(flash_info)
+                type_info = BodyLabel(f"📄 Page模式 (F1系列)")
+                content_layout.addWidget(type_info)
+            else:
+                # F4/H7系列 - Sector模式
+                flash_info = BodyLabel(f"Flash容量: {flash_size} KB ({len(self.flash_config['sectors'])} 个扇区)")
+                content_layout.addWidget(flash_info)
+                
+                if self.flash_config['dual_bank']:
+                    max_sector = len(self.flash_config['sectors']) - 1
+                    bank_info = BodyLabel(f"⚠️ 双Bank Flash (Sector 0-{max_sector})")
+                else:
+                    max_sector = len(self.flash_config['sectors']) - 1
+                    bank_info = BodyLabel(f"单Bank Flash (Sector 0-{max_sector})")
+                content_layout.addWidget(bank_info)
+
+        layout.addWidget(self.content_widget)
+        self.content_widget.setEnabled(False)
+
+    def _on_generate_changed(self, state):
+        self.content_widget.setEnabled(state == 2)
+
+    def is_need_generate(self):
+        return self.generate_checkbox.isChecked() and self.flash_config is not None
+
+    def _generate_bsp_code_internal(self):
+        if not self.is_need_generate():
+            return False
+        
+        if not self.flash_config:
+            return False
+        
+        # 生成头文件
+        if not self._generate_header_file():
+            return False
+        
+        # 生成源文件
+        if not self._generate_source_file():
+            return False
+        
+        self._save_config()
+        return True
+
+    def _generate_header_file(self):
+        """生成flash.h"""
+        periph_folder = "flash"
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, "flash.h")
+        
+        if not os.path.exists(template_path):
+            return False
+        
+        template_content = CodeGenerator.load_template(template_path)
+        if not template_content:
+            return False
+        
+        # 生成Sector/Page定义
+        flash_type = self.flash_config.get('type', 'sector')
+        sector_lines = []
+        
+        for item in self.flash_config['sectors']:
+            addr = item['address']
+            size = item['size']
+            item_id = item['id']
+            
+            if flash_type == 'page':
+                # F1系列 - Page模式
+                sector_lines.append(
+                    f"#define ADDR_FLASH_PAGE_{item_id} ((uint32_t)0x{addr:08X})"
+                )
+                sector_lines.append(
+                    f"/* Base address of Page {item_id}, {size} Kbytes */"
+                )
+            else:
+                # F4/H7系列 - Sector模式
+                sector_lines.append(
+                    f"#define ADDR_FLASH_SECTOR_{item_id} ((uint32_t)0x{addr:08X})"
+                )
+                sector_lines.append(
+                    f"/* Base address of Sector {item_id}, {size} Kbytes */"
+                )
+        
+        content = CodeGenerator.replace_auto_generated(
+            template_content, "AUTO GENERATED FLASH_SECTORS", "\n".join(sector_lines)
+        )
+        
+        # 生成结束地址
+        end_addr = self.flash_config['end_address']
+        end_line = f"#define ADDR_FLASH_END ((uint32_t)0x{end_addr:08X}) /* End address for flash */"
+        content = CodeGenerator.replace_auto_generated(
+            content, "AUTO GENERATED FLASH_END_ADDRESS", end_line
+        )
+        
+        output_path = os.path.join(self.project_path, "User/bsp/flash.h")
+        CodeGenerator.save_with_preserve(output_path, content)
+        return True
+
+    def _generate_source_file(self):
+        """生成flash.c"""
+        periph_folder = "flash"
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, "flash.c")
+        
+        if not os.path.exists(template_path):
+            return False
+        
+        template_content = CodeGenerator.load_template(template_path)
+        if not template_content:
+            return False
+        
+        # 生成最大Sector数定义
+        max_sector = len(self.flash_config['sectors']) - 1
+        max_sector_line = f"#define BSP_FLASH_MAX_SECTOR {max_sector}"
+        content = CodeGenerator.replace_auto_generated(
+            template_content, "AUTO GENERATED FLASH_MAX_SECTOR", max_sector_line
+        )
+        
+        # 生成擦除检查代码
+        erase_check = f"  if (sector > 0 && sector <= {max_sector}) {{"
+        content = CodeGenerator.replace_auto_generated(
+            content, "AUTO GENERATED FLASH_ERASE_CHECK", erase_check
+        )
+        
+        output_path = os.path.join(self.project_path, "User/bsp/flash.c")
+        CodeGenerator.save_with_preserve(output_path, content)
+        return True
+
+    def _save_config(self):
+        """保存配置"""
+        config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
+        config_data = CodeGenerator.load_config(config_path)
+        config_data['flash'] = {
+            'enabled': True,
+            'mcu_name': self.mcu_name,
+            'dual_bank': self.flash_config['dual_bank'],
+            'sectors': len(self.flash_config['sectors'])
+        }
+        CodeGenerator.save_config(config_data, config_path)
+
+    def _load_config(self):
+        """加载配置"""
+        config_path = os.path.join(self.project_path, "User/bsp/bsp_config.yaml")
+        config_data = CodeGenerator.load_config(config_path)
+        conf = config_data.get('flash', {})
+        if conf.get('enabled', False):
+            self.generate_checkbox.setChecked(True)
+
+
+# 更新get_bsp_page函数以包含PWM和Flash
 def get_bsp_page(peripheral_name, project_path):
     """根据外设名返回对应的页面类，没有特殊类则返回默认BspSimplePeripheral"""
     name_lower = peripheral_name.lower()
@@ -1387,7 +1605,8 @@ def get_bsp_page(peripheral_name, project_path):
         "spi": bsp_spi,
         "uart": bsp_uart,
         "gpio": bsp_gpio,
-        "pwm": bsp_pwm,  # 添加PWM
+        "pwm": bsp_pwm,
+        "flash": bsp_flash,  # 添加Flash自动配置
         # 以后可以继续添加特殊外设
     }
     if name_lower in special_classes:

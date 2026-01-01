@@ -9,4 +9,4 @@ time,获取时间戳函数，需要开启freerots
 dwt,需要开启dwt，获取时间
 i2c,请开启i2c的dma和中断
 pwm,用于选择那些勇于输出pwm
-
+flash,自动识别MCU型号并配置Flash，支持STM32F1(Page)/F4(Sector)/H7(Sector)，自动处理单Bank/双Bank配置
