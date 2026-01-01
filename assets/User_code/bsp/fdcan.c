@@ -90,7 +90,9 @@ static bool BSP_FDCAN_TxQueueIsEmpty(BSP_FDCAN_t fdcan);
 /* Private functions -------------------------------------------------------- */
 static BSP_FDCAN_t FDCAN_Get(FDCAN_HandleTypeDef *hfdcan) {
   if (hfdcan == NULL) return BSP_FDCAN_ERR;
-/* AUTO GENERATED FDCAN_GET */
+  if (hfdcan->Instance == FDCAN1) return BSP_FDCAN_1;
+  else if (hfdcan->Instance == FDCAN2) return BSP_FDCAN_2;
+  else if (hfdcan->Instance == FDCAN3) return BSP_FDCAN_3;
   else return BSP_FDCAN_ERR;
 }
 
@@ -326,10 +328,9 @@ int8_t BSP_FDCAN_Init(void) {
   queue_mutex = osMutexNew(NULL);
   if (queue_mutex == NULL) return BSP_ERR;
 
-  /* 配置并启动 FDCAN 实例，绑定中断/回调 */
-/* AUTO GENERATED FDCAN_INIT */
-  
   inited = true;
+
+  /* 配置并启动 FDCAN 实例，绑定中断/回调 */
 
   //========== 过滤器配置说明：==========================
   //  过滤器编号：相对于每个（相当于经典can过滤器的bank）
@@ -370,11 +371,48 @@ int8_t BSP_FDCAN_Init(void) {
   //  IsCalibrationMsg = 0 or 1; 
   // fdcan_filter_table.h
   //=================================================================================
-  /* 配置并启动 FDCAN 实例，绑定中断/回调 */
-/* AUTO GENERATED FDCAN_INIT */
-  
-  inited = true;
-  
+  /* 依据上述说明，配置过滤器并启动FDCAN */
+  FDCAN_FilterTypeDef sFilterConfig;
+
+#ifdef FDCAN1_EN
+  #define hfdcan hfdcan1
+  #define FDCANX_RX_FIFO FDCAN1_RX_FIFO
+  FDCAN1_FILTER_CONFIG_TABLE(FDCAN_CONFIG_FILTER)
+  #undef hfdcan
+  #undef FDCANX_RX_FIFO
+  HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, FDCAN1_GLOBAL_FILTER);
+  HAL_FDCAN_ActivateNotification(&hfdcan1, FDCANx_NOTIFY_FLAGS(FDCAN1_RX_FIFO), 0);
+  BSP_FDCAN_RegisterCallback(BSP_FDCAN_1, FDCANX_MSG_PENDING_CB(FDCAN1_RX_FIFO), BSP_FDCAN_RxFifo0Callback);
+  BSP_FDCAN_RegisterCallback(BSP_FDCAN_1, HAL_FDCAN_TX_EVENT_FIFO_CB, BSP_FDCAN_TxCompleteCallback);
+  HAL_FDCAN_Start(&hfdcan1);
+#endif
+
+#ifdef FDCAN2_EN
+  #define hfdcan hfdcan2
+  #define FDCANX_RX_FIFO FDCAN2_RX_FIFO
+  FDCAN2_FILTER_CONFIG_TABLE(FDCAN_CONFIG_FILTER)
+  #undef hfdcan
+  #undef FDCANX_RX_FIFO
+  HAL_FDCAN_ConfigGlobalFilter(&hfdcan2, FDCAN2_GLOBAL_FILTER);
+  HAL_FDCAN_ActivateNotification(&hfdcan2, FDCANx_NOTIFY_FLAGS(FDCAN2_RX_FIFO), 0);
+  BSP_FDCAN_RegisterCallback(BSP_FDCAN_2, FDCANX_MSG_PENDING_CB(FDCAN2_RX_FIFO), BSP_FDCAN_RxFifo1Callback);
+  BSP_FDCAN_RegisterCallback(BSP_FDCAN_2, HAL_FDCAN_TX_EVENT_FIFO_CB, BSP_FDCAN_TxCompleteCallback);
+  HAL_FDCAN_Start(&hfdcan2);
+#endif
+
+#ifdef FDCAN3_EN
+  #define hfdcan hfdcan3
+  #define FDCANX_RX_FIFO FDCAN3_RX_FIFO
+  FDCAN3_FILTER_CONFIG_TABLE(FDCAN_CONFIG_FILTER)
+  #undef hfdcan
+  #undef FDCANX_RX_FIFO
+  HAL_FDCAN_ConfigGlobalFilter(&hfdcan3, FDCAN3_GLOBAL_FILTER);
+  HAL_FDCAN_ActivateNotification(&hfdcan3, FDCANx_NOTIFY_FLAGS(FDCAN3_RX_FIFO), 0);
+  BSP_FDCAN_RegisterCallback(BSP_FDCAN_3, FDCANX_MSG_PENDING_CB(FDCAN3_RX_FIFO), BSP_FDCAN_RxFifo1Callback);
+  BSP_FDCAN_RegisterCallback(BSP_FDCAN_3, HAL_FDCAN_TX_EVENT_FIFO_CB, BSP_FDCAN_TxCompleteCallback);
+  HAL_FDCAN_Start(&hfdcan3);
+#endif
+
 #undef FDCAN_FILTER_TO_RXFIFO_ENUM_INNER
 #undef FDCAN_FILTER_TO_RXFIFO_ENUM
 #undef FDCAN_CONFIG_FILTER 
@@ -388,13 +426,15 @@ int8_t BSP_FDCAN_Init(void) {
 }
 
 FDCAN_HandleTypeDef *BSP_FDCAN_GetHandle(BSP_FDCAN_t fdcan) {
-  if (fdcan >= BSP_FDCAN_NUM) return NULL;
-  
-  switch (fdcan) {
-/* AUTO GENERATED BSP_FDCAN_GET_HANDLE */
-    default:
-      return NULL;
-  }
+    if (fdcan >= BSP_FDCAN_NUM) return NULL;
+    switch (fdcan) {
+        /* AUTO GENERATED BSP_FDCAN_GET_HANDLE BEGIN */
+        case BSP_FDCAN_1: return &hfdcan1;
+        case BSP_FDCAN_2: return &hfdcan2;
+        case BSP_FDCAN_3: return &hfdcan3;
+        /* AUTO GENERATED BSP_FDCAN_GET_HANDLE END */
+        default: return NULL;
+    }
 }
 
 int8_t BSP_FDCAN_RegisterCallback(BSP_FDCAN_t fdcan, BSP_FDCAN_Callback_t type, void (*callback)(void)) {

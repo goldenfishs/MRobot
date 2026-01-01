@@ -71,7 +71,7 @@ class analyzing_ioc:
     @staticmethod
     def get_enabled_can_from_ioc(ioc_path):
         """
-        获取已启用的CAN列表
+        获取已启用的CAN列表（不包括FDCAN）
         返回格式: ['CAN1', 'CAN2'] 等
         """
         enabled_can = []
@@ -84,6 +84,7 @@ class analyzing_ioc:
                     key, value = line.split('=', 1)
                     key = key.strip()
                     value = value.strip()
+                    # 只匹配CAN，不包括FDCAN
                     if key.startswith('Mcu.IP') and value.startswith('CAN') and not value.startswith('FDCAN'):
                         can_name = value.split('.')[0] if '.' in value else value
                         if can_name not in enabled_can:

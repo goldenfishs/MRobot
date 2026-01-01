@@ -11,8 +11,6 @@ OutputBaseFilename=MRobotInstaller
 Source: "dist\MRobot\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 ; 复制 assets 资源文件到安装目录（支持后续更新）
 Source: "assets\logo\*"; DestDir: "{app}\assets\logo"; Flags: ignoreversion recursesubdirs
-Source: "assets\User_code\*"; DestDir: "{app}\assets\User_code"; Flags: ignoreversion recursesubdirs
-Source: "assets\mech_lib\*"; DestDir: "{app}\assets\mech_lib"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\MRobot"; Filename: "{app}\MRobot.exe"; IconFilename: "{app}\assets\logo\M.ico"

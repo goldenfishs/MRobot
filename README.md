@@ -86,5 +86,5 @@
 使用以下命令构建可执行文件：
 
 ```bash
-pyinstaller MRobot.py --onefile --windowed --add-data "assets;assets" --add-data "app;app" --add-data "app/tools;app/tools"
+pyinstaller MRobot.py --onefile --windowed --add-data "assets/logo;assets/logo" --add-data "app;app" --add-data "app/tools;app/tools"
 ```

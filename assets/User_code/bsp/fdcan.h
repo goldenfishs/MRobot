@@ -22,13 +22,32 @@ extern "C" {
 #define BSP_FDCAN_TIMEOUT_FOREVER         osWaitForever
 #define BSP_FDCAN_TX_QUEUE_SIZE           32
 /* Exported macro ----------------------------------------------------------- */
-/* AUTO GENERATED FDCAN_ENABLE */
+//FDCANX实例使能
+/* AUTO GENERATED FDCAN_EN BEGIN */
+#define FDCAN1_EN 
+#define FDCAN2_EN  
+#define FDCAN3_EN 
+/* AUTO GENERATED FDCAN_EN END */
 
+// FDCANX接收FIFO选择（0=FIFO0, 1=FIFO1）
+/* AUTO GENERATED FDCAN_RX_FIFO BEGIN */
+#ifdef FDCAN1_EN
+  #define FDCAN1_RX_FIFO  0
+#endif
+#ifdef FDCAN2_EN
+  #define FDCAN2_RX_FIFO  1
+#endif
+#ifdef FDCAN3_EN
+  #define FDCAN3_RX_FIFO  1 
+#endif
+/* AUTO GENERATED FDCAN_RX_FIFO END */
 /* Exported types ----------------------------------------------------------- */
 typedef enum {
+  /* AUTO GENERATED BSP_FDCAN_NAME BEGIN */
   BSP_FDCAN_1,
   BSP_FDCAN_2,
   BSP_FDCAN_3,
+  /* AUTO GENERATED BSP_FDCAN_NAME END */
   BSP_FDCAN_NUM,
   BSP_FDCAN_ERR,
 } BSP_FDCAN_t;
