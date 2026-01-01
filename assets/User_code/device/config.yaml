@@ -240,6 +240,22 @@ devices:
     description: "lcd驱动(SPI)"
     dependencies:
       bsp: ["gpio", "spi"]
+    bsp_requirements:
+      - type: "spi"
+        var_name: "BSP_SPI_LCD"
+        description: "用于LCD通信的SPI总线"
+      - type: "gpio"
+        var_name: "BSP_GPIO_LCD_CS"
+        description: "LCD片选引脚"
+        gpio_type: "output"
+      - type: "gpio"
+        var_name: "BSP_GPIO_LCD_DC"
+        description: "LCD数据/命令控制引脚"
+        gpio_type: "output"
+      - type: "gpio"
+        var_name: "BSP_GPIO_LCD_RST"
+        description: "LCD复位引脚"
+        gpio_type: "output"
     thread_signals: []
     files:
       header: "lcd.h"

@@ -243,8 +243,13 @@ class DeviceSimple(QWidget):
         # 使用设备名称作为子文件夹名（小写）
         device_folder = self.device_name.lower()
         template_base_dir = CodeGenerator.get_assets_dir("User_code/device")
+        device_template_dir = os.path.join(template_base_dir, device_folder)
         files = self.device_config.get('files', {})
         
+        # 收集需要替换BSP配置的文件列表
+        files_to_process = list(files.values())
+        
+        # 处理配置中定义的主要文件（需要BSP替换）
         for file_type, filename in files.items():
             # 先尝试从子文件夹加载
             src_path = os.path.join(template_base_dir, device_folder, filename)
@@ -272,6 +277,25 @@ class DeviceSimple(QWidget):
                     os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                     with open(dst_path, 'w', encoding='utf-8') as f:
                         f.write(content)
+        
+        # 复制设备文件夹下的其他文件（如 lcd_lib.h）
+        if os.path.exists(device_template_dir):
+            import shutil
+            for item in os.listdir(device_template_dir):
+                # 跳过已处理的文件
+                if item in files_to_process:
+                    continue
+                
+                src_file = os.path.join(device_template_dir, item)
+                dst_file = os.path.join(self.project_path, f"User/device/{item}")
+                
+                # 只复制文件，不复制子目录
+                if os.path.isfile(src_file):
+                    # 检查文件是否已存在，避免覆盖
+                    if not os.path.exists(dst_file):
+                        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                        shutil.copy2(src_file, dst_file)
+                        print(f"复制额外文件: {dst_file}")
         
         self._save_config()
         return True

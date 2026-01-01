@@ -235,7 +235,15 @@ class BspPeripheralBase(QWidget):
         return True
 
     def _generate_source_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, self.template_names['source'])
+        # 从子文件夹加载模板（与_generate_header_file保持一致）
+        periph_folder = self.peripheral_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, self.template_names['source'])
+        
+        if not os.path.exists(template_path):
+            # 如果子文件夹不存在，尝试从根目录加载（向后兼容）
+            template_path = os.path.join(template_base_dir, self.template_names['source'])
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -398,7 +406,15 @@ class bsp_can(BspPeripheralBase):
         )
 
     def _generate_source_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, self.template_names['source'])
+        # 从子文件夹加载模板（与_generate_header_file保持一致）
+        periph_folder = self.peripheral_name.lower()
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, periph_folder, self.template_names['source'])
+        
+        if not os.path.exists(template_path):
+            # 如果子文件夹不存在，尝试从根目录加载（向后兼容）
+            template_path = os.path.join(template_base_dir, self.template_names['source'])
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -1048,7 +1064,14 @@ class bsp_gpio(QWidget):
         return True
 
     def _generate_header_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, "gpio.h")
+        # 从子文件夹加载模板
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, "gpio", "gpio.h")
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：从根目录加载
+            template_path = os.path.join(template_base_dir, "gpio.h")
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -1067,7 +1090,14 @@ class bsp_gpio(QWidget):
         return True
 
     def _generate_source_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, "gpio.c")
+        # 从子文件夹加载模板
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, "gpio", "gpio.c")
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：从根目录加载
+            template_path = os.path.join(template_base_dir, "gpio.c")
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -1305,7 +1335,14 @@ class bsp_pwm(QWidget):
         return True
 
     def _generate_header_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, "pwm.h")
+        # 从子文件夹加载模板
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, "pwm", "pwm.h")
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：从根目录加载
+            template_path = os.path.join(template_base_dir, "pwm.h")
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False
@@ -1324,7 +1361,14 @@ class bsp_pwm(QWidget):
         return True
 
     def _generate_source_file(self, configs, template_dir):
-        template_path = os.path.join(template_dir, "pwm.c")
+        # 从子文件夹加载模板
+        template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+        template_path = os.path.join(template_base_dir, "pwm", "pwm.c")
+        
+        if not os.path.exists(template_path):
+            # 向后兼容：从根目录加载
+            template_path = os.path.join(template_base_dir, "pwm.c")
+        
         template_content = CodeGenerator.load_template(template_path)
         if not template_content:
             return False

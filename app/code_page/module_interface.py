@@ -28,7 +28,7 @@ class ModulePage(QWidget):
         module_dir = CodeGenerator.get_assets_dir("User_code/module")
         if subtype:
             self.module_path = os.path.join(module_dir, module_type, subtype)
-            self.module_key = subtype
+            self.module_key = module_type  # 使用类型名作为目标文件夹
         else:
             self.module_path = os.path.join(module_dir, module_type)
             self.module_key = module_type
@@ -139,10 +139,7 @@ class ModulePage(QWidget):
     
     def _check_generated_status(self):
         """检查模块是否已生成"""
-        if self.subtype:
-            dst_dir = os.path.join(self.project_path, "User/module", self.module_type, self.subtype)
-        else:
-            dst_dir = os.path.join(self.project_path, "User/module", self.module_type)
+        dst_dir = os.path.join(self.project_path, "User/module", self.module_key)
         
         if os.path.exists(dst_dir):
             has_code = any(
@@ -165,11 +162,8 @@ class ModulePage(QWidget):
             # 首先生成 config（如果不存在）
             self._generate_config()
             
-            # 目标目录
-            if self.subtype:
-                dst_dir = os.path.join(self.project_path, "User/module", self.module_type, self.subtype)
-            else:
-                dst_dir = os.path.join(self.project_path, "User/module", self.module_type)
+            # 目标目录：展平到 User/module/{module_key}
+            dst_dir = os.path.join(self.project_path, "User/module", self.module_key)
             
             # 检查是否已存在
             if os.path.exists(dst_dir):
