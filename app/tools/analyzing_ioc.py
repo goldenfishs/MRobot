@@ -71,7 +71,7 @@ class analyzing_ioc:
     @staticmethod
     def get_enabled_can_from_ioc(ioc_path):
         """
-        获取已启用的CAN列表
+        获取已启用的CAN列表（不包括FDCAN）
         返回格式: ['CAN1', 'CAN2'] 等
         """
         enabled_can = []
@@ -84,11 +84,34 @@ class analyzing_ioc:
                     key, value = line.split('=', 1)
                     key = key.strip()
                     value = value.strip()
-                    if key.startswith('Mcu.IP') and value.startswith('CAN'):
+                    # 只匹配CAN，不包括FDCAN
+                    if key.startswith('Mcu.IP') and value.startswith('CAN') and not value.startswith('FDCAN'):
                         can_name = value.split('.')[0] if '.' in value else value
                         if can_name not in enabled_can:
                             enabled_can.append(can_name)
         return sorted(enabled_can)
+
+    @staticmethod
+    def get_enabled_fdcan_from_ioc(ioc_path):
+        """
+        获取已启用的FDCAN列表
+        返回格式: ['FDCAN1', 'FDCAN2', 'FDCAN3'] 等
+        """
+        enabled_fdcan = []
+        with open(ioc_path, encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    if key.startswith('Mcu.IP') and value.startswith('FDCAN'):
+                        fdcan_name = value.split('.')[0] if '.' in value else value
+                        if fdcan_name not in enabled_fdcan:
+                            enabled_fdcan.append(fdcan_name)
+        return sorted(enabled_fdcan)
 
     @staticmethod
     def get_enabled_uart_from_ioc(ioc_path):
