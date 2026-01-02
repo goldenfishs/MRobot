@@ -657,6 +657,44 @@ class bsp_fdcan(BspPeripheralBase):
             get_available_fdcan
         )
 
+    def _generate_bsp_code_internal(self):
+        """重写以在生成FDCAN代码后自动复制CAN兼容层"""
+        # 先调用父类方法生成FDCAN代码
+        result = super()._generate_bsp_code_internal()
+        if result:
+            # 成功后复制CAN兼容层文件
+            self._copy_can_wrapper()
+        return result
+
+    def _copy_can_wrapper(self):
+        """复制CAN兼容层文件(can.h和can.c)到项目"""
+        try:
+            template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
+            fdcan_folder = os.path.join(template_base_dir, "fdcan")
+            bsp_output_dir = os.path.join(self.project_path, "User/bsp")
+            
+            # 确保输出目录存在
+            os.makedirs(bsp_output_dir, exist_ok=True)
+            
+            # 复制can.h
+            can_h_src = os.path.join(fdcan_folder, "can.h")
+            can_h_dst = os.path.join(bsp_output_dir, "can.h")
+            if os.path.exists(can_h_src):
+                import shutil
+                shutil.copy2(can_h_src, can_h_dst)
+                print(f"✓ 已复制CAN兼容层: can.h")
+            
+            # 复制can.c (如果存在)
+            can_c_src = os.path.join(fdcan_folder, "can.c")
+            can_c_dst = os.path.join(bsp_output_dir, "can.c")
+            if os.path.exists(can_c_src):
+                import shutil
+                shutil.copy2(can_c_src, can_c_dst)
+                print(f"✓ 已复制CAN兼容层: can.c")
+                
+        except Exception as e:
+            print(f"复制CAN兼容层文件时出错: {e}")
+
     def _generate_header_file(self, configs, template_dir):
         """重写头文件生成，添加 FDCAN 使能和 FIFO 分配定义"""
         # 从子文件夹加载模板
