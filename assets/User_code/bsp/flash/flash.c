@@ -26,10 +26,18 @@ void BSP_Flash_EraseSector(uint32_t sector) {
     flash_erase.TypeErase = FLASH_TYPEERASE_SECTORS;
     flash_erase.VoltageRange = FLASH_VOLTAGE_RANGE_3;
     flash_erase.NbSectors = 1;
+#if defined(STM32H7)
+    flash_erase.Banks = FLASH_BANK_1;  // H7 requires Bank parameter
+#endif
 
     HAL_FLASH_Unlock();
+#if defined(STM32H7)
+    while (FLASH_WaitForLastOperation(50, FLASH_BANK_1) != HAL_OK)
+      ;
+#else
     while (FLASH_WaitForLastOperation(50) != HAL_OK)
       ;
+#endif
     HAL_FLASHEx_Erase(&flash_erase, &sector_error);
     HAL_FLASH_Lock();
   }
@@ -39,6 +47,24 @@ void BSP_Flash_EraseSector(uint32_t sector) {
 
 void BSP_Flash_WriteBytes(uint32_t address, const uint8_t *buf, size_t len) {
   HAL_FLASH_Unlock();
+#if defined(STM32H7)
+  // H7 uses FLASHWORD (32 bytes) programming
+  uint8_t flash_word[32] __attribute__((aligned(32)));
+  while (len > 0) {
+    size_t chunk = (len < 32) ? len : 32;
+    memset(flash_word, 0xFF, 32);
+    memcpy(flash_word, buf, chunk);
+    
+    while (FLASH_WaitForLastOperation(50, FLASH_BANK_1) != HAL_OK)
+      ;
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_FLASHWORD, address, (uint32_t)flash_word);
+    
+    address += 32;
+    buf += chunk;
+    len -= chunk;
+  }
+#else
+  // F4/F7 use byte programming
   while (len > 0) {
     while (FLASH_WaitForLastOperation(50) != HAL_OK)
       ;
@@ -47,6 +73,7 @@ void BSP_Flash_WriteBytes(uint32_t address, const uint8_t *buf, size_t len) {
     buf++;
     len--;
   }
+#endif
   HAL_FLASH_Lock();
 }
 

@@ -69,7 +69,6 @@ int8_t BSP_GPIO_EnableIRQ(BSP_GPIO_t gpio) {
     default:
       return BSP_ERR;
   }
-  return BSP_OK;
 }
 
 int8_t BSP_GPIO_DisableIRQ(BSP_GPIO_t gpio) {
@@ -78,7 +77,6 @@ int8_t BSP_GPIO_DisableIRQ(BSP_GPIO_t gpio) {
     default:
       return BSP_ERR;
   }
-  return BSP_OK;
 }
 int8_t BSP_GPIO_WritePin(BSP_GPIO_t gpio, bool value){
   if (gpio >= BSP_GPIO_NUM) return BSP_ERR;

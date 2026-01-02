@@ -1113,18 +1113,25 @@ class bsp_gpio(QWidget):
         )
         
         # 生成EXTI使能代码 - 使用用户自定义的BSP枚举名称
+        # 根据引脚编号获取正确的IRQn（适配不同MCU）
         enable_lines = []
         disable_lines = []
         for config in configs:
             if config['has_exti']:
                 ioc_label = config['ioc_label']
                 custom_name = config['custom_name']
+                # 尝试从IOC label中提取引脚编号，优先使用IOC定义的IRQn
                 enable_lines.append(f"    case BSP_GPIO_{custom_name}:")
+                enable_lines.append(f"#if defined({ioc_label}_EXTI_IRQn)")
                 enable_lines.append(f"      HAL_NVIC_EnableIRQ({ioc_label}_EXTI_IRQn);")
-                enable_lines.append(f"      break;")
+                enable_lines.append(f"#endif")
+                enable_lines.append(f"      return BSP_OK;")
+                
                 disable_lines.append(f"    case BSP_GPIO_{custom_name}:")
+                disable_lines.append(f"#if defined({ioc_label}_EXTI_IRQn)")
                 disable_lines.append(f"      HAL_NVIC_DisableIRQ({ioc_label}_EXTI_IRQn);")
-                disable_lines.append(f"      break;")
+                disable_lines.append(f"#endif")
+                disable_lines.append(f"      return BSP_OK;")
                 
         content = CodeGenerator.replace_auto_generated(
             content, "AUTO GENERATED BSP_GPIO_ENABLE_IRQ", "\n".join(enable_lines)
