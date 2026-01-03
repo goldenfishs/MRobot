@@ -197,7 +197,7 @@ int8_t CMD_Arbitrate(CMD_t *ctx) {
   }
   
   /* 自动仲裁：优先级 PC > RC > NUC */
-  CMD_InputSource_t candidates[] = {CMD_SRC_PC, CMD_SRC_RC, CMD_SRC_NUC};
+  CMD_InputSource_t candidates[] = {CMD_SRC_RC, CMD_SRC_PC, CMD_SRC_NUC};
   const int num_candidates = sizeof(candidates) / sizeof(candidates[0]);
   
   /* 如果当前输入源仍然在线且有效，保持使用 */

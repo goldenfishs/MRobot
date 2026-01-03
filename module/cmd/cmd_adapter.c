@@ -10,7 +10,7 @@
 // static CMD_InputAdapter_t *g_adapters[CMD_SRC_NUM] = {0};
 CMD_InputAdapter_t *g_adapters[CMD_SRC_NUM] = {0};
 /* ========================================================================== */
-/*                        DR16 抽象实现                                       */
+/*                        DR16 适配器实现                                       */
 /* ========================================================================== */
 #if CMD_RC_DEVICE_TYPE == 0
 
@@ -27,19 +27,19 @@ int8_t CMD_DR16_RC_GetInput(void *data, CMD_RawInput_t *output) {
     output->online[CMD_SRC_RC] = dr16->header.online;
     
     /* 遥控器摇杆映射 */
-    output->rc.joy_left.x  = dr16->data.rc.ch_l_x;
-    output->rc.joy_left.y  = dr16->data.rc.ch_l_y;
-    output->rc.joy_right.x = dr16->data.rc.ch_r_x;
-    output->rc.joy_right.y = dr16->data.rc.ch_r_y;
+    output->rc.joy_left.x  = dr16->data.ch_l_x;
+    output->rc.joy_left.y  = dr16->data.ch_l_y;
+    output->rc.joy_right.x = dr16->data.ch_r_x;
+    output->rc.joy_right.y = dr16->data.ch_r_y;
     
     /* 拨杆映射 */
-    switch (dr16->data.rc.sw_l) {
+    switch (dr16->data.sw_l) {
         case DR16_SW_UP:   output->rc.sw[0] = CMD_SW_UP;   break;
         case DR16_SW_MID:  output->rc.sw[0] = CMD_SW_MID;  break;
         case DR16_SW_DOWN: output->rc.sw[0] = CMD_SW_DOWN; break;
         default:           output->rc.sw[0] = CMD_SW_ERR;  break;
     }
-    switch (dr16->data.rc.sw_r) {
+    switch (dr16->data.sw_r) {
         case DR16_SW_UP:   output->rc.sw[1] = CMD_SW_UP;   break;
         case DR16_SW_MID:  output->rc.sw[1] = CMD_SW_MID;  break;
         case DR16_SW_DOWN: output->rc.sw[1] = CMD_SW_DOWN; break;
@@ -47,7 +47,7 @@ int8_t CMD_DR16_RC_GetInput(void *data, CMD_RawInput_t *output) {
     }
     
     /* 拨轮映射 */
-    output->rc.dial = dr16->data.rc.ch_res;
+    output->rc.dial = dr16->data.ch_res;
     
     return CMD_OK;
 }
@@ -60,10 +60,10 @@ int8_t CMD_DR16_PC_GetInput(void *data, CMD_RawInput_t *output) {
     output->online[CMD_SRC_PC] = dr16->header.online;
     
     /* PC端鼠标映射 */
-    output->pc.mouse.x = dr16->data.pc.mouse.x;
-    output->pc.mouse.y = dr16->data.pc.mouse.y;
-    output->pc.mouse.l_click = dr16->data.pc.mouse.l_click;
-    output->pc.mouse.r_click = dr16->data.pc.mouse.r_click;
+    output->pc.mouse.x = dr16->data.mouse.x;
+    output->pc.mouse.y = dr16->data.mouse.y;
+    output->pc.mouse.l_click = dr16->data.mouse.l_click;
+    output->pc.mouse.r_click = dr16->data.mouse.r_click;
     
     /* 键盘映射 */
     output->pc.keyboard.bitmap = dr16->raw_data.key;
@@ -83,7 +83,7 @@ CMD_DEFINE_ADAPTER(DR16_PC, cmd_dr16, CMD_SRC_PC, CMD_DR16_Init, CMD_DR16_PC_Get
 #endif /* CMD_RC_DEVICE_TYPE == 0 */
 
 /* ========================================================================== */
-/*                        AT9S 抽象实现 (示例框架)                            */
+/*                        AT9S 适配器实现 (示例框架)                            */
 /* ========================================================================== */
 #if CMD_RC_DEVICE_TYPE == 1
 
@@ -100,10 +100,10 @@ int8_t CMD_AT9S_GetInput(void *data, CMD_RawInput_t *output) {
     output->online[CMD_SRC_RC] = at9s->header.online;
     
     /* TODO: 按照AT9S的数据格式进行映射 */
-    output->joy_left.x  = at9s->data.rc.ch_l_x;
-    output->joy_left.y  = at9s->data.rc.ch_l_y;
-    output->joy_right.x = at9s->data.rc.ch_r_x;
-    output->joy_right.y = at9s->data.rc.ch_r_y;
+    output->joy_left.x  = at9s->data.ch_l_x;
+    output->joy_left.y  = at9s->data.ch_l_y;
+    output->joy_right.x = at9s->data.ch_r_x;
+    output->joy_right.y = at9s->data.ch_r_y;
     
     /* 拨杆映射需要根据AT9S的实际定义 */
     
@@ -141,10 +141,6 @@ int8_t CMD_Adapter_InitAll(void) {
     /* AT9S 目前只支持 RC 输入 */
     CMD_Adapter_Register(&g_adapter_AT9S);
 #endif
-    
-    /* 注册NUC适配器 */
-
-    /* 注册REF适配器 */
     
     /* 初始化所有已注册的适配器 */
     for (int i = 0; i < CMD_SRC_NUM; i++) {
