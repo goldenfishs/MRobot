@@ -10,6 +10,7 @@
 *.lst
 *.ini
 *.iex
+*.pyc
 *.sct
 *.scvd
 *.uvguix

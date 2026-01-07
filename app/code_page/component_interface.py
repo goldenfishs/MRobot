@@ -124,6 +124,26 @@ class ComponentSimple(QWidget):
                 continue
             output_path = os.path.join(self.project_path, f"User/component/{filename}")
             CodeGenerator.save_with_preserve(output_path, template_content)
+        
+        # 复制组件文件夹下的其他额外文件
+        comp_template_dir = os.path.join(template_base_dir, comp_folder)
+        if os.path.exists(comp_template_dir) and os.path.isdir(comp_template_dir):
+            import shutil
+            files_to_process = list(self.template_names.values())
+            for item in os.listdir(comp_template_dir):
+                # 跳过已处理的主要文件
+                if item in files_to_process:
+                    continue
+                
+                src_file = os.path.join(comp_template_dir, item)
+                dst_file = os.path.join(self.project_path, f"User/component/{item}")
+                
+                # 只复制文件，不复制子目录
+                if os.path.isfile(src_file):
+                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+                    shutil.copy2(src_file, dst_file)
+                    print(f"复制组件额外文件: {item}")
+        
         self._save_config()
         return True
     
@@ -271,75 +291,27 @@ class component(QWidget):
                         if not dep_name.endswith(('.h', '.c', '.hpp', '.cpp')):
                             components_to_generate.add(dep_name)
         
-        # 为没有对应页面但需要生成的依赖组件创建临时页面
+        # 检查缺失的依赖组件
         user_code_dir = CodeGenerator.get_assets_dir("User_code")
+        missing_dependencies = []
         for comp_name in components_to_generate:
             if comp_name not in component_pages:
-                # 创建临时组件页面
-                template_names = {'header': f'{comp_name}.h', 'source': f'{comp_name}.c'}
-                temp_page = ComponentSimple(project_path, comp_name.upper(), template_names)
-                # temp_page.set_forced_enabled(True)  # 自动启用依赖组件
-                component_pages[comp_name] = temp_page
+                missing_dependencies.append(comp_name)
         
         # 如果没有组件需要生成，返回提示信息
         if not components_to_generate:
             return "没有启用的组件需要生成代码。"
         
-        # 生成代码和依赖文件
+        # 如果有缺失的依赖组件，提示用户
+        if missing_dependencies:
+            missing_msg = f"警告：以下依赖组件未启用，可能导致编译错误：{', '.join(missing_dependencies)}\n请在组件配置中启用这些依赖组件。\n\n"
+        else:
+            missing_msg = ""
+        
+        # 生成代码
         success_count = 0
         fail_count = 0
         fail_list = []
-        
-        # 处理依赖文件的复制
-        all_deps = set()
-        for page in pages:
-            if hasattr(page, "component_name") and hasattr(page, "is_need_generate"):
-                if page.is_need_generate():
-                    deps = page.get_enabled_dependencies()
-                    all_deps.update(deps)
-        
-        # 复制依赖文件
-        for dep_path in all_deps:
-            try:
-                # 检查是否是 bsp 层依赖
-                if dep_path.startswith('bsp/'):
-                    # 对于 bsp 层依赖，跳过复制，因为这些由 BSP 代码生成负责
-                    print(f"跳过 BSP 层依赖: {dep_path} (由 BSP 代码生成负责)")
-                    continue
-                
-                # dep_path 格式如 "component/filter" 或 "component/user_math.h"
-                src_path = os.path.join(user_code_dir, dep_path)
-                dst_path = os.path.join(project_path, "User", dep_path)
-                
-                if os.path.isdir(src_path):
-                    # 如果是目录，复制整个目录
-                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                    if os.path.exists(dst_path):
-                        shutil.rmtree(dst_path)
-                    shutil.copytree(src_path, dst_path)
-                elif os.path.isfile(src_path):
-                    # 如果是文件，复制单个文件并保留用户区域
-                    os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                    with open(src_path, 'r', encoding='utf-8') as f:
-                        new_content = f.read()
-                    CodeGenerator.save_with_preserve(dst_path, new_content)
-                else:
-                    # 如果既不是文件也不是目录，跳过
-                    print(f"跳过不存在的依赖: {dep_path}")
-                    continue
-                    
-                success_count += 1
-                print(f"成功复制依赖: {dep_path}")
-            except Exception as e:
-                # 对于 bsp 层依赖的错误，只记录但不计入失败
-                if dep_path.startswith('bsp/'):
-                    print(f"BSP 层依赖 {dep_path} 复制失败，但忽略此错误: {e}")
-                else:
-                    fail_count += 1
-                    fail_list.append(f"{dep_path} (依赖复制异常: {e})")
-                    print(f"复制依赖失败: {dep_path}, 错误: {e}")
-        
-        # 生成组件代码
         skipped_count = 0
         skipped_list = []
         
@@ -370,8 +342,8 @@ class component(QWidget):
                     fail_list.append(f"{comp_name} (生成异常: {e})")
                     print(f"生成组件异常: {comp_name}, 错误: {e}")
         
-        total_items = len(all_deps) + len(components_to_generate)
-        msg = f"组件代码生成完成：总共处理 {total_items} 项，成功生成 {success_count} 项，跳过 {skipped_count} 项，失败 {fail_count} 项。"
+        total_items = len(components_to_generate)
+        msg = missing_msg + f"组件代码生成完成：总共处理 {total_items} 项，成功生成 {success_count} 项，跳过 {skipped_count} 项，失败 {fail_count} 项。"
         if skipped_list:
             msg += f"\n跳过项（文件已存在且未勾选）：\n" + "\n".join(skipped_list)
         if fail_list:
