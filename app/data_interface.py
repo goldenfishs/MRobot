@@ -456,11 +456,19 @@ class DataInterface(QWidget):
 
     def generate_freertos_task(self):
         import re
-        freertos_path = os.path.join(self.project_path, "Core", "Src", "freertos.c")
-        if not os.path.exists(freertos_path):
+        # 尝试查找 freertos.c 或 app_freertos.c (G4系列使用 app_freertos.c)
+        freertos_path = None
+        possible_names = ["freertos.c", "app_freertos.c"]
+        for name in possible_names:
+            path = os.path.join(self.project_path, "Core", "Src", name)
+            if os.path.exists(path):
+                freertos_path = path
+                break
+        
+        if not freertos_path:
             InfoBar.error(
-                title="未找到 freertos.c",
-                content="未找到 Core/Src/freertos.c 文件，请确认工程路径。",
+                title="未找到 FreeRTOS 文件",
+                content="未找到 Core/Src/freertos.c 或 Core/Src/app_freertos.c 文件，请确认工程路径。",
                 parent=self,
                 duration=2500
             )
