@@ -637,6 +637,31 @@ class DataInterface(QWidget):
         for t in task_list:
             desc = t.get("description", "")
             desc_wrapped = "\n    ".join(textwrap.wrap(desc, 20))
+            
+            # 检查是否是预设任务
+            if t.get("preset_task"):
+                # 使用预设任务的代码
+                preset_task_name = t["preset_task"]
+                from app.tools.code_generator import CodeGenerator
+                task_template_dir = CodeGenerator.get_assets_dir("User_code/task/template_task")
+                preset_task_file = os.path.join(task_template_dir, f"{preset_task_name}.c")
+                
+                if os.path.exists(preset_task_file):
+                    # 直接复制预设任务文件
+                    task_c_path = os.path.join(output_dir, f"{t['name']}.c")
+                    with open(preset_task_file, 'r', encoding='utf-8') as f:
+                        preset_code = f.read()
+                    
+                    # 如果任务名称不同，需要替换函数名
+                    if preset_task_name != t["name"]:
+                        # 替换任务函数名
+                        preset_code = preset_code.replace(f"Task_{preset_task_name}", t["function"])
+                        preset_code = preset_code.replace(f"    {preset_task_name} Task", f"    {t['name']} Task")
+                    
+                    save_with_preserve(task_c_path, preset_code)
+                    continue
+            
+            # 使用默认模板生成任务代码
             context_task = {
                 "task_name": t["name"],
                 "task_function": t["function"],
