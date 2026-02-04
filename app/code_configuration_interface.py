@@ -2,16 +2,55 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QSizePolicy
 from PyQt5.QtCore import Qt
 from qfluentwidgets import PushSettingCard, FluentIcon, TabBar
 from qfluentwidgets import TitleLabel, BodyLabel, PushButton, FluentIcon
-from PyQt5.QtWidgets import QFileDialog, QDialog, QHBoxLayout
+from PyQt5.QtWidgets import QFileDialog, QHBoxLayout
 from qfluentwidgets import ComboBox, PrimaryPushButton, SubtitleLabel
+from qfluentwidgets import MessageBoxBase, InfoBar
 import os
+import sys
 import shutil
 import tempfile
 from .function_fit_interface import FunctionFitInterface
 from .ai_interface import AIInterface
-from qfluentwidgets import InfoBar
 from .tools.update_code import update_code
 from .code_generate_interface import CodeGenerateInterface
+from .tools.code_generator import CodeGenerator
+
+
+class PresetIocDialog(MessageBoxBase):
+    """预设IOC选择对话框 - Fluent设计风格"""
+    def __init__(self, preset_files, parent=None):
+        super().__init__(parent)
+        self.preset_files = preset_files
+        self.titleLabel = SubtitleLabel("选择要使用的IOC模版")
+        
+        # 选择下拉框
+        self.select_label = BodyLabel("预设IOC：")
+        self.preset_combo = ComboBox()
+        
+        for preset in preset_files:
+            self.preset_combo.addItem(preset['name'])
+        
+        # 添加控件到布局
+        self.viewLayout.addWidget(self.titleLabel)
+        self.viewLayout.addSpacing(12)
+        
+        select_layout = QHBoxLayout()
+        select_layout.addWidget(self.select_label)
+        select_layout.addWidget(self.preset_combo, 1)
+        self.viewLayout.addLayout(select_layout)
+        
+        # 设置对话框属性
+        self.widget.setMinimumWidth(400)
+        self.yesButton.setText("保存到")
+        self.cancelButton.setText("取消")
+    
+    def get_selected_preset(self):
+        """获取选中的预设"""
+        selected_index = self.preset_combo.currentIndex()
+        if 0 <= selected_index < len(self.preset_files):
+            return self.preset_files[selected_index]
+        return None
+
 
 class CodeConfigurationInterface(QWidget):
     def __init__(self, parent=None):
@@ -99,7 +138,9 @@ class CodeConfigurationInterface(QWidget):
     def get_preset_ioc_files(self):
         """获取预设的ioc文件列表"""
         try:
-            preset_ioc_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "User_code", "ioc")
+            # 使用CodeGenerator统一的assets路径获取方法
+            preset_ioc_dir = CodeGenerator.get_assets_dir("User_code/ioc")
+            
             if not os.path.exists(preset_ioc_dir):
                 return []
             
@@ -128,54 +169,11 @@ class CodeConfigurationInterface(QWidget):
             )
             return
 
-        # 创建选择对话框
-        dialog = QDialog(self)
-        dialog.setWindowTitle("获取预设IOC")
-        dialog.resize(400, 200)
-        dialog.setModal(True)
-
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # 标题
-        title_label = SubtitleLabel("选择要使用的IOC模版")
-        layout.addWidget(title_label)
-
-        # 选择下拉框
-        select_layout = QHBoxLayout()
-        select_label = BodyLabel("预设IOC：")
-        preset_combo = ComboBox()
-        
-        # 修复ComboBox数据问题
-        for i, preset in enumerate(preset_files):
-            preset_combo.addItem(preset['name'])
-        
-        select_layout.addWidget(select_label)
-        select_layout.addWidget(preset_combo)
-        layout.addLayout(select_layout)
-
-        layout.addSpacing(16)
-
-        # 按钮区域
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        
-        cancel_btn = PushButton("取消")
-        ok_btn = PrimaryPushButton("保存到")
-        
-        cancel_btn.clicked.connect(dialog.reject)
-        ok_btn.clicked.connect(dialog.accept)
-        
-        btn_layout.addWidget(cancel_btn)
-        btn_layout.addWidget(ok_btn)
-        layout.addLayout(btn_layout)
-
-        # 显示对话框
-        if dialog.exec() == QDialog.Accepted:
-            selected_index = preset_combo.currentIndex()
-            if selected_index >= 0 and selected_index < len(preset_files):
-                selected_preset = preset_files[selected_index]
+        # 创建Fluent风格的对话框
+        dialog = PresetIocDialog(preset_files, self)
+        if dialog.exec():
+            selected_preset = dialog.get_selected_preset()
+            if selected_preset:
                 self.save_preset_template(selected_preset)
 
     def save_preset_template(self, preset_info):
