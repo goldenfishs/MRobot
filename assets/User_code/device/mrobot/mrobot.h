@@ -143,10 +143,6 @@ extern "C" {
 #define MROBOT_HTOP_REFRESH_MS      200     /* htop 刷新间隔 (ms) */
 #endif
 
-#ifndef MROBOT_UART_PORT
-#define MROBOT_UART_PORT            BSP_UART_VOFA  /* 默认 UART 端口 */
-#endif
-
 #ifndef MROBOT_USER_NAME
 #define MROBOT_USER_NAME            "root"         /* CLI 用户名 */
 #endif

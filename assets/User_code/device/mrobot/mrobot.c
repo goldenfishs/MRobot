@@ -120,7 +120,7 @@ static void send_string(const char *str) {
     if (str == NULL || *str == '\0') return;
     
     ctx.tx_complete = false;
-    BSP_UART_Transmit(MROBOT_UART_PORT, (uint8_t *)str, strlen(str), true);
+    BSP_UART_Transmit(BSP_UART_MROBOT, (uint8_t *)str, strlen(str), true);
     while (!ctx.tx_complete) { osDelay(1); }
 }
 
@@ -151,7 +151,7 @@ static void uart_rx_callback(void) {
         if (ch == 'q' || ch == 'Q' || ch == 27) {
             ctx.htop_exit = true;
         }
-        BSP_UART_Receive(MROBOT_UART_PORT, &ctx.uart_rx_char, 1, false);
+        BSP_UART_Receive(BSP_UART_MROBOT, &ctx.uart_rx_char, 1, false);
         return;
     }
     
@@ -160,19 +160,19 @@ static void uart_rx_callback(void) {
         if (ctx.cmd_index > 0) {
             ctx.cmd_buffer[ctx.cmd_index] = '\0';
             ctx.cmd_ready = true;
-            BSP_UART_Transmit(MROBOT_UART_PORT, (uint8_t *)"\r\n", 2, false);
+            BSP_UART_Transmit(BSP_UART_MROBOT, (uint8_t *)"\r\n", 2, false);
         }
     } else if (ch == 127 || ch == 8) {  /* 退格键 */
         if (ctx.cmd_index > 0) {
             ctx.cmd_index--;
-            BSP_UART_Transmit(MROBOT_UART_PORT, (uint8_t *)ANSI_BACKSPACE, 3, false);
+            BSP_UART_Transmit(BSP_UART_MROBOT, (uint8_t *)ANSI_BACKSPACE, 3, false);
         }
     } else if (ch >= 32 && ch < 127 && ctx.cmd_index < sizeof(ctx.cmd_buffer) - 1) {
         ctx.cmd_buffer[ctx.cmd_index++] = ch;
-        BSP_UART_Transmit(MROBOT_UART_PORT, &ch, 1, false);
+        BSP_UART_Transmit(BSP_UART_MROBOT, &ch, 1, false);
     }
     
-    BSP_UART_Receive(MROBOT_UART_PORT, &ctx.uart_rx_char, 1, false);
+    BSP_UART_Receive(BSP_UART_MROBOT, &ctx.uart_rx_char, 1, false);
 }
 
 /* ========================================================================== */
@@ -500,11 +500,11 @@ void MRobot_Init(void) {
     }
     
     /* 注册 UART 回调 */
-    BSP_UART_RegisterCallback(MROBOT_UART_PORT, BSP_UART_RX_CPLT_CB, uart_rx_callback);
-    BSP_UART_RegisterCallback(MROBOT_UART_PORT, BSP_UART_TX_CPLT_CB, uart_tx_callback);
+    BSP_UART_RegisterCallback(BSP_UART_MROBOT, BSP_UART_RX_CPLT_CB, uart_rx_callback);
+    BSP_UART_RegisterCallback(BSP_UART_MROBOT, BSP_UART_TX_CPLT_CB, uart_tx_callback);
     
     /* 启动 UART 接收 */
-    BSP_UART_Receive(MROBOT_UART_PORT, &ctx.uart_rx_char, 1, false);
+    BSP_UART_Receive(BSP_UART_MROBOT, &ctx.uart_rx_char, 1, false);
     
     /* 等待用户按下回车 */
     while (ctx.uart_rx_char != '\r' && ctx.uart_rx_char != '\n') {
