@@ -1,10 +1,10 @@
 /**
- * @file mrobot.c
- * @brief MRobot CLI 实现
+ * @file putty.c
+ * @brief Putty CLI 实现
  */
 
 /* Includes ----------------------------------------------------------------- */
-#include "device/mrobot.h"
+#include "device/putty.h"
 #include "component/freertos_cli.h"
 #include "bsp/uart.h"
 #include "bsp/mm.h"
@@ -39,19 +39,19 @@ static const char *const CLI_WELCOME_MESSAGE =
 /* CLI 上下文结构体 - 封装所有状态 */
 typedef struct {
     /* 设备管理 */
-    MRobot_Device_t devices[MROBOT_MAX_DEVICES];
+    Putty_Device_t devices[PUTTY_MAX_DEVICES];
     uint8_t device_count;
     
     /* 自定义命令 */
-    CLI_Command_Definition_t *custom_cmds[MROBOT_MAX_CUSTOM_COMMANDS];
+    CLI_Command_Definition_t *custom_cmds[PUTTY_MAX_CUSTOM_COMMANDS];
     uint8_t custom_cmd_count;
     
     /* CLI 状态 */
-    MRobot_State_t state;
-    char current_path[MROBOT_PATH_MAX_LEN];
+    Putty_State_t state;
+    char current_path[PUTTY_PATH_MAX_LEN];
     
     /* 命令缓冲区 */
-    uint8_t cmd_buffer[MROBOT_CMD_BUFFER_SIZE];
+    uint8_t cmd_buffer[PUTTY_CMD_BUFFER_SIZE];
     volatile uint8_t cmd_index;
     volatile bool cmd_ready;
     
@@ -61,20 +61,20 @@ typedef struct {
     volatile bool htop_exit;
     
     /* 输出缓冲区 */
-    char output_buffer[MROBOT_OUTPUT_BUFFER_SIZE];
+    char output_buffer[PUTTY_OUTPUT_BUFFER_SIZE];
     
     /* 初始化标志 */
     bool initialized;
     
     /* 互斥锁 */
     SemaphoreHandle_t mutex;
-} MRobot_Context_t;
+} Putty_Context_t;
 
 /* Private variables -------------------------------------------------------- */
-static MRobot_Context_t ctx = {
+static Putty_Context_t ctx = {
     .device_count = 0,
     .custom_cmd_count = 0,
-    .state = MROBOT_STATE_IDLE,
+    .state = PUTTY_STATE_IDLE,
     .current_path = "/",
     .cmd_index = 0,
     .cmd_ready = false,
@@ -85,7 +85,6 @@ static MRobot_Context_t ctx = {
 };
 
 /* Private function prototypes ---------------------------------------------- */
-/* 命令处理函数 */
 static BaseType_t cmd_help(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t cmd_htop(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t cmd_cd(char *pcWriteBuffer, size_t xWriteBufferLen, const char *pcCommandString);
@@ -128,8 +127,8 @@ static void send_string(const char *str) {
  * @brief 发送命令提示符
  */
 static void send_prompt(void) {
-    char prompt[MROBOT_PATH_MAX_LEN + 32];
-    snprintf(prompt, sizeof(prompt), MROBOT_USER_NAME "@" MROBOT_HOST_NAME ":%s$ ", ctx.current_path);
+    char prompt[PUTTY_PATH_MAX_LEN + 32];
+    snprintf(prompt, sizeof(prompt), PUTTY_USER_NAME "@" PUTTY_HOST_NAME ":%s$ ", ctx.current_path);
     send_string(prompt);
 }
 
@@ -147,7 +146,7 @@ static void uart_rx_callback(void) {
     uint8_t ch = ctx.uart_rx_char;
     
     /* htop 模式下检查退出键 */
-    if (ctx.state == MROBOT_STATE_HTOP) {
+    if (ctx.state == PUTTY_STATE_HTOP) {
         if (ch == 'q' || ch == 'Q' || ch == 27) {
             ctx.htop_exit = true;
         }
@@ -187,7 +186,7 @@ static BaseType_t cmd_help(char *pcWriteBuffer, size_t xWriteBufferLen, const ch
     (void)pcCommandString;
     
     int offset = snprintf(pcWriteBuffer, xWriteBufferLen,
-        "MRobot CLI v2.0\r\n"
+        "Putty CLI v2.0\r\n"
         "================\r\n"
         "Built-in Commands:\r\n");
     
@@ -217,7 +216,7 @@ static BaseType_t cmd_htop(char *pcWriteBuffer, size_t xWriteBufferLen, const ch
     (void)pcCommandString;
     (void)pcWriteBuffer;
     (void)xWriteBufferLen;
-    /* htop 模式在 MRobot_Run 中处理 */
+    /* htop 模式在 Putty_Run 中处理 */
     return pdFALSE;
 }
 
@@ -238,7 +237,7 @@ static BaseType_t cmd_cd(char *pcWriteBuffer, size_t xWriteBufferLen, const char
     }
     
     /* 安全复制路径参数 */
-    char path[MROBOT_PATH_MAX_LEN];
+    char path[PUTTY_PATH_MAX_LEN];
     size_t copy_len = (size_t)param_len < sizeof(path) - 1 ? (size_t)param_len : sizeof(path) - 1;
     strncpy(path, param, copy_len);
     path[copy_len] = '\0';
@@ -304,7 +303,7 @@ static BaseType_t cmd_show(char *pcWriteBuffer, size_t xWriteBufferLen, const ch
     /* 使用局部静态变量跟踪多次打印状态 */
     static uint32_t print_count = 0;
     static uint32_t current_iter = 0;
-    static char target_device[MROBOT_DEVICE_NAME_LEN] = {0};
+    static char target_device[PUTTY_DEVICE_NAME_LEN] = {0};
     
     /* 首次调用时解析参数 */
     if (current_iter == 0) {
@@ -380,7 +379,7 @@ static BaseType_t cmd_show(char *pcWriteBuffer, size_t xWriteBufferLen, const ch
         }
     } else {
         /* 显示指定设备 */
-        const MRobot_Device_t *dev = MRobot_FindDevice(target_device);
+        const Putty_Device_t *dev = Putty_FindDevice(target_device);
         
         if (dev == NULL) {
             snprintf(pcWriteBuffer, xWriteBufferLen, 
@@ -404,7 +403,7 @@ static BaseType_t cmd_show(char *pcWriteBuffer, size_t xWriteBufferLen, const ch
     /* 判断是否继续打印 */
     current_iter++;
     if (current_iter < print_count) {
-        osDelay(MROBOT_HTOP_REFRESH_MS);
+        osDelay(PUTTY_HTOP_REFRESH_MS);
         return pdTRUE;
     } else {
         current_iter = 0;
@@ -417,7 +416,7 @@ static BaseType_t cmd_show(char *pcWriteBuffer, size_t xWriteBufferLen, const ch
  * ========================================================================== */
 static void handle_htop_mode(void) {
     send_string(ANSI_CLEAR_SCREEN);
-    send_string("=== MRobot Task Monitor (Press 'q' to exit) ===\r\n\r\n");
+    send_string("=== Putty Task Monitor (Press 'q' to exit) ===\r\n\r\n");
     
     /* 获取任务列表 */
     char task_buffer[1024];
@@ -465,20 +464,20 @@ static void handle_htop_mode(void) {
     
     /* 检查退出 */
     if (ctx.htop_exit) {
-        ctx.state = MROBOT_STATE_IDLE;
+        ctx.state = PUTTY_STATE_IDLE;
         ctx.htop_exit = false;
         send_string(ANSI_CLEAR_SCREEN);
         send_prompt();
     }
     
-    osDelay(MROBOT_HTOP_REFRESH_MS);
+    osDelay(PUTTY_HTOP_REFRESH_MS);
 }
 
 /* ========================================================================== */
 /*                              公共 API 实现                                   */
 /* ========================================================================== */
 
-void MRobot_Init(void) {
+void Putty_Init(void) {
     if (ctx.initialized) return;
     
     /* 创建互斥锁 */
@@ -487,7 +486,7 @@ void MRobot_Init(void) {
     /* 初始化状态（保留已注册的设备） */
     // 注意：不清除 devices 和 device_count，因为其他任务可能已经注册了设备
     ctx.custom_cmd_count = 0;
-    ctx.state = MROBOT_STATE_IDLE;
+    ctx.state = PUTTY_STATE_IDLE;
     strcpy(ctx.current_path, "/");
     ctx.cmd_index = 0;
     ctx.cmd_ready = false;
@@ -518,7 +517,7 @@ void MRobot_Init(void) {
     ctx.initialized = true;
 }
 
-void MRobot_DeInit(void) {
+void Putty_DeInit(void) {
     if (!ctx.initialized) return;
     
     /* 释放自定义命令内存 */
@@ -538,23 +537,23 @@ void MRobot_DeInit(void) {
     ctx.initialized = false;
 }
 
-MRobot_State_t MRobot_GetState(void) {
+Putty_State_t Putty_GetState(void) {
     return ctx.state;
 }
 
-MRobot_Error_t MRobot_RegisterDevice(const char *name, void *data, MRobot_PrintCallback_t print_cb) {
+Putty_Error_t Putty_RegisterDevice(const char *name, void *data, Putty_PrintCallback_t print_cb) {
     if (name == NULL || data == NULL) {
-        return MROBOT_ERR_NULL_PTR;
+        return PUTTY_ERR_NULL_PTR;
     }
     
-    if (ctx.device_count >= MROBOT_MAX_DEVICES) {
-        return MROBOT_ERR_FULL;
+    if (ctx.device_count >= PUTTY_MAX_DEVICES) {
+        return PUTTY_ERR_FULL;
     }
     
     /* 检查重名 */
     for (uint8_t i = 0; i < ctx.device_count; i++) {
         if (strcmp(ctx.devices[i].name, name) == 0) {
-            return MROBOT_ERR_INVALID_ARG;  /* 设备名已存在 */
+            return PUTTY_ERR_INVALID_ARG;  /* 设备名已存在 */
         }
     }
     
@@ -563,8 +562,8 @@ MRobot_Error_t MRobot_RegisterDevice(const char *name, void *data, MRobot_PrintC
         xSemaphoreTake(ctx.mutex, portMAX_DELAY);
     }
     
-    strncpy(ctx.devices[ctx.device_count].name, name, MROBOT_DEVICE_NAME_LEN - 1);
-    ctx.devices[ctx.device_count].name[MROBOT_DEVICE_NAME_LEN - 1] = '\0';
+    strncpy(ctx.devices[ctx.device_count].name, name, PUTTY_DEVICE_NAME_LEN - 1);
+    ctx.devices[ctx.device_count].name[PUTTY_DEVICE_NAME_LEN - 1] = '\0';
     ctx.devices[ctx.device_count].data = data;
     ctx.devices[ctx.device_count].print_cb = print_cb;
     ctx.device_count++;
@@ -573,12 +572,12 @@ MRobot_Error_t MRobot_RegisterDevice(const char *name, void *data, MRobot_PrintC
         xSemaphoreGive(ctx.mutex);
     }
     
-    return MROBOT_OK;
+    return PUTTY_OK;
 }
 
-MRobot_Error_t MRobot_UnregisterDevice(const char *name) {
+Putty_Error_t Putty_UnregisterDevice(const char *name) {
     if (name == NULL) {
-        return MROBOT_ERR_NULL_PTR;
+        return PUTTY_ERR_NULL_PTR;
     }
     
     if (ctx.mutex != NULL) {
@@ -596,30 +595,30 @@ MRobot_Error_t MRobot_UnregisterDevice(const char *name) {
             if (ctx.mutex != NULL) {
                 xSemaphoreGive(ctx.mutex);
             }
-            return MROBOT_OK;
+            return PUTTY_OK;
         }
     }
     
     if (ctx.mutex != NULL) {
         xSemaphoreGive(ctx.mutex);
     }
-    return MROBOT_ERR_NOT_FOUND;
+    return PUTTY_ERR_NOT_FOUND;
 }
 
-MRobot_Error_t MRobot_RegisterCommand(const char *command, const char *help_text,
-                                       MRobot_CommandCallback_t callback, int8_t param_count) {
+Putty_Error_t Putty_RegisterCommand(const char *command, const char *help_text,
+                                       Putty_CommandCallback_t callback, int8_t param_count) {
     if (command == NULL || help_text == NULL || callback == NULL) {
-        return MROBOT_ERR_NULL_PTR;
+        return PUTTY_ERR_NULL_PTR;
     }
     
-    if (ctx.custom_cmd_count >= MROBOT_MAX_CUSTOM_COMMANDS) {
-        return MROBOT_ERR_FULL;
+    if (ctx.custom_cmd_count >= PUTTY_MAX_CUSTOM_COMMANDS) {
+        return PUTTY_ERR_FULL;
     }
     
     /* 动态分配命令结构体 */
     CLI_Command_Definition_t *cmd_def = BSP_Malloc(sizeof(CLI_Command_Definition_t));
     if (cmd_def == NULL) {
-        return MROBOT_ERR_ALLOC;
+        return PUTTY_ERR_ALLOC;
     }
     
     /* 初始化命令定义 */
@@ -634,14 +633,14 @@ MRobot_Error_t MRobot_RegisterCommand(const char *command, const char *help_text
     ctx.custom_cmds[ctx.custom_cmd_count] = cmd_def;
     ctx.custom_cmd_count++;
     
-    return MROBOT_OK;
+    return PUTTY_OK;
 }
 
-uint8_t MRobot_GetDeviceCount(void) {
+uint8_t Putty_GetDeviceCount(void) {
     return ctx.device_count;
 }
 
-const MRobot_Device_t *MRobot_FindDevice(const char *name) {
+const Putty_Device_t *Putty_FindDevice(const char *name) {
     if (name == NULL) return NULL;
     
     for (uint8_t i = 0; i < ctx.device_count; i++) {
@@ -652,10 +651,10 @@ const MRobot_Device_t *MRobot_FindDevice(const char *name) {
     return NULL;
 }
 
-int MRobot_Printf(const char *fmt, ...) {
+int Putty_Printf(const char *fmt, ...) {
     if (fmt == NULL || !ctx.initialized) return -1;
     
-    char buffer[MROBOT_OUTPUT_BUFFER_SIZE];
+    char buffer[PUTTY_OUTPUT_BUFFER_SIZE];
     va_list args;
     va_start(args, fmt);
     int len = format_float_va(buffer, sizeof(buffer), fmt, args);
@@ -710,7 +709,7 @@ static int format_float_va(char *buf, size_t size, const char *fmt, va_list args
         switch (*p) {
             case 'f': {  /* 浮点数 */
                 double val = va_arg(args, double);
-                written = MRobot_FormatFloat(buf_ptr, buf_remain, (float)val, precision);
+                written = Putty_FormatFloat(buf_ptr, buf_remain, (float)val, precision);
                 break;
             }
             case 'd':
@@ -785,7 +784,7 @@ static int format_float_va(char *buf, size_t size, const char *fmt, va_list args
     return (int)(buf_ptr - buf);
 }
 
-int MRobot_Snprintf(char *buf, size_t size, const char *fmt, ...) {
+int Putty_Snprintf(char *buf, size_t size, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     int len = format_float_va(buf, size, fmt, args);
@@ -793,7 +792,7 @@ int MRobot_Snprintf(char *buf, size_t size, const char *fmt, ...) {
     return len;
 }
 
-int MRobot_FormatFloat(char *buf, size_t size, float val, int precision) {
+int Putty_FormatFloat(char *buf, size_t size, float val, int precision) {
     if (buf == NULL || size == 0) return 0;
     
     int offset = 0;
@@ -831,22 +830,22 @@ int MRobot_FormatFloat(char *buf, size_t size, float val, int precision) {
     return (written > 0) ? (offset + written) : offset;
 }
 
-void MRobot_Run(void) {
+void Putty_Run(void) {
     if (!ctx.initialized) return;
     
     /* htop 模式 */
-    if (ctx.state == MROBOT_STATE_HTOP) {
+    if (ctx.state == PUTTY_STATE_HTOP) {
         handle_htop_mode();
         return;
     }
     
     /* 处理命令 */
     if (ctx.cmd_ready) {
-        ctx.state = MROBOT_STATE_PROCESSING;
+        ctx.state = PUTTY_STATE_PROCESSING;
         
         /* 检查是否是 htop 命令 */
         if (strcmp((char *)ctx.cmd_buffer, "htop") == 0) {
-            ctx.state = MROBOT_STATE_HTOP;
+            ctx.state = PUTTY_STATE_HTOP;
             ctx.htop_exit = false;
         } else {
             /* 处理其他命令 */
@@ -863,7 +862,7 @@ void MRobot_Run(void) {
             } while (more != pdFALSE);
             
             send_prompt();
-            ctx.state = MROBOT_STATE_IDLE;
+            ctx.state = PUTTY_STATE_IDLE;
         }
         
         ctx.cmd_index = 0;
