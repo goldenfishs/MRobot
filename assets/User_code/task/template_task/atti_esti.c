@@ -84,9 +84,12 @@ void Task_atti_esti(void *argument) {
     AHRS_GetEulr(&eulr_to_send, &gimbal_ahrs);
     osKernelUnlock();
 
+    /* 在此处用消息队列传递imu数据 */
+    /* osMessageQueuePut( ... ); */
+  
+    /* 控制IMU加热器 */
     BSP_PWM_SetComp(BSP_PWM_IMU_HEAT, PID_Calc(&imu_temp_ctrl_pid, 40.5f,
                                                bmi088.temp, 0.0f, 0.0f));
-
     /* USER CODE END */
   }
   

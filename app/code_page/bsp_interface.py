@@ -917,10 +917,48 @@ class bsp_spi(BspPeripheralBase):
 
 
 def patch_uart_interrupts(project_path, uart_instances):
-    """自动修改 stm32f4xx_it.c，插入 UART BSP 相关代码"""
-    it_path = os.path.join(project_path, "Core/Src/stm32f4xx_it.c")
+    """自动修改中断文件，插入 UART BSP 相关代码（支持 F1/F4/H7 等系列）"""
+    # 检测MCU型号，确定正确的中断文件
+    ioc_files = [f for f in os.listdir(project_path) if f.endswith('.ioc')]
+    if not ioc_files:
+        return
+    
+    ioc_path = os.path.join(project_path, ioc_files[0])
+    mcu_name = analyzing_ioc.get_mcu_name_from_ioc(ioc_path)
+    
+    if not mcu_name:
+        return
+    
+    # 根据MCU型号确定中断文件名
+    mcu_upper = mcu_name.upper()
+    if 'STM32F1' in mcu_upper:
+        it_file = "stm32f1xx_it.c"
+    elif 'STM32F4' in mcu_upper:
+        it_file = "stm32f4xx_it.c"
+    elif 'STM32H7' in mcu_upper:
+        it_file = "stm32h7xx_it.c"
+    elif 'STM32F7' in mcu_upper:
+        it_file = "stm32f7xx_it.c"
+    elif 'STM32G4' in mcu_upper:
+        it_file = "stm32g4xx_it.c"
+    elif 'STM32L4' in mcu_upper:
+        it_file = "stm32l4xx_it.c"
+    else:
+        # 通用处理：尝试从MCU名称提取系列信息
+        # 格式通常为 STM32X0XXX，提取 X0 部分
+        import re as regex
+        match = regex.match(r'STM32([A-Z]\d)', mcu_upper)
+        if match:
+            series = match.group(1).lower()
+            it_file = f"stm32{series}xx_it.c"
+        else:
+            # 默认尝试 F4
+            it_file = "stm32f4xx_it.c"
+    
+    it_path = os.path.join(project_path, f"Core/Src/{it_file}")
     if not os.path.exists(it_path):
         return
+    
     with open(it_path, "r", encoding="utf-8") as f:
         code = f.read()
 
