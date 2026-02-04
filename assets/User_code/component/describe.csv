@@ -12,3 +12,4 @@ mixer,混控器
 ui,用户交互
 user_math,用户自定义数学函数
 pid,PID控制器
+kalman_filter,卡尔曼滤波器
