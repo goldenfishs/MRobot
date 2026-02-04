@@ -105,3 +105,8 @@ float HeatLimit_ShootFreq(float heat, float heat_limit, float cooling_rate,
   else
     return (heat_percent > 0.7f) ? stable_freq : 3.0f * stable_freq;
 }
+
+
+/* USER CODE BEGIN */
+
+/* USER CODE END */
