@@ -1,7 +1,7 @@
 atti_esti:
   name: "atti_esti"
   frequency: 1000
-  delay: 100
+  delay: 0
   stack: 512
   freq_control: false
   description: |
@@ -16,3 +16,13 @@ atti_esti:
     - 陀螺仪使用前需要校准，校准结果保存在bmi088_cali结构体中
     - 无磁力计版本，适用于干净的电磁环境
     - 需要配置PWM通道用于IMU加热控制
+cli:
+  name: "cli"
+  frequency: 500
+  delay: 0
+  stack: 1024
+  freq_control: false
+  description: |
+    命令行接口任务
+    通过串口实现的虚拟终端，配合putty食用更佳
+    需要freertos_cli组件支持，还有mrobot设备驱动

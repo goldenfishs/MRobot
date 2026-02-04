@@ -169,7 +169,8 @@ static void uart_rx_callback(void) {
         }
     } else if (ch >= 32 && ch < 127 && ctx.cmd_index < sizeof(ctx.cmd_buffer) - 1) {
         ctx.cmd_buffer[ctx.cmd_index++] = ch;
-        BSP_UART_Transmit(BSP_UART_MROBOT, &ch, 1, false);
+        /* 回显：使用静态变量地址，避免异步发送时局部变量已失效 */
+        BSP_UART_Transmit(BSP_UART_MROBOT, &ctx.uart_rx_char, 1, false);
     }
     
     BSP_UART_Receive(BSP_UART_MROBOT, &ctx.uart_rx_char, 1, false);
@@ -483,9 +484,8 @@ void MRobot_Init(void) {
     /* 创建互斥锁 */
     ctx.mutex = xSemaphoreCreateMutex();
     
-    /* 初始化状态 */
-    memset(ctx.devices, 0, sizeof(ctx.devices));
-    ctx.device_count = 0;
+    /* 初始化状态（保留已注册的设备） */
+    // 注意：不清除 devices 和 device_count，因为其他任务可能已经注册了设备
     ctx.custom_cmd_count = 0;
     ctx.state = MROBOT_STATE_IDLE;
     strcpy(ctx.current_path, "/");
