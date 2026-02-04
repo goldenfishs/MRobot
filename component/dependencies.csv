@@ -6,3 +6,4 @@ pid,component/filter
 filter,component/ahrs
 mixer,component/user_math.h
 ui,component/user_math.h
+kalman_filter,arm_math.h

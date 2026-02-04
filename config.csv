@@ -1,4 +1,4 @@
 bsp,can,fdcan,dwt,gpio,i2c,mm,spi,uart,pwm,time,flash
 component,ahrs,capacity,cmd,crc8,crc16,error_detect,filter,FreeRTOS_CLI,limiter,mixer,pid,ui,user_math
-device,dr16,bmi088,ist8310,motor,motor_rm,motor_dm,motor_vesc,motor_lk,motor_lz,motor_odrive,dm_imu,rc_can,servo,buzzer,led,ws2812,vofa,ops9,oid,lcd_driver
+device,dr16,bmi088,ist8310,motor,motor_rm,motor_dm,motor_vesc,motor_lk,motor_lz,motor_odrive,dm_imu,rc_can,servo,buzzer,led,ws2812,vofa,ops9,oid,lcd_driver,mrobot
 module,

@@ -1,0 +1,18 @@
+atti_esti:
+  name: "atti_esti"
+  frequency: 1000
+  delay: 100
+  stack: 512
+  freq_control: false
+  description: |
+    带有PWM温控的纯陀螺仪（BMI088）姿态解算任务
+    功能特点：
+    - 控制IMU加热到指定温度防止温漂
+    - 收集BMI088数据给AHRS算法进行姿态解算
+    - 解算后得到四元数，转换为欧拉角放到消息队列
+    - 使用PID控制IMU温度到40.5°C
+    - 运行频率1000Hz，提供高精度姿态信息
+    注意事项：
+    - 陀螺仪使用前需要校准，校准结果保存在bmi088_cali结构体中
+    - 无磁力计版本，适用于干净的电磁环境
+    - 需要配置PWM通道用于IMU加热控制
