@@ -6,7 +6,7 @@
 #include "cmd.h"
 
 /* ========================================================================== */
-/*                           配置示例                                          */
+/*                           config示例                                          */
 /* ========================================================================== */
 
 /* 默认配置 */
@@ -38,33 +38,56 @@
 // static CMD_t g_cmd_ctx;
 
 /* ========================================================================== */
+/*                          队列创建示例                                       */
+/* ========================================================================== */
+// #if CMD_RCTypeTable_Index == 0
+//   task_runtime.msgq.cmd.rc= osMessageQueueNew(3u, sizeof(DR16_t), NULL);
+// #elif CMD_RCTypeTable_Index == 1
+//   task_runtime.msgq.cmd.rc= osMessageQueueNew(3u, sizeof(AT9S_t), NULL);
+// #endif
+
+/* ========================================================================== */
 /*                           任务示例                                          */
 /* ========================================================================== */
 
-/*
- * 初始化示例
- */
-// void Example_CMD_Init(void) {
-//     CMD_Init(&g_cmd_ctx, &g_cmd_config);
-// }
+// #if CMD_RCTypeTable_Index == 0
+// DR16_t cmd_dr16;
+// #elif CMD_RCTypeTable_Index == 1
+// AT9S_t cmd_at9s;
+// #endif
+// Shoot_CMD_t    *cmd_for_shoot;
+// Chassis_CMD_t  *cmd_for_chassis;
+// Gimbal_CMD_t   *cmd_for_gimbal;
 
-// /*
-//  * 任务循环示例
-//  */
-// void Example_CMD_Task(void) {
-//     /* 一键更新 */
-//     CMD_Update(&g_cmd_ctx);
+// static CMD_t cmd;
+
+// void Task_cmd() {
+
+//   CMD_Init(&cmd, &Config_GetRobotParam()->cmd_param);
+  
+//   while (1) {
+//     #if CMD_RCTypeTable_Index == 0
+//     osMessageQueueGet(task_runtime.msgq.cmd.rc, &cmd_dr16, NULL, 0);
+//     #elif CMD_RCTypeTable_Index == 1
+//     osMessageQueueGet(task_runtime.msgq.cmd.rc, &cmd_at9s, NULL, 0);
+//     #endif
+//     CMD_Update(&cmd);
     
 //     /* 获取命令发送到各模块 */
-//     Chassis_CMD_t *chassis_cmd = CMD_GetChassisCmd(&g_cmd_ctx);
-//     Gimbal_CMD_t *gimbal_cmd = CMD_GetGimbalCmd(&g_cmd_ctx);
-//     Shoot_CMD_t *shoot_cmd = CMD_GetShootCmd(&g_cmd_ctx);
-    
-//     /* 使用命令... */
-//     (void)chassis_cmd;
-//     (void)gimbal_cmd;
-//     (void)shoot_cmd;
+//     cmd_for_chassis = CMD_GetChassisCmd(&cmd);
+//     cmd_for_gimbal = CMD_GetGimbalCmd(&cmd);
+//     cmd_for_shoot = CMD_GetShootCmd(&cmd);
+// 	osMessageQueueReset(task_runtime.msgq.gimbal.cmd);
+//     osMessageQueuePut(task_runtime.msgq.gimbal.cmd, cmd_for_gimbal, 0, 0);
+// 	osMessageQueueReset(task_runtime.msgq.shoot.cmd);
+//     osMessageQueuePut(task_runtime.msgq.shoot.cmd, cmd_for_shoot, 0, 0);
+// 	osMessageQueueReset(task_runtime.msgq.chassis.cmd);
+//     osMessageQueuePut(task_runtime.msgq.chassis.cmd, cmd_for_chassis, 0, 0);
+//   }
+  
 // }
+
+
 
 /* ========================================================================== */
 /*                   架构说明                                                   */

@@ -111,11 +111,21 @@ static int8_t MOTOR_DM_SendMITCmd(MOTOR_DM_t *motor, MOTOR_MIT_Output_t *output)
 	uint16_t pos_tmp,vel_tmp,kp_tmp,kd_tmp,tor_tmp;
 	uint16_t id = motor->param.can_id;
 
-	pos_tmp = float_to_uint(output->angle, DM_P_MIN , DM_P_MAX, 16);
-	vel_tmp = float_to_uint(output->velocity, DM_V_MIN , DM_V_MAX, 12);
+    /* 根据 reverse 参数调整控制值 */
+    float angle = output->angle;
+    float velocity = output->velocity;
+    float torque = output->torque;
+    if (motor->param.reverse) {
+        angle = -angle;
+        velocity = -velocity;
+        torque = -torque;
+    }
+
+	pos_tmp = float_to_uint(angle, DM_P_MIN , DM_P_MAX, 16);
+	vel_tmp = float_to_uint(velocity, DM_V_MIN , DM_V_MAX, 12);
 	kp_tmp  = float_to_uint(output->kp,   DM_KP_MIN, DM_KP_MAX, 12);
 	kd_tmp  = float_to_uint(output->kd,   DM_KD_MIN, DM_KD_MAX, 12);
-	tor_tmp = float_to_uint(output->torque, DM_T_MIN , DM_T_MAX, 12);
+	tor_tmp = float_to_uint(torque, DM_T_MIN , DM_T_MAX, 12);
 
     /* 打包数据 */
 	data[0] = (pos_tmp >> 8);
@@ -151,6 +161,11 @@ static int8_t MOTOR_DM_SendPosVelCmd(MOTOR_DM_t *motor, float pos, float vel) {
     
     uint8_t data[8] = {0};
 
+    /* 根据 reverse 参数调整控制值 */
+    if (motor->param.reverse) {
+        pos = -pos;
+        vel = -vel;
+    }
     
     /* 直接发送浮点数数据 */
     memcpy(&data[0], &pos, 4);  // 位置，低位在前
@@ -178,6 +193,11 @@ static int8_t MOTOR_DM_SendVelCmd(MOTOR_DM_t *motor, float vel) {
     }
     
     uint8_t data[4] = {0};
+    
+    /* 根据 reverse 参数调整控制值 */
+    if (motor->param.reverse) {
+        vel = -vel;
+    }
     
     /* 直接发送浮点数数据 */
     memcpy(&data[0], &vel, 4);  // 速度，低位在前
