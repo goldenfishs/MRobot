@@ -8,10 +8,26 @@
 #include "cmd_adapter.h"
 #include "cmd_behavior.h"
 
-/* 引入输出模块的命令类型 */
-#include "module/chassis.h"
-#include "module/gimbal.h"
-#include "module/shoot.h"
+/* 按需引入输出模块的命令类型 */
+#if CMD_ENABLE_MODULE_CHASSIS
+  #include "module/chassis.h"
+#endif
+#if CMD_ENABLE_MODULE_GIMBAL
+  #include "module/gimbal.h"
+#endif
+#if CMD_ENABLE_MODULE_SHOOT
+  #include "module/shoot.h"
+#endif
+#if CMD_ENABLE_MODULE_TRACK
+  #include "module/track.h"
+#endif
+#if CMD_ENABLE_MODULE_ARM
+  #include "component/arm_kinematics/arm6dof.h"
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+  #include "module/balance_chassis.h"
+#endif
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -23,20 +39,59 @@ extern "C" {
 /* ========================================================================== */
 
 /* 每个模块的输出包含源信息和命令 */
+#if CMD_ENABLE_MODULE_CHASSIS
 typedef struct {
     CMD_InputSource_t source;
     Chassis_CMD_t cmd;
 } CMD_ChassisOutput_t;
+#endif
 
+#if CMD_ENABLE_MODULE_GIMBAL
 typedef struct {
     CMD_InputSource_t source;
     Gimbal_CMD_t cmd;
 } CMD_GimbalOutput_t;
+#endif
 
+#if CMD_ENABLE_MODULE_SHOOT
 typedef struct {
     CMD_InputSource_t source;
     Shoot_CMD_t cmd;
 } CMD_ShootOutput_t;
+#endif
+
+#if CMD_ENABLE_MODULE_TRACK
+typedef struct {
+    CMD_InputSource_t source;
+    Track_CMD_t cmd;
+} CMD_TrackOutput_t;
+#endif
+
+#if CMD_ENABLE_MODULE_ARM
+typedef struct {
+    CMD_InputSource_t source;
+    Arm_CMD_t         cmd;
+} CMD_ArmOutput_t;
+#endif
+
+#if CMD_ENABLE_MODULE_REFUI
+typedef struct {
+    CMD_InputSource_t source;
+    Referee_UI_CMD_t  cmd;
+} CMD_RefUIOutput_t;
+#endif
+
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+typedef struct {
+    CMD_InputSource_t source;
+    Chassis_CMD_t     cmd;
+} CMD_BalanceChassisOutput_t;
+#endif
+
+#if CMD_ENABLE_SRC_REF
+// /* REF 透传输出：裁判数据直通各模块，不参与仲裁 */
+// typedef CMD_RawInput_REF_t CMD_RawInput_REF_t;
+#endif
 
 /* ========================================================================== */
 /*                           配置结构                                           */
@@ -52,15 +107,32 @@ typedef struct {
 
 /* RC模式映射配置 - 定义开关位置到模式的映射 */
 typedef struct {
+#if CMD_ENABLE_MODULE_CHASSIS
     /* 左拨杆映射 - 底盘模式 */
     Chassis_Mode_t sw_left_up;
     Chassis_Mode_t sw_left_mid;
     Chassis_Mode_t sw_left_down;
-    
+#endif
+
+#if CMD_ENABLE_MODULE_GIMBAL
     /* 右拨杆映射 - 云台/射击模式 */
     Gimbal_Mode_t gimbal_sw_up;
     Gimbal_Mode_t gimbal_sw_mid;
     Gimbal_Mode_t gimbal_sw_down;
+#endif
+
+#if CMD_ENABLE_MODULE_TRACK
+    /* 左拨杆映射 - 履带使能 */
+    bool track_sw_up;
+    bool track_sw_mid;
+    bool track_sw_down;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    /* 左拨杆映射 - 平衡底盘模式 */
+    Chassis_Mode_t balance_sw_up;
+    Chassis_Mode_t balance_sw_mid;
+    Chassis_Mode_t balance_sw_down;
+#endif
 } CMD_RCModeMap_t;
 
 /* 整体配置 */
@@ -102,9 +174,30 @@ typedef struct CMD_Context {
     
     /* 输出 */
     struct {
+#if CMD_ENABLE_MODULE_CHASSIS
     CMD_ChassisOutput_t chassis;
+#endif
+#if CMD_ENABLE_MODULE_GIMBAL
     CMD_GimbalOutput_t gimbal;
+#endif
+#if CMD_ENABLE_MODULE_SHOOT
     CMD_ShootOutput_t shoot;
+#endif
+#if CMD_ENABLE_MODULE_TRACK
+    CMD_TrackOutput_t track;
+#endif
+#if CMD_ENABLE_MODULE_ARM
+    CMD_ArmOutput_t arm;
+#endif
+#if CMD_ENABLE_MODULE_REFUI
+    CMD_RefUIOutput_t refui;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    CMD_BalanceChassisOutput_t balance_chassis;
+#endif
+#if CMD_ENABLE_SRC_REF
+    CMD_RawInput_REF_t ref;
+#endif
     } output;
 } CMD_t;
 
@@ -153,19 +246,60 @@ int8_t CMD_Update(CMD_t *ctx);
 /* ========================================================================== */
 
 /* 获取底盘命令 */
+#if CMD_ENABLE_MODULE_CHASSIS
 static inline Chassis_CMD_t* CMD_GetChassisCmd(CMD_t *ctx) {
     return &ctx->output.chassis.cmd;
   }
+#endif
 
 /* 获取云台命令 */
+#if CMD_ENABLE_MODULE_GIMBAL
 static inline Gimbal_CMD_t* CMD_GetGimbalCmd(CMD_t *ctx) {
     return &ctx->output.gimbal.cmd;
 }
+#endif
 
 /* 获取射击命令 */
+#if CMD_ENABLE_MODULE_SHOOT
 static inline Shoot_CMD_t* CMD_GetShootCmd(CMD_t *ctx) {
     return &ctx->output.shoot.cmd;
 }
+#endif
+
+/* 获取履带命令 */
+#if CMD_ENABLE_MODULE_TRACK
+static inline Track_CMD_t* CMD_GetTrackCmd(CMD_t *ctx) {
+    return &ctx->output.track.cmd;
+}
+#endif
+
+/* 获取机械臂命令 */
+#if CMD_ENABLE_MODULE_ARM
+static inline Arm_CMD_t* CMD_GetArmCmd(CMD_t *ctx) {
+    return &ctx->output.arm.cmd;
+}
+#endif
+
+/* 获取裁判系UI命令 */
+#if CMD_ENABLE_MODULE_REFUI
+static inline Referee_UI_CMD_t* CMD_GetRefUICmd(CMD_t *ctx) {
+    return &ctx->output.refui.cmd;
+}
+#endif
+
+/* 获取平衡底盘命令 */
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+static inline Chassis_CMD_t* CMD_GetBalanceChassisCmd(CMD_t *ctx) {
+    return &ctx->output.balance_chassis.cmd;
+}
+#endif
+
+/* 获取裁判系透传数据 */
+#if CMD_ENABLE_SRC_REF
+static inline CMD_RawInput_REF_t* CMD_GetRefData(CMD_t *ctx) {
+    return &ctx->output.ref;
+}
+#endif
 
 #ifdef __cplusplus
 }
