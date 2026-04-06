@@ -27,14 +27,14 @@ extern "C"
 
 typedef enum
 {
-	VESC_1 = 1,
-	VESC_2 = 2,
-	VESC_3 = 3,
-	VESC_4 = 4,
-	CAN_VESC5065_M1_MSG1 = 0x901, // vesc的数据回传使用了扩展id，[0:7]为驱动器id，[8:15]为帧类型
-	CAN_VESC5065_M2_MSG1 = 0x902,
-	CAN_VESC5065_M3_MSG1 = 0x903,
-	CAN_VESC5065_M4_MSG1 = 0x904, 
+	VESC_1 = 31,
+	VESC_2 = 32,
+	VESC_3 = 33,
+	VESC_4 = 34,
+	CAN_VESC5065_M1_MSG1 = 0x91F, // vesc的数据回传使用了扩展id，[0:7]为驱动器id，[8:15]为帧类型
+	CAN_VESC5065_M2_MSG1 = 0x920,
+	CAN_VESC5065_M3_MSG1 = 0x921,
+	CAN_VESC5065_M4_MSG1 = 0x922, 
 }VESC_ID;
 
 typedef enum

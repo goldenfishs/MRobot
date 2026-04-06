@@ -43,6 +43,11 @@ void assert_param_pos(float *pos){
 
 static VESC_CANManager_t *can_managers[BSP_CAN_NUM] = {NULL};
 
+// 根据VESC ID计算状态回传的扩展帧ID: (CAN_PACKET_STATUS << 8) | id
+static uint32_t VESC_GetStatusExtId(uint16_t id) {
+    return ((uint32_t)CAN_PACKET_STATUS << 8) | id;
+}  
+
 
 // 获取指定CAN总线的电机管理器指针
 static VESC_CANManager_t* MOTOR_GetCANManager(BSP_CAN_t can) {
@@ -104,8 +109,8 @@ int8_t VESC_Register(VESC_Param_t *param) {
     memcpy(&new_motor->param, param, sizeof(VESC_Param_t));
     memset(&new_motor->motor, 0, sizeof(MOTOR_t));
     new_motor->motor.reverse = param->reverse;
-    // 注册CAN接收ID
-    if (BSP_CAN_RegisterId(param->can, param->id, 3) != BSP_OK) {
+    // 注册CAN接收ID（使用扩展帧ID）
+    if (BSP_CAN_RegisterId(param->can, VESC_GetStatusExtId(param->id), 3) != BSP_OK) {
         BSP_Free(new_motor);
         return DEVICE_ERR;
     }
@@ -113,6 +118,8 @@ int8_t VESC_Register(VESC_Param_t *param) {
     manager->motor_count++;
     return DEVICE_OK;
 }
+
+BSP_CAN_Message_t rx_msg;
 
 // 更新指定电机的反馈数据（扩展帧方式）
 int8_t VESC_Update(VESC_Param_t *param)
@@ -128,15 +135,9 @@ int8_t VESC_Update(VESC_Param_t *param)
         }
     }
     if (motor == NULL) return DEVICE_ERR_NO_DEV;
-    // 根据电机 ID 获取对应扩展帧 ID
-    uint32_t ext_id = 0;
-    switch (param->id) {
-        case VESC_1: ext_id = CAN_VESC5065_M1_MSG1; break;
-        case VESC_2: ext_id = CAN_VESC5065_M2_MSG1; break;
-        case VESC_4: ext_id = CAN_VESC5065_M3_MSG1; break;
-        default: return DEVICE_ERR_NO_DEV;
-    }
-    BSP_CAN_Message_t rx_msg;
+    // 根据电机 ID 计算对应扩展帧 ID
+    uint32_t ext_id = VESC_GetStatusExtId(param->id);
+    
     if (BSP_CAN_GetMessage(param->can, ext_id, &rx_msg, BSP_CAN_TIMEOUT_IMMEDIATE) != BSP_OK) {
         uint64_t now_time = BSP_TIME_Get();
         if (now_time - motor->motor.header.last_online_time > 1000) {
@@ -183,11 +184,19 @@ VESC_t* VESC_GetMotor(VESC_Param_t *param) {
     return NULL;
 }
 
+// 将int32大端序写入buffer
+static void VESC_PutInt32BE(uint8_t *buf, int32_t val) {
+    buf[0] = (uint8_t)(val >> 24);
+    buf[1] = (uint8_t)(val >> 16);
+    buf[2] = (uint8_t)(val >> 8);
+    buf[3] = (uint8_t)(val);
+}
+
 // 设置指定电机的输出值
 int8_t VESC_SetOutput(VESC_Param_t *param, float value)
 {
     if (param == NULL) return DEVICE_ERR_NULL;
-    BSP_CAN_StdDataFrame_t tx_frame;
+    BSP_CAN_ExtDataFrame_t tx_frame = {0};
     uint16_t command_id;
 
     if (param->reverse) {
@@ -197,10 +206,10 @@ int8_t VESC_SetOutput(VESC_Param_t *param, float value)
     switch (param->mode)
     {
         case DUTY_CONTROL: {
-            assert_param_duty(&value); // 调用你现有的限幅函数
+            assert_param_duty(&value);
             command_id = CAN_PACKET_SET_DUTY;
-            int32_t duty_val = (int32_t)(value * 1e5f); // duty 放大 1e5
-            memcpy(&tx_frame.data[0], &duty_val, 4);
+            int32_t duty_val = (int32_t)(value * 1e5f);
+            VESC_PutInt32BE(tx_frame.data, duty_val);
             tx_frame.dlc = 4;
             break;
         }
@@ -208,30 +217,31 @@ int8_t VESC_SetOutput(VESC_Param_t *param, float value)
             assert_param_rpm(&value); 
             command_id = CAN_PACKET_SET_RPM;
             int32_t rpm_val = (int32_t)value;
-            memcpy(&tx_frame.data[0], &rpm_val, 4);
+            VESC_PutInt32BE(tx_frame.data, rpm_val);
             tx_frame.dlc = 4;
             break;
         }
         case CURRENT_CONTROL: {
             assert_param_current(&value); 
             command_id = CAN_PACKET_SET_CURRENT;
-            int32_t cur_val = (int32_t)(value * 1e3f); // A -> mA （0-50A）
-            memcpy(&tx_frame.data[0], &cur_val, 4);
+            int32_t cur_val = (int32_t)(value * 1e3f);
+            VESC_PutInt32BE(tx_frame.data, cur_val);
             tx_frame.dlc = 4;
             break;
         }
         case POSITION_CONTROL: {
             assert_param_pos(&value); 
             command_id = CAN_PACKET_SET_POS;
-            memcpy(&tx_frame.data[0], &value, 4); 
+            int32_t pos_val = (int32_t)(value * 1e6f);
+            VESC_PutInt32BE(tx_frame.data, pos_val);
             tx_frame.dlc = 4;
             break;
         }
         default:
             return DEVICE_ERR;
     }
-    tx_frame.id = (param->id << 5) | command_id;
-    return BSP_CAN_TransmitStdDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
+    tx_frame.id = ((uint32_t)command_id << 8) | param->id;
+    return BSP_CAN_TransmitExtDataFrame(param->can, &tx_frame) == BSP_OK ? DEVICE_OK : DEVICE_ERR;
   }
 
 int8_t VESC_Relax(VESC_Param_t *param) {
