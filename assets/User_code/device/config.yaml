@@ -261,7 +261,7 @@ devices:
       header: "lcd.h"
       source: "lcd.c"
 
-  mrobot:
+  putty:
     name: "MRobot CLI"
     description: "基于 FreeRTOS CLI 的嵌入式调试命令行系统，支持设备注册与监控、类 Unix 文件系统命令、htop 风格任务监控等"
     dependencies:
@@ -269,9 +269,9 @@ devices:
       component: ["freertos_cli"]
     bsp_requirements:
       - type: "uart"
-        var_name: "BSP_UART_MROBOT"
+        var_name: "BSP_UART_PUTTY"
         description: "用于 MRobot CLI 命令行交互"
     thread_signals: []
     files:
-      header: "mrobot.h"
-      source: "mrobot.c"
+      header: "putty.h"
+      source: "putty.c"

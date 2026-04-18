@@ -2,6 +2,8 @@
  * CMD 模块 V2 - 输入适配器实现
  */
 #include "cmd_adapter.h"
+#include "module/cmd/cmd_adapter.h"
+#include <stdbool.h>
 #include <string.h>
 
 /* ========================================================================== */
@@ -62,6 +64,7 @@ int8_t CMD_DR16_PC_GetInput(void *data, CMD_RawInput_t *output) {
     /* PC端鼠标映射 */
     output->pc.mouse.x = dr16->data.mouse.x;
     output->pc.mouse.y = dr16->data.mouse.y;
+    output->pc.mouse.z = dr16->data.mouse.z;
     output->pc.mouse.l_click = dr16->data.mouse.l_click;
     output->pc.mouse.r_click = dr16->data.mouse.r_click;
     
@@ -120,6 +123,72 @@ CMD_DEFINE_ADAPTER(AT9S, at9s, CMD_SRC_RC, CMD_AT9S_Init, CMD_AT9S_GetInput, CMD
 #endif /* CMD_RC_DEVICE_TYPE == 1 */
 
 /* ========================================================================== */
+/*                        NUC/AI 适配器实现                                    */
+/* ========================================================================== */
+/* ========================================================================== */
+/*                        REF/裁判系统 适配器实现                               */
+/* ========================================================================== */
+#if CMD_ENABLE_SRC_REF
+
+int8_t CMD_REF_AdapterInit(void *data) {
+    (void)data;
+    return CMD_OK;
+}
+
+int8_t CMD_REF_GetInput(void *data, CMD_RawInput_t *output) {
+    CMD_RawInput_REF_t *ref = (CMD_RawInput_REF_t *)data;
+    output->online[CMD_SRC_REF] = CMD_REF_IsOnline(ref);
+    output->ref = *ref;
+    return CMD_OK;
+}
+
+bool CMD_REF_IsOnline(void *data) {
+    CMD_RawInput_REF_t *ref = (CMD_RawInput_REF_t *)data;
+    return !(ref->chassis.ref_status == REF_STATUS_OFFLINE&&
+      ref->ai.ref_status == REF_STATUS_OFFLINE&&
+      ref->cap.ref_status == REF_STATUS_OFFLINE&&
+      ref->shoot.ref_status == REF_STATUS_OFFLINE);
+}
+
+CMD_DEFINE_ADAPTER(REF, cmd_ref, CMD_SRC_REF, CMD_REF_AdapterInit, CMD_REF_GetInput, CMD_REF_IsOnline)
+
+#endif /* CMD_ENABLE_SRC_REF */
+
+#if CMD_ENABLE_SRC_NUC
+
+int8_t CMD_NUC_AdapterInit(void *data) {
+    /* NUC适配器不需要特殊初始化 */
+    return CMD_OK;
+}
+
+int8_t CMD_NUC_GetInput(void *data, CMD_RawInput_t *output) {
+    AI_cmd_t *ai_cmd = (AI_cmd_t *)data;
+    
+    output->online[CMD_SRC_NUC] = true;
+    
+    /* 映射AI数据到NUC输入结构 */
+    output->nuc.mode = ai_cmd->mode;
+    output->nuc.gimbal.setpoint.yaw = ai_cmd->gimbal.setpoint.yaw;
+    output->nuc.gimbal.setpoint.pit = ai_cmd->gimbal.setpoint.pit;
+    output->nuc.gimbal.accl.pit = ai_cmd->gimbal.accl.pit;
+    output->nuc.gimbal.accl.yaw = ai_cmd->gimbal.accl.yaw;
+    output->nuc.gimbal.vel.pit = ai_cmd->gimbal.vel.pit;
+    output->nuc.gimbal.vel.yaw = ai_cmd->gimbal.vel.yaw;
+
+    return CMD_OK;
+}
+
+bool CMD_NUC_IsOnline(void *data) {
+    return true;
+}
+
+/* 定义NUC适配器实例 */
+extern AI_cmd_t ai_cmd;
+CMD_DEFINE_ADAPTER(NUC, cmd_ai, CMD_SRC_NUC, CMD_NUC_AdapterInit, CMD_NUC_GetInput, CMD_NUC_IsOnline)
+
+#endif /* CMD_ENABLE_SRC_NUC */
+
+/* ========================================================================== */
 /*                           适配器管理实现                                     */
 /* ========================================================================== */
 
@@ -140,6 +209,16 @@ int8_t CMD_Adapter_InitAll(void) {
 #elif CMD_RC_DEVICE_TYPE == 1
     /* AT9S 目前只支持 RC 输入 */
     CMD_Adapter_Register(&g_adapter_AT9S);
+#endif
+
+#if CMD_ENABLE_SRC_NUC
+    /* 注册NUC适配器 */
+    CMD_Adapter_Register(&g_adapter_NUC);
+#endif
+
+#if CMD_ENABLE_SRC_REF
+    /* 注册REF适配器 */
+    CMD_Adapter_Register(&g_adapter_REF);
 #endif
     
     /* 初始化所有已注册的适配器 */

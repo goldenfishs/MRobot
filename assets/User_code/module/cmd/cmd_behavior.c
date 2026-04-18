@@ -3,7 +3,10 @@
  */
 #include "cmd_behavior.h"
 #include "cmd.h"
-#include "module/gimbal.h"
+#include "module/balance_chassis.h"
+#if CMD_ENABLE_MODULE_GIMBAL
+  #include "module/gimbal.h"
+#endif
 #include <string.h>
 
 /* ========================================================================== */
@@ -12,75 +15,152 @@
 
 /* 行为处理函数实现 */
 int8_t CMD_Behavior_Handle_FORE(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_CHASSIS
     ctx->output.chassis.cmd.ctrl_vec.vy += ctx->config->sensitivity.move_sens;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    ctx->output.balance_chassis.cmd.move_vec.vx = ctx->config->sensitivity.move_sens;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_BACK(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_CHASSIS
     ctx->output.chassis.cmd.ctrl_vec.vy -= ctx->config->sensitivity.move_sens;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    ctx->output.balance_chassis.cmd.move_vec.vx = -ctx->config->sensitivity.move_sens;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_LEFT(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_CHASSIS
     ctx->output.chassis.cmd.ctrl_vec.vx -= ctx->config->sensitivity.move_sens;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    ctx->output.balance_chassis.cmd.move_vec.vy = -ctx->config->sensitivity.move_sens;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_RIGHT(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_CHASSIS
     ctx->output.chassis.cmd.ctrl_vec.vx += ctx->config->sensitivity.move_sens;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    ctx->output.balance_chassis.cmd.move_vec.vy = ctx->config->sensitivity.move_sens;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_ACCELERATE(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_CHASSIS
     ctx->output.chassis.cmd.ctrl_vec.vx *= ctx->config->sensitivity.move_fast_mult;
     ctx->output.chassis.cmd.ctrl_vec.vy *= ctx->config->sensitivity.move_fast_mult;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    ctx->output.balance_chassis.cmd.move_vec.vx *= ctx->config->sensitivity.move_fast_mult;
+    ctx->output.balance_chassis.cmd.move_vec.vy *= ctx->config->sensitivity.move_fast_mult;
+#endif
     return CMD_OK;
 }
 
-int8_t CMD_Behavior_Handle_DECELERATE(CMD_t *ctx) {
-    ctx->output.chassis.cmd.ctrl_vec.vx *= ctx->config->sensitivity.move_slow_mult;
-    ctx->output.chassis.cmd.ctrl_vec.vy *= ctx->config->sensitivity.move_slow_mult;
+int8_t CMD_Behavior_Handle_CLIMB(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+    ctx->output.balance_chassis.cmd.mode = CHASSIS_MODE_CLIMB_STEP;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_FIRE(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_SHOOT
     ctx->output.shoot.cmd.firecmd = true;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_FIRE_MODE(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_SHOOT
     ctx->output.shoot.cmd.mode = (ctx->output.shoot.cmd.mode + 1) % SHOOT_MODE_NUM;
+#endif
     return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_ROTOR(CMD_t *ctx) {
+#if CMD_ENABLE_MODULE_GIMBAL
+  ctx->output.gimbal.cmd.mode = GIMBAL_MODE_RELATIVE;
+  #if CMD_ENABLE_MODULE_CHASSIS
   ctx->output.chassis.cmd.mode = CHASSIS_MODE_ROTOR;
   ctx->output.chassis.cmd.mode_rotor = ROTOR_MODE_RAND;
-  ctx->output.gimbal.cmd.mode = GIMBAL_MODE_RELATIVE;
+  #endif
+  #if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+  ctx->output.balance_chassis.cmd.mode = CHASSIS_MODE_BALANCE_ROTOR;
+  #endif
+#endif
   return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_AUTOAIM(CMD_t *ctx) {
-    /* TODO: 自瞄模式切换 */
-    return CMD_OK;
+    /* 自瞄模式切换 */
+#if CMD_ENABLE_SRC_NUC && CMD_ENABLE_MODULE_GIMBAL && CMD_ENABLE_MODULE_SHOOT
+  if (ctx->input.online[CMD_SRC_NUC]) {
+    if (ctx->active_source == CMD_SRC_PC){
+      ctx->output.gimbal.source = CMD_SRC_NUC;
+      ctx->output.shoot.source = CMD_SRC_NUC;
+#if CMD_ENABLE_MODULE_REFUI
+      ctx->output.refui.source = CMD_SRC_NUC;
+#endif
+    }
+  }
+#endif
+  return CMD_OK;
 }
 
 int8_t CMD_Behavior_Handle_CHECKSOURCERCPC(CMD_t *ctx) {
-    /* TODO: 切换RC和PC输入源 */
+    /* 切换RC和PC输入源 */
     if (ctx->active_source == CMD_SRC_PC) {
       ctx->active_source = CMD_SRC_RC;
+#if CMD_ENABLE_MODULE_CHASSIS
       ctx->output.chassis.source = CMD_SRC_RC;
+#endif
+#if CMD_ENABLE_MODULE_GIMBAL
       ctx->output.gimbal.source = CMD_SRC_RC;
+#endif
+#if CMD_ENABLE_MODULE_SHOOT
       ctx->output.shoot.source = CMD_SRC_RC;
+#endif
+#if CMD_ENABLE_MODULE_ARM
+      ctx->output.arm.source = CMD_SRC_RC;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+      ctx->output.balance_chassis.source = CMD_SRC_RC;
+#endif
     } else if(ctx->active_source == CMD_SRC_RC) {
       ctx->active_source = CMD_SRC_PC;
+#if CMD_ENABLE_MODULE_CHASSIS
       ctx->output.chassis.source = CMD_SRC_PC;
+#endif
+#if CMD_ENABLE_MODULE_GIMBAL
       ctx->output.gimbal.source = CMD_SRC_PC;
+#endif
+#if CMD_ENABLE_MODULE_SHOOT
       ctx->output.shoot.source = CMD_SRC_PC;
+#endif
+#if CMD_ENABLE_MODULE_ARM
+      ctx->output.arm.source = CMD_SRC_PC;
+#endif
+#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
+      ctx->output.balance_chassis.source = CMD_SRC_PC;
+#endif
     }
     return CMD_OK;
 }
-
+extern bool reset;
+int8_t CMD_Behavior_Handle_RESET(CMD_t *ctx) {
+    reset = !reset;
+    return CMD_OK;
+}
 /* 行为配置表 - 由宏生成 */
 static const CMD_BehaviorConfig_t g_behavior_configs[] = {
     CMD_BEHAVIOR_TABLE(BUILD_BEHAVIOR_CONFIG)
