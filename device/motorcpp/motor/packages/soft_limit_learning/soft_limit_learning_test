@@ -1,0 +1,766 @@
+
+/*
+ * 测试文件。可用于寻找各电机默认控制参数，测试软限位学习。
+ */
+
+ 
+/*
+extern "C" {
+#include "task/user_task.h"
+#include "bsp/can.h"
+#include "device/device.h"
+#include "device/motor_rm.h"
+#include "component/pid.h"
+}
+
+#include <new>
+#include <stdint.h>
+
+#include "component/math/scalar.hpp"
+#include "device/motor/factory/motor_factory.hpp"
+#include "device/motor/motor.hpp"
+#include "device/motor/packages/controller/motor_controller.hpp"
+#include "device/motor/packages/soft_limit_learning/soft_limit_learning.hpp"
+
+namespace {
+
+using MotorType = mr::motor::RmM2006Motor;
+using ControllerType = mr::motor::MotorControllerT<MotorType>;
+
+constexpr float kTaskFreqHz = 500.0f;
+constexpr float kTaskDtS = 1.0f / kTaskFreqHz;
+constexpr uint32_t kDelayTick = 2u;
+constexpr float kMaxM2006TorqueNm = MotorType::Traits::kMaxTorque;
+constexpr float kMaxM2006VelocityRadS = MotorType::Traits::kMaxVelocity;
+
+float AbsFloat(float value) {
+  return mr::component::math::abs_scalar(value);
+}
+
+float ClampFloat(float value, float lower, float upper) {
+  if (!mr::component::math::is_finite_scalar(value)) {
+    return lower;
+  }
+  return mr::component::math::clamp_scalar(value, lower, upper);
+}
+
+float PositiveOr(float value, float fallback) {
+  return (mr::component::math::is_finite_scalar(value) && value > 0.0f) ? value : fallback;
+}
+
+bool NearlyEqual(float lhs, float rhs, float eps = 1.0e-6f) {
+  return AbsFloat(lhs - rhs) <= eps;
+}
+
+}  // namespace
+
+struct MotorLimitTestSafetyParams {
+  uint8_t output_enable;
+  uint8_t protocol;
+};
+
+struct MotorLimitTestCommandParams {
+  uint8_t cmd;
+};
+
+struct MotorLimitTestLearningParams {
+  float seek_velocity_rad_s;
+  float travel_rad;
+  float limit_margin_rad;
+  float min_range_rad;
+  float manual_lower_rad;
+  float manual_upper_rad;
+  uint8_t post_learn_return_target;
+  float post_learn_return_max_velocity_rad_s;
+};
+
+struct MotorLimitTestVelocityParams {
+  float target_rad_s;
+};
+
+struct MotorLimitTestPositionParams {
+  float target_rad;
+  float max_velocity_rad_s;
+};
+
+struct MotorLimitTestMitParams {
+  float target_position_rad;
+  float target_velocity_rad_s;
+  float kp;
+  float kd;
+  float torque_ff_nm;
+};
+
+struct MotorLimitTestPidParams {
+  float k;
+  float p;
+  float i;
+  float d;
+  float i_limit;
+  float out_limit;
+  float d_cutoff_hz;
+  float range;
+};
+
+struct MotorLimitTestControllerParams {
+  float position_to_velocity_limit;
+  float velocity_to_torque_limit;
+  float feedback_lowpass_cutoff_hz;
+  float output_lowpass_cutoff_hz;
+};
+
+struct MotorLimitTestStatusObs {
+  int8_t can_init_ret;
+  int8_t register_ret;
+  int8_t enable_ret;
+  int8_t update_ret;
+  int8_t set_cmd_ret;
+  int8_t commit_ret;
+  int8_t command_ret;
+  uint8_t initialized;
+  uint8_t online;
+  uint8_t protocol_state;
+  uint8_t last_commit_ok;
+  uint32_t fault;
+};
+
+struct MotorLimitTestMotorObs {
+  float position_rad;
+  float single_turn_rad;
+  float velocity_rad_s;
+  float torque_nm;
+  float temperature_c;
+};
+
+struct MotorLimitTestControllerObs {
+  float output_nm;
+  float feedback_pos;
+  float feedback_vel;
+  float command_velocity;
+  float command_position;
+};
+
+struct MotorLimitTestLearningObs {
+  uint8_t state;
+  uint8_t workflow;
+  float seek_startup_ignore_left_s;
+  uint16_t stall_cycles;
+  float elapsed_seek_s;
+  uint8_t lower_valid;
+  uint8_t upper_valid;
+  float lower_rad;
+  float upper_rad;
+  float travel_rad;
+  float center_rad;
+  uint8_t has_post_learn_target;
+  uint8_t returning_to_post_learn_target;
+  float post_learn_target_rad;
+  float pending_travel_rad;
+};
+
+struct MotorLimitTestTaskObs {
+  uint32_t loop_count;
+};
+
+// ============================================================================
+// Debug Watch 参数区
+//   使用方法: 在调试器 Watch 窗口直接修改这些全局变量。
+//   注意: RM M2006 底层只支持电流/力矩控制；vel/pos/MIT 都由 MotorController 软件模拟。
+// ============================================================================
+extern "C" {
+
+// ----------------------------------------------------------------------------
+// 1) 安全开关与控制协议选择
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestSafetyParams g_motor_limit_test_safety = {
+  .output_enable = 1,  // 输出总开关: 0=Relax急停, 1=允许控制器下发电流
+  .protocol = 0,       // 非寻限时控制协议: 0=速度vel, 1=位置pos, 2=MIT模拟
+};
+
+// ----------------------------------------------------------------------------
+// 2) 一次性调试命令
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestCommandParams g_motor_limit_test_command = {
+  .cmd = 0,  // 一次性命令, 执行后自动清零
+};
+// cmd取值: 1=自动寻下限, 2=自动寻上限, 3=当前位置捕获为下限, 4=当前位置捕获为上限,
+//          5=取消寻限, 6=清除已学习限位, 7=使用manual上下限, 8=重建controller/重置控制器,
+//          9=寻下限并用travel推算上限, 10=寻上限并用travel推算下限,
+//          11=先寻上限再寻下限, 12=先寻下限再寻上限
+
+// ----------------------------------------------------------------------------
+// 3) 限位自学习参数
+// ----------------------------------------------------------------------------
+// 失速判定、启动忽略、寻限超时、自动学习扣边等通用策略已收口到
+// SOFT_LIMIT_LEARNING_* 宏；如需修改这些固定策略，请改宏并重新编译。
+volatile MotorLimitTestLearningParams g_motor_limit_test_learning = {
+  .seek_velocity_rad_s = 3.0f,              // 自动寻限速度幅值(rad/s), 通用快速寻限；不同结构可按刚性/惯量继续调低或调高
+  .travel_rad = 1.0f,                       // 已知机械总行程(rad), cmd=9/10时用于单侧限位推算另一侧
+  .limit_margin_rad = 0.02f,                // 使用限位时保留的运行安全边距(rad), 较小边距提高可用行程
+  .min_range_rad = 0.05f,                   // 合法上下限最小间距(rad), 小于该范围会拒绝提交
+  .manual_lower_rad = -1.0f,                // 手动下限(rad), cmd=7时写入学习器
+  .manual_upper_rad = 1.0f,                 // 手动上限(rad), cmd=7时写入学习器
+  .post_learn_return_target = 2u,           // 学习完成后返回目标: 0=不返回, 1=下限, 2=中位, 3=上限
+  .post_learn_return_max_velocity_rad_s = 3.0f, // 学习完成后返回目标的位置控制限速(rad/s)
+};
+
+// ----------------------------------------------------------------------------
+// 4) vel 协议目标参数
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestVelocityParams g_motor_limit_test_velocity = {
+  .target_rad_s = 0.0f,  // vel协议目标速度(rad/s), protocol=0时生效
+};
+
+// ----------------------------------------------------------------------------
+// 5) pos 协议目标参数
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestPositionParams g_motor_limit_test_position = {
+  .target_rad = 0.0f,          // pos协议目标位置(rad), protocol=1时生效, 会被学习限位Clamp
+  .max_velocity_rad_s = kMaxM2006VelocityRadS, // pos协议最大运行速度(rad/s), 默认使用M2006输出端最高速度
+};
+
+// ----------------------------------------------------------------------------
+// 6) MIT 协议模拟目标参数
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestMitParams g_motor_limit_test_mit = {
+  .target_position_rad = 0.0f,   // MIT模拟目标位置(rad), protocol=2时生效, 会被学习限位Clamp
+  .target_velocity_rad_s = 0.0f, // MIT模拟目标速度(rad/s), 会按已学习限位限制方向
+  .kp = 2.0f,                    // MIT模拟位置刚度(Nm/rad), 快响应通用值；大惯量/柔性结构可适当降低
+  .kd = 0.1f,                   // MIT模拟速度阻尼(Nm/(rad/s)), 提高阻尼以适配不同惯量并抑制振荡
+  .torque_ff_nm = 0.0f,          // MIT模拟前馈力矩(Nm), 会按M2006最大力矩限幅
+};
+
+// ----------------------------------------------------------------------------
+// 7) 速度环 PID 参数: vel 协议和自动寻限共用
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestPidParams g_motor_limit_test_vel_pid = {
+  .k = 0.3f,            // 速度环整体增益倍率
+  .p = 1.25f,           // 速度环P: 快速建立力矩，约3.3rad/s误差即可到达峰值力矩
+  .i = 0.02f,           // 速度环I: 小积分用于克服摩擦/负载静差，通用性高且不易积累过快
+  .d = 0.008f,          // 速度环D: 抑制速度突变/振荡
+  .i_limit = 0.35f,     // 速度环积分限幅(Nm), 防止长时间卡滞后积分过大
+  .out_limit = kMaxM2006TorqueNm, // 速度环输出力矩限幅(Nm), 默认使用M2006峰值力矩
+  .d_cutoff_hz = 100.0f, // 速度环D项低通截止频率(Hz), 较高截止提升响应
+  .range = 0.0f,        // 速度环周期误差范围, 速度控制保持0禁用
+};
+
+// ----------------------------------------------------------------------------
+// 8) 位置环 PID 参数: pos 协议使用, 输出为速度目标
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestPidParams g_motor_limit_test_pos_pid = {
+  .k = 1.0f,            // 位置环整体增益倍率
+  .p = 60.0f,            // 位置环P: 位置误差(rad)到速度目标(rad/s), 快速跟随且由速度上限保护
+  .i = 0.0f,            // 位置环I: 当前默认关闭
+  .d = 0.0f,           // 位置环D: 对快速位置变化增加阻尼，适配不同机械惯量
+  .i_limit = 0.0f,      // 位置环积分限幅, i=0时无实际作用
+  .out_limit = kMaxM2006VelocityRadS, // 位置环输出速度限幅(rad/s), 默认使用M2006输出端最高速度
+  .d_cutoff_hz = 80.0f, // 位置环D项低通截止频率(Hz)
+  .range = 0.0f,        // 位置环周期误差范围, 普通多圈位置保持0禁用
+};
+
+// ----------------------------------------------------------------------------
+// 9) Controller 通用限幅与滤波参数
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestControllerParams g_motor_limit_test_controller = {
+  .position_to_velocity_limit = kMaxM2006VelocityRadS, // controller位置到速度默认限幅(rad/s), M2006输出端最高速度
+  .velocity_to_torque_limit = kMaxM2006TorqueNm,       // controller速度到力矩默认限幅(Nm), M2006峰值输出力矩
+  .feedback_lowpass_cutoff_hz = 160.0f,                // 反馈位置/速度低通截止频率(Hz), 提高截止以获得更快响应
+  .output_lowpass_cutoff_hz = 120.0f,                  // 输出力矩低通截止频率(Hz), 保留少量滤波同时减小延迟
+};
+
+// ============================================================================
+// Debug Watch 观测量区
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// A) 初始化、返回值和通信状态观测
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestStatusObs g_motor_limit_test_status_obs = {};       // 初始化、返回值和通信状态观测
+
+// ----------------------------------------------------------------------------
+// B) 电机反馈观测
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestMotorObs g_motor_limit_test_motor_obs = {};         // 电机反馈观测
+
+// ----------------------------------------------------------------------------
+// C) Controller 命令与滤波反馈观测
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestControllerObs g_motor_limit_test_controller_obs = {}; // Controller 命令与滤波反馈观测
+
+// ----------------------------------------------------------------------------
+// D) 限位自学习状态观测
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestLearningObs g_motor_limit_test_learning_obs = {};   // 限位自学习状态观测
+
+// ----------------------------------------------------------------------------
+// E) 任务运行状态观测
+// ----------------------------------------------------------------------------
+volatile MotorLimitTestTaskObs g_motor_limit_test_task_obs = {};           // 任务运行状态观测
+
+}
+
+namespace {
+
+MOTOR_RM_Param_t g_rm_param{
+    .can = BSP_CAN_1, 
+    .id = 0x207,
+    .module = MOTOR_M2006,
+    .reverse = true,
+    .gear = true,
+};
+
+MotorType* g_motor = nullptr;
+ControllerType* g_controller = nullptr;
+mr::motor::SoftLimitLearning g_limit_learner;
+
+alignas(ControllerType) uint8_t g_controller_storage[sizeof(ControllerType)] = {0};
+
+KPID_Params_t g_velocity_pid{};
+KPID_Params_t g_position_pid{};
+mr::motor::MotorControllerConfig g_controller_config{};
+mr::motor::SoftLimitLearningConfig g_learning_config{};
+
+float g_last_controller_position_to_velocity_limit = -1.0f;
+float g_last_controller_velocity_to_torque_limit = -1.0f;
+float g_last_controller_feedback_cutoff_hz = -1.0f;
+float g_last_controller_output_cutoff_hz = -1.0f;
+MotorLimitTestPidParams g_last_vel_pid_params{};
+MotorLimitTestPidParams g_last_pos_pid_params{};
+bool g_last_pid_params_valid = false;
+bool g_was_learning_seeking = false;
+bool g_returning_to_post_learn_target = false;
+
+mr::motor::SoftLimitReturnTarget DecodeReturnTarget(uint8_t target) {
+  switch (target) {
+    case 1u:
+      return mr::motor::SoftLimitReturnTarget::Lower;
+    case 2u:
+      return mr::motor::SoftLimitReturnTarget::Center;
+    case 3u:
+      return mr::motor::SoftLimitReturnTarget::Upper;
+    case 0u:
+    default:
+      return mr::motor::SoftLimitReturnTarget::None;
+  }
+}
+
+bool PidParamsChanged(const MotorLimitTestPidParams& lhs,
+                      const volatile MotorLimitTestPidParams& rhs) {
+  return !NearlyEqual(lhs.k, rhs.k) ||
+         !NearlyEqual(lhs.p, rhs.p) ||
+         !NearlyEqual(lhs.i, rhs.i) ||
+         !NearlyEqual(lhs.d, rhs.d) ||
+         !NearlyEqual(lhs.i_limit, rhs.i_limit) ||
+         !NearlyEqual(lhs.out_limit, rhs.out_limit) ||
+         !NearlyEqual(lhs.d_cutoff_hz, rhs.d_cutoff_hz) ||
+         !NearlyEqual(lhs.range, rhs.range);
+}
+
+bool PidConfigChanged() {
+  return !g_last_pid_params_valid ||
+         PidParamsChanged(g_last_vel_pid_params, g_motor_limit_test_vel_pid) ||
+         PidParamsChanged(g_last_pos_pid_params, g_motor_limit_test_pos_pid);
+}
+
+void RememberPidConfig() {
+  g_last_vel_pid_params.k = g_motor_limit_test_vel_pid.k;
+  g_last_vel_pid_params.p = g_motor_limit_test_vel_pid.p;
+  g_last_vel_pid_params.i = g_motor_limit_test_vel_pid.i;
+  g_last_vel_pid_params.d = g_motor_limit_test_vel_pid.d;
+  g_last_vel_pid_params.i_limit = g_motor_limit_test_vel_pid.i_limit;
+  g_last_vel_pid_params.out_limit = g_motor_limit_test_vel_pid.out_limit;
+  g_last_vel_pid_params.d_cutoff_hz = g_motor_limit_test_vel_pid.d_cutoff_hz;
+  g_last_vel_pid_params.range = g_motor_limit_test_vel_pid.range;
+
+  g_last_pos_pid_params.k = g_motor_limit_test_pos_pid.k;
+  g_last_pos_pid_params.p = g_motor_limit_test_pos_pid.p;
+  g_last_pos_pid_params.i = g_motor_limit_test_pos_pid.i;
+  g_last_pos_pid_params.d = g_motor_limit_test_pos_pid.d;
+  g_last_pos_pid_params.i_limit = g_motor_limit_test_pos_pid.i_limit;
+  g_last_pos_pid_params.out_limit = g_motor_limit_test_pos_pid.out_limit;
+  g_last_pos_pid_params.d_cutoff_hz = g_motor_limit_test_pos_pid.d_cutoff_hz;
+  g_last_pos_pid_params.range = g_motor_limit_test_pos_pid.range;
+  g_last_pid_params_valid = true;
+}
+
+void CopyPidParamsFromDebug() {
+  g_velocity_pid.k = g_motor_limit_test_vel_pid.k;
+  g_velocity_pid.p = g_motor_limit_test_vel_pid.p;
+  g_velocity_pid.i = g_motor_limit_test_vel_pid.i;
+  g_velocity_pid.d = g_motor_limit_test_vel_pid.d;
+  g_velocity_pid.i_limit = g_motor_limit_test_vel_pid.i_limit;
+  g_velocity_pid.out_limit = PositiveOr(g_motor_limit_test_vel_pid.out_limit, 0.1f);
+  g_velocity_pid.d_cutoff_freq = PositiveOr(g_motor_limit_test_vel_pid.d_cutoff_hz, 0.0f);
+  g_velocity_pid.range = g_motor_limit_test_vel_pid.range;
+
+  g_position_pid.k = g_motor_limit_test_pos_pid.k;
+  g_position_pid.p = g_motor_limit_test_pos_pid.p;
+  g_position_pid.i = g_motor_limit_test_pos_pid.i;
+  g_position_pid.d = g_motor_limit_test_pos_pid.d;
+  g_position_pid.i_limit = g_motor_limit_test_pos_pid.i_limit;
+  g_position_pid.out_limit = PositiveOr(g_motor_limit_test_pos_pid.out_limit, 0.1f);
+  g_position_pid.d_cutoff_freq = PositiveOr(g_motor_limit_test_pos_pid.d_cutoff_hz, 0.0f);
+  g_position_pid.range = g_motor_limit_test_pos_pid.range;
+}
+
+void BuildControllerConfig() {
+  CopyPidParamsFromDebug();
+  g_controller_config.velocity_pid = &g_velocity_pid;
+  g_controller_config.position_pid = &g_position_pid;
+  g_controller_config.sample_freq = kTaskFreqHz;
+  g_controller_config.position_to_velocity_limit =
+      PositiveOr(g_motor_limit_test_controller.position_to_velocity_limit, 0.6f);
+  g_controller_config.velocity_to_torque_limit =
+      ClampFloat(PositiveOr(g_motor_limit_test_controller.velocity_to_torque_limit, 1.0f), 0.01f, kMaxM2006TorqueNm);
+  g_controller_config.feedback_lowpass_cutoff_hz = PositiveOr(g_motor_limit_test_controller.feedback_lowpass_cutoff_hz, 0.0f);
+  g_controller_config.output_lowpass_cutoff_hz = PositiveOr(g_motor_limit_test_controller.output_lowpass_cutoff_hz, 0.0f);
+}
+
+bool ControllerConfigChanged() {
+  return PidConfigChanged() ||
+         !NearlyEqual(g_last_controller_position_to_velocity_limit, g_motor_limit_test_controller.position_to_velocity_limit) ||
+         !NearlyEqual(g_last_controller_velocity_to_torque_limit, g_motor_limit_test_controller.velocity_to_torque_limit) ||
+         !NearlyEqual(g_last_controller_feedback_cutoff_hz, g_motor_limit_test_controller.feedback_lowpass_cutoff_hz) ||
+         !NearlyEqual(g_last_controller_output_cutoff_hz, g_motor_limit_test_controller.output_lowpass_cutoff_hz);
+}
+
+void RememberControllerConfig() {
+  g_last_controller_position_to_velocity_limit = g_motor_limit_test_controller.position_to_velocity_limit;
+  g_last_controller_velocity_to_torque_limit = g_motor_limit_test_controller.velocity_to_torque_limit;
+  g_last_controller_feedback_cutoff_hz = g_motor_limit_test_controller.feedback_lowpass_cutoff_hz;
+  g_last_controller_output_cutoff_hz = g_motor_limit_test_controller.output_lowpass_cutoff_hz;
+  RememberPidConfig();
+}
+
+void RebuildController() {
+  if (g_motor == nullptr) {
+    return;
+  }
+  BuildControllerConfig();
+  g_controller = new (g_controller_storage) ControllerType(*g_motor, g_controller_config);
+  RememberControllerConfig();
+}
+
+void UpdateLearningConfigFromDebug() {
+  g_learning_config.seek_velocity_rad_s =
+      mr::component::math::positive_or_zero(g_motor_limit_test_learning.seek_velocity_rad_s);
+  g_learning_config.known_travel_rad =
+      mr::component::math::positive_or_zero(g_motor_limit_test_learning.travel_rad);
+  g_learning_config.limit_margin_rad =
+      mr::component::math::positive_or_zero(g_motor_limit_test_learning.limit_margin_rad);
+  g_learning_config.min_range_rad =
+      mr::component::math::positive_or_zero(g_motor_limit_test_learning.min_range_rad);
+  g_limit_learner.Configure(g_learning_config);
+  g_limit_learner.SetPostLearnReturnTarget(
+      DecodeReturnTarget(g_motor_limit_test_learning.post_learn_return_target));
+}
+
+void ApplyPostLearnReturnTargetIfReady() {
+  if (g_controller == nullptr) {
+    return;
+  }
+
+  const bool is_seeking = g_limit_learner.IsSeeking();
+  const bool just_finished_learning = g_was_learning_seeking && !is_seeking && g_limit_learner.IsReady();
+  g_was_learning_seeking = is_seeking;
+
+  if (!just_finished_learning || !g_limit_learner.HasPostLearnTargetPosition()) {
+    return;
+  }
+
+  const float target = g_limit_learner.GetPostLearnTargetPosition();
+  const float max_velocity = PositiveOr(g_motor_limit_test_learning.post_learn_return_max_velocity_rad_s,
+                                        g_controller_config.position_to_velocity_limit);
+  g_motor_limit_test_position.target_rad = target;
+  g_motor_limit_test_controller_obs.command_position = target;
+  g_motor_limit_test_controller_obs.command_velocity = max_velocity;
+  g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetPosition(target, max_velocity);
+  g_returning_to_post_learn_target = true;
+}
+
+bool PostLearnReturnCommandActive() {
+  return g_returning_to_post_learn_target &&
+         g_limit_learner.IsReady() &&
+         g_limit_learner.HasPostLearnTargetPosition();
+}
+
+void UpdateObservations() {
+  if (g_controller == nullptr) {
+    return;
+  }
+
+  const mr::motor::MotorState state = g_controller->GetState();
+  const mr::motor::SoftLimitRange& range = g_limit_learner.GetRange();
+
+  g_motor_limit_test_status_obs.initialized = (g_motor != nullptr && g_controller != nullptr) ? 1u : 0u;
+  g_motor_limit_test_status_obs.online = state.online ? 1u : 0u;
+  g_motor_limit_test_status_obs.protocol_state = static_cast<uint8_t>(state.protocol_state);
+  g_motor_limit_test_status_obs.last_commit_ok = state.last_commit_ok ? 1u : 0u;
+  g_motor_limit_test_status_obs.fault = state.protocol_fault;
+  g_motor_limit_test_motor_obs.position_rad = state.position_rad;
+  g_motor_limit_test_motor_obs.single_turn_rad = state.position_single_turn_rad;
+  g_motor_limit_test_motor_obs.velocity_rad_s = state.velocity_rad_s;
+  g_motor_limit_test_motor_obs.torque_nm = state.torque_nm;
+  g_motor_limit_test_motor_obs.temperature_c = state.temperature_c;
+  g_motor_limit_test_controller_obs.output_nm = g_controller->GetLastOutputTorque();
+  g_motor_limit_test_controller_obs.feedback_pos = g_controller->GetLastFeedbackPosition();
+  g_motor_limit_test_controller_obs.feedback_vel = g_controller->GetLastFeedbackVelocity();
+  g_motor_limit_test_learning_obs.state = static_cast<uint8_t>(g_limit_learner.GetState());
+  g_motor_limit_test_learning_obs.workflow = static_cast<uint8_t>(g_limit_learner.GetWorkflow());
+  g_motor_limit_test_learning_obs.seek_startup_ignore_left_s = g_limit_learner.GetStartupIgnoreLeftS();
+  g_motor_limit_test_learning_obs.stall_cycles = g_limit_learner.GetStallCycles();
+  g_motor_limit_test_learning_obs.elapsed_seek_s = g_limit_learner.GetElapsedSeekS();
+  g_motor_limit_test_learning_obs.lower_valid = range.lower_valid ? 1u : 0u;
+  g_motor_limit_test_learning_obs.upper_valid = range.upper_valid ? 1u : 0u;
+  g_motor_limit_test_learning_obs.lower_rad = range.lower_rad;
+  g_motor_limit_test_learning_obs.upper_rad = range.upper_rad;
+  g_motor_limit_test_learning_obs.travel_rad = g_limit_learner.GetTravelRad();
+  g_motor_limit_test_learning_obs.center_rad = g_limit_learner.GetCenterRad();
+  g_motor_limit_test_learning_obs.has_post_learn_target = g_limit_learner.HasPostLearnTargetPosition() ? 1u : 0u;
+  g_motor_limit_test_learning_obs.returning_to_post_learn_target = g_returning_to_post_learn_target ? 1u : 0u;
+  g_motor_limit_test_learning_obs.post_learn_target_rad = g_limit_learner.GetPostLearnTargetPosition();
+  g_motor_limit_test_learning_obs.pending_travel_rad = g_limit_learner.GetPendingTravelRad();
+}
+
+void HandleDebugCommand() {
+  const uint8_t cmd = g_motor_limit_test_command.cmd;
+  if (cmd == 0u) {
+    return;
+  }
+
+  int8_t ret = DEVICE_OK;
+  switch (cmd) {
+    case 1u:
+      ret = g_limit_learner.StartSeekLower() ? DEVICE_OK : DEVICE_ERR;
+      if (ret == DEVICE_OK && g_controller) {
+        (void)g_controller->ResetControllers();
+        g_returning_to_post_learn_target = false;
+      }
+      break;
+    case 2u:
+      ret = g_limit_learner.StartSeekUpper() ? DEVICE_OK : DEVICE_ERR;
+      if (ret == DEVICE_OK && g_controller) {
+        (void)g_controller->ResetControllers();
+        g_returning_to_post_learn_target = false;
+      }
+      break;
+    case 3u:
+      ret = g_limit_learner.CaptureLowerFromObserved() ? DEVICE_OK : DEVICE_ERR;
+      break;
+    case 4u:
+      ret = g_limit_learner.CaptureUpperFromObserved() ? DEVICE_OK : DEVICE_ERR;
+      break;
+    case 5u:
+      g_limit_learner.CancelSeek();
+      g_was_learning_seeking = false;
+      g_returning_to_post_learn_target = false;
+      ret = DEVICE_OK;
+      break;
+    case 6u:
+      g_limit_learner.ClearRange();
+      g_was_learning_seeking = false;
+      g_returning_to_post_learn_target = false;
+      ret = DEVICE_OK;
+      break;
+    case 7u:
+      ret = g_limit_learner.SetRange(g_motor_limit_test_learning.manual_lower_rad,
+                                     g_motor_limit_test_learning.manual_upper_rad)
+                ? DEVICE_OK
+                : DEVICE_ERR;
+      break;
+    case 8u:
+      if (g_controller) {
+        (void)g_controller->ResetControllers();
+      }
+      RebuildController();
+      ret = DEVICE_OK;
+      break;
+    case 9u:
+      ret = g_limit_learner.StartSeekLowerWithTravel()
+                ? DEVICE_OK
+                : DEVICE_ERR;
+      if (ret == DEVICE_OK && g_controller) {
+        (void)g_controller->ResetControllers();
+        g_returning_to_post_learn_target = false;
+      }
+      break;
+    case 10u:
+      ret = g_limit_learner.StartSeekUpperWithTravel()
+                ? DEVICE_OK
+                : DEVICE_ERR;
+      if (ret == DEVICE_OK && g_controller) {
+        (void)g_controller->ResetControllers();
+        g_returning_to_post_learn_target = false;
+      }
+      break;
+    case 11u:
+      ret = g_limit_learner.StartSeekUpperThenLower()
+                ? DEVICE_OK
+                : DEVICE_ERR;
+      if (ret == DEVICE_OK && g_controller) {
+        (void)g_controller->ResetControllers();
+        g_returning_to_post_learn_target = false;
+      }
+      break;
+    case 12u:
+      ret = g_limit_learner.StartSeekLowerThenUpper()
+                ? DEVICE_OK
+                : DEVICE_ERR;
+      if (ret == DEVICE_OK && g_controller) {
+        (void)g_controller->ResetControllers();
+        g_returning_to_post_learn_target = false;
+      }
+      break;
+    default:
+      ret = DEVICE_ERR_UNSUPPORTED;
+      break;
+  }
+
+  g_motor_limit_test_status_obs.command_ret = ret;
+  g_motor_limit_test_command.cmd = 0u;
+}
+
+void ApplySelectedControl() {
+  if (g_controller == nullptr) {
+    g_motor_limit_test_status_obs.set_cmd_ret = DEVICE_ERR_NULL;
+    return;
+  }
+
+  const mr::motor::MotorState state = g_controller->GetState();
+
+  if (g_limit_learner.IsSeeking()) {
+    const float velocity = g_limit_learner.GetSeekVelocity();
+    g_motor_limit_test_controller_obs.command_velocity = velocity;
+    g_motor_limit_test_controller_obs.command_position = state.position_rad;
+    g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetVelocity(velocity);
+    return;
+  }
+
+  if (PostLearnReturnCommandActive()) {
+    const float position = g_limit_learner.GetPostLearnTargetPosition();
+    const float max_velocity = PositiveOr(g_motor_limit_test_learning.post_learn_return_max_velocity_rad_s,
+                                          g_controller_config.position_to_velocity_limit);
+    g_motor_limit_test_position.target_rad = position;
+    g_motor_limit_test_controller_obs.command_velocity = max_velocity;
+    g_motor_limit_test_controller_obs.command_position = position;
+    g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetPosition(position, max_velocity);
+    return;
+  }
+
+  switch (g_motor_limit_test_safety.protocol) {
+    case 0u: {
+      float velocity = g_motor_limit_test_velocity.target_rad_s;
+      velocity = g_limit_learner.LimitVelocity(state.position_rad, velocity);
+      g_motor_limit_test_controller_obs.command_velocity = velocity;
+      g_motor_limit_test_controller_obs.command_position = state.position_rad;
+      g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetVelocity(velocity);
+      break;
+    }
+    case 1u: {
+      const float position = g_limit_learner.ClampPosition(g_motor_limit_test_position.target_rad);
+      const float max_velocity = PositiveOr(g_motor_limit_test_position.max_velocity_rad_s,
+                                            g_controller_config.position_to_velocity_limit);
+      g_motor_limit_test_controller_obs.command_velocity = max_velocity;
+      g_motor_limit_test_controller_obs.command_position = position;
+      g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetPosition(position, max_velocity);
+      break;
+    }
+    case 2u: {
+      const float position = g_limit_learner.ClampPosition(g_motor_limit_test_mit.target_position_rad);
+      float velocity = g_motor_limit_test_mit.target_velocity_rad_s;
+      velocity = g_limit_learner.LimitVelocity(state.position_rad, velocity);
+      const float torque_ff = ClampFloat(g_motor_limit_test_mit.torque_ff_nm,
+                                         -kMaxM2006TorqueNm,
+                                         kMaxM2006TorqueNm);
+      g_motor_limit_test_controller_obs.command_velocity = velocity;
+      g_motor_limit_test_controller_obs.command_position = position;
+      g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetMIT(position,
+                               velocity,
+                               g_motor_limit_test_mit.kp,
+                               g_motor_limit_test_mit.kd,
+                               torque_ff);
+      break;
+    }
+    default:
+      g_motor_limit_test_status_obs.set_cmd_ret = g_controller->SetVelocity(0.0f);
+      break;
+  }
+}
+
+void InitializeTestMotor() {
+  g_motor_limit_test_status_obs.can_init_ret = BSP_CAN_Init();
+
+  const mr::motor::MotorInstallSpec direct_install{1.0f, false};
+  g_motor = mr::motor::MotorFactory::Create<mr::motor::MotorKind::RM, mr::motor::MotorModel::M2006>(
+      mr::motor::MotorInstanceConfig<mr::motor::MotorKind::RM>::FromVendorParam(g_rm_param),
+      direct_install);
+
+  if (g_motor == nullptr) {
+    g_motor_limit_test_status_obs.register_ret = DEVICE_ERR_NULL;
+    return;
+  }
+
+  g_motor_limit_test_status_obs.register_ret = g_motor->Register();
+  RebuildController();
+  UpdateLearningConfigFromDebug();
+
+  if (g_controller != nullptr) {
+    g_motor_limit_test_status_obs.enable_ret = g_controller->Enable();
+  }
+}
+
+}  // namespace
+
+extern "C" void Task_motor_limit_test(void *argument) {
+  (void)argument;
+
+  osDelay(ARM_MAIN_INIT_DELAY);
+  InitializeTestMotor();
+
+  uint32_t tick = osKernelGetTickCount();
+
+  while (1) {
+    tick += kDelayTick;
+    ++g_motor_limit_test_task_obs.loop_count;
+    static uint8_t last_output_enable = 0u;
+
+    UpdateLearningConfigFromDebug();
+    CopyPidParamsFromDebug();
+    if (ControllerConfigChanged()) {
+      RebuildController();
+      last_output_enable = 0u;
+    }
+
+    if (g_controller != nullptr) {
+      if (g_motor_limit_test_safety.output_enable != 0u) {
+        if (last_output_enable == 0u) {
+          g_motor_limit_test_status_obs.enable_ret = g_controller->Enable();
+        }
+        last_output_enable = 1u;
+        g_motor_limit_test_status_obs.update_ret = g_controller->Update();
+        g_limit_learner.Observe(g_controller->GetState(), kTaskDtS);
+        HandleDebugCommand();
+        ApplyPostLearnReturnTargetIfReady();
+        ApplySelectedControl();
+        g_motor_limit_test_status_obs.commit_ret = g_controller->CommitCommand();
+      } else {
+        last_output_enable = 0u;
+        g_limit_learner.Observe(g_controller->GetState(), kTaskDtS);
+        HandleDebugCommand();
+        ApplyPostLearnReturnTargetIfReady();
+        g_motor_limit_test_status_obs.set_cmd_ret = g_controller->Relax();
+        g_controller->ClearPendingCommand();
+        g_motor_limit_test_status_obs.commit_ret = DEVICE_OK;
+      }
+      UpdateObservations();
+    }
+
+    task_runtime.stack_water_mark.motor_limit_test = uxTaskGetStackHighWaterMark(nullptr);
+    task_runtime.freq.motor_limit_test = kTaskFreqHz;
+    task_runtime.last_up_time.motor_limit_test = static_cast<float>(tick);
+
+    osDelayUntil(tick);
+  }
+}
+
+*/

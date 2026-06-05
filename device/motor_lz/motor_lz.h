@@ -48,14 +48,22 @@ typedef enum {
     MOTOR_LZ_STATE_MOTOR = 2,       /* Motor模式[运行] */
 } MOTOR_LZ_State_t;
 
-/* 灵足电机故障信息 */
+typedef enum {
+    MOTOR_LZ_FAULT_UNDERVOLTAGE = (1u << 0),
+    MOTOR_LZ_FAULT_PHASE_CURRENT = (1u << 1),
+    MOTOR_LZ_FAULT_OVERTEMPERATURE = (1u << 2),
+    MOTOR_LZ_FAULT_ENCODER = (1u << 3),
+    MOTOR_LZ_FAULT_OVERLOAD = (1u << 4),
+    MOTOR_LZ_FAULT_STALL = (1u << 5),
+} MOTOR_LZ_FaultBits_t;
+
 typedef struct {
-    bool uncalibrated;      /* bit21: 未标定 */
-    bool stall_overload;    /* bit20: 堵转过载故障 */
-    bool encoder_fault;     /* bit19: 磁编码故障 */
-    bool over_temp;         /* bit18: 过温 */
-    bool driver_fault;      /* bit17: 驱动故障 */
-    bool under_voltage;     /* bit16: 欠压故障 */
+    bool uncalibrated;
+    bool stall_overload;
+    bool encoder_fault;
+    bool over_temp;
+    bool driver_fault;
+    bool under_voltage;
 } MOTOR_LZ_Fault_t;
 
 /* 灵足电机运控参数 */
@@ -64,7 +72,7 @@ typedef struct {
     float target_velocity;  /* 目标角速度 (-20~20 rad/s) */
     float kp;               /* 位置增益 (0.0~5000.0) */
     float kd;               /* 微分增益 (0.0~100.0) */
-    float torque;           /* 力矩 (-60~60 Nm) */
+    float torque;           /* 力矩，范围由电机型号决定 */
 } MOTOR_LZ_MotionParam_t;
 
 /*每个电机需要的参数*/
@@ -77,16 +85,23 @@ typedef struct {
     MOTOR_LZ_ControlMode_t mode; /* 控制模式 */
 } MOTOR_LZ_Param_t;
 
-/*电机反馈信息扩展*/
+/*电机反馈信息扩展：仅保留协议原始状态位，不承载高层语义量*/
 typedef struct {
-    float current_angle;        /* 当前角度 (-12.57f~12.57f rad) */
-    float current_velocity;     /* 当前角速度 (-20~20 rad/s) */
-    float current_torque;       /* 当前力矩 (-60~60 Nm) */
-    float temperature;          /* 当前温度 (摄氏度) */
-    MOTOR_LZ_State_t state;     /* 运行状态 */
-    MOTOR_LZ_Fault_t fault;     /* 故障信息 */
+    float current_angle;
+    float current_velocity;
+    float current_torque;
+    float temperature;
+    MOTOR_LZ_State_t state;
+    MOTOR_LZ_Fault_t fault;
     uint8_t motor_can_id;       /* 当前电机CAN ID */
+    /* MOTOR_CPP_ADAPTER_STATE_BEGIN: raw protocol state consumed by lz_protocol.cpp. */
+    uint8_t state_bits;         /* 原始运行状态位 */
+    uint8_t fault_bits;         /* 原始故障位 bit0~5 */
+    /* MOTOR_CPP_ADAPTER_STATE_END */
 } MOTOR_LZ_Feedback_t;
+
+/* MOTOR_CPP_ADAPTER_DATA: raw protocol feedback alias used by C++ LZ wrapper. */
+typedef MOTOR_RawFeedback_t MOTOR_LZ_RawFeedback_t;
 
 /*电机实例*/
 typedef struct {
@@ -101,9 +116,18 @@ typedef struct {
     BSP_CAN_t can;
     MOTOR_LZ_t *motors[MOTOR_LZ_MAX_MOTORS];
     uint8_t motor_count;
+    /* C++ motor 适配层：由 C++ 对象持有生命周期的外部实例。 */
+    /* MOTOR_CPP_ADAPTER_STATE_BEGIN: external instances owned by C++ wrappers. */
+    MOTOR_LZ_t *external_motors[MOTOR_LZ_MAX_MOTORS];
+    uint8_t external_motor_count;
+    /* MOTOR_CPP_ADAPTER_STATE_END */
 } MOTOR_LZ_CANManager_t;
 
 /* Exported functions prototypes -------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/* 原生 C 驱动接口：初始化、注册、反馈更新、协议控制帧与状态控制。 */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @brief 初始化灵足电机驱动系统
@@ -142,7 +166,7 @@ int8_t MOTOR_LZ_MotionControl(MOTOR_LZ_Param_t *param, MOTOR_LZ_MotionParam_t *m
 /**
  * @brief 电流(力矩)模式控制电机
  * @param param 电机参数
- * @param torque 目标力矩 (-60~60 Nm)
+ * @param torque 目标力矩，范围由电机型号决定
  * @return 设备状态码
  */
 int8_t MOTOR_LZ_TorqueControl(MOTOR_LZ_Param_t *param, float torque);
@@ -206,6 +230,23 @@ int8_t MOTOR_LZ_Relax(MOTOR_LZ_Param_t *param);
  * @return 设备状态码
  */
 int8_t MOTOR_LZ_Offline(MOTOR_LZ_Param_t *param);
+
+/* -------------------------------------------------------------------------- */
+/* C++ motor 适配接口：protocol/motor_t 使用的外部实例与原始反馈读取。 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @brief 将外部分配的灵足电机实例附着到底层驱动
+ * @param param 电机参数
+ * @param external_motor 外部实例存储，生命周期需覆盖整个使用期
+ * @return 设备状态码
+ * @note C++ motor 框架专用；外部实例由 C++ 对象持有，不由 C 驱动分配/释放。
+ */
+/* MOTOR_CPP_ADAPTER_API_BEGIN: used by User/device/motor/protocol/lz_protocol.cpp. */
+int8_t MOTOR_LZ_AttachExternal(MOTOR_LZ_Param_t *param, MOTOR_LZ_t *external_motor);
+
+const MOTOR_LZ_RawFeedback_t* MOTOR_LZ_GetRawFeedback(MOTOR_LZ_Param_t *param);
+/* MOTOR_CPP_ADAPTER_API_END */
 
 #ifdef __cplusplus
 }
