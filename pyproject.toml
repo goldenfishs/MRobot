@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mrobot-mcode"
+version = "0.1.0"
+description = "Headless code generation engine and CLI for MRobot"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "MRobot" }]
+
+[project.optional-dependencies]
+yaml = ["PyYAML>=6.0"]
+
+[project.scripts]
+mcode = "mcode.cli:main"
+
+[tool.setuptools]
+packages = ["mcode", "mcode.stm32"]
+package-dir = { mcode = ".", "mcode.stm32" = "stm32" }
+
+[tool.setuptools.package-data]
+mcode = ["schemas/*.json"]
