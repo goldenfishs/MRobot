@@ -53,6 +53,9 @@ python -m mcode generate /path/to/cubemx-project
 python -m mcode validate /path/to/cubemx-project --json
 python -m mcode package search bmi088
 python -m mcode package install mrobot.device.bmi088@^0.2.0 --project /path/to/cubemx-project
+python -m mcode run build --project /path/to/cubemx-project
+python -m mcode run flash --project /path/to/cubemx-project
+python -m mcode run debug --project /path/to/cubemx-project
 ```
 
 `plan` 永不写文件；`generate` 使用生成状态和内容哈希保护用户修改。官方 [mrobot-registry](https://github.com/goldenfishs/mrobot-registry) 已收录平台、板级、BSP、设备、组件、算法、模块和任务包。详细设计见 [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md) 和 [包清单规范](docs/architecture/PACKAGE_SPEC.md)。

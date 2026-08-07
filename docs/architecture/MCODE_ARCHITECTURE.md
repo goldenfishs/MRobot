@@ -68,3 +68,4 @@ flowchart LR
 4. 旧 assets 已批量迁移为独立包仓库，MCode 在计划阶段完成兼容模板渲染。
 5. 官方 registry 提供 SemVer、递归依赖、能力提供者和 lockfile。
 6. ESP-IDF、WCH CH32、HPM SDK 和 TI MSPM0 使用统一项目描述协议与独立 platform pack。
+7. 构建、下载/烧录、调试与清理动作通过无 shell 的参数数组统一暴露给 CLI、MCP 和 VS Code。
