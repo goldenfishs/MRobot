@@ -41,7 +41,7 @@
 
 ### MCode：统一代码生成内核
 
-MRobot 是框架和生态名称；`MCode` 是新的无界面代码生成内核。GUI、CLI、VS Code 插件和 AI/MCP 前端将共同调用 `MCodeService`，不再各自解析 `.ioc` 或修改工程文件。
+MRobot 是框架和生态名称；`MCode` 是独立的无界面代码生成内核。GUI、CLI、[VS Code 插件](https://github.com/goldenfishs/mcode-vscode) 和 MCP 前端共同调用 `MCodeService`，不再各自解析 `.ioc` 或修改工程文件。MRobot 通过固定版本的 Git 子模块消费 MCode，避免核心源码分叉。
 
 当前基础版本优先支持 STM32CubeMX，并提供稳定 JSON 输出：
 
@@ -51,9 +51,11 @@ python -m mcode init /path/to/cubemx-project
 python -m mcode plan /path/to/cubemx-project
 python -m mcode generate /path/to/cubemx-project
 python -m mcode validate /path/to/cubemx-project --json
+python -m mcode package search bmi088
+python -m mcode package install mrobot.device.bmi088@^0.2.0 --project /path/to/cubemx-project
 ```
 
-`plan` 永不写文件；`generate` 使用生成状态和内容哈希保护用户修改。包源码、生成 glue 与用户业务文件分别采用不可变输入、`generated` 和 `scaffold` 所有权策略。详细设计见 [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md) 和 [包清单规范](docs/architecture/PACKAGE_SPEC.md)。
+`plan` 永不写文件；`generate` 使用生成状态和内容哈希保护用户修改。官方 [mrobot-registry](https://github.com/goldenfishs/mrobot-registry) 已收录平台、板级、BSP、设备、组件、算法、模块和任务包。详细设计见 [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md) 和 [包清单规范](docs/architecture/PACKAGE_SPEC.md)。
 
 ---
 
@@ -205,7 +207,7 @@ User_code/
 
 ### 环境要求
 
-- **Python**: GUI 需要 3.8 或更高版本；MCode 需要 3.10 或更高版本
+- **Python**: GUI 与 MCode 均需要 3.10 或更高版本
 - **操作系统**: Windows / macOS / Linux
 - **依赖库**: 
   - PyQt5
@@ -218,13 +220,13 @@ User_code/
 
 1. **克隆仓库**
 ```bash
-git clone https://github.com/goldenfishs/MRobot.git
+git clone --recurse-submodules https://github.com/goldenfishs/MRobot.git
 cd MRobot
 ```
 
 2. **安装依赖**
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 3. **运行程序**
@@ -238,7 +240,7 @@ python MRobot.py
 使用PyInstaller将程序打包为单个可执行文件：
 
 ```bash
-pyinstaller MRobot.py --onefile --windowed --add-data "assets/logo;assets/logo" --add-data "app;app" --add-data "app/tools;app/tools"
+pyinstaller MRobot.spec
 ```
 ```
 

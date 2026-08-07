@@ -273,20 +273,8 @@ class CodeGenerateInterface(QWidget):
 
 
     def generate_code(self):
-        """生成所有代码，包括未加载页面"""
+        """通过 MCode 的唯一生成流水线安装选中包并生成代码。"""
         try:
-            # MCode owns project analysis, validation and generated-file state.
-            diagnostics = self.mcode.validate(self.project_path)
-            errors = [item for item in diagnostics if item.severity.value == "error"]
-            if errors:
-                InfoBar.error(
-                    title="MCode 验证失败",
-                    content="\n".join(item.message for item in errors),
-                    parent=self,
-                    duration=5000
-                )
-                return
-
             # 先收集所有页面名（从CSV配置文件读取）
             from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
             csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
@@ -317,31 +305,43 @@ class CodeGenerateInterface(QWidget):
                     elif hasattr(widget, '_generate_device_code_internal') and widget not in device_pages:
                         device_pages.append(widget)
 
-            # 确保导入成功
-            from app.code_page.bsp_interface import bsp
-            from app.code_page.component_interface import component
-            from app.code_page.device_interface import device
+            algorithms = {"ahrs", "filter", "kalman_filter", "limiter", "mixer", "pid", "user_math"}
+            package_specs = ["mrobot.platform.stm32"]
+            bindings = {}
+            for page in bsp_pages:
+                if not getattr(page, "is_need_generate", lambda: False)():
+                    continue
+                name = getattr(page, "yaml_key", getattr(page, "peripheral_name", "")).lower()
+                if name:
+                    package_specs.append(f"mrobot.bsp.{name.replace('_', '-')}")
+                if hasattr(page, "_collect_configs"):
+                    for logical_name, instance in page._collect_configs():
+                        bindings[f"BSP_{name.upper()}_{logical_name.upper()}"] = instance
+            for page in component_pages:
+                if not getattr(page, "is_need_generate", lambda: False)():
+                    continue
+                name = getattr(page, "component_name", "").lower()
+                package_type = "algorithm" if name in algorithms else "component"
+                if name:
+                    package_specs.append(f"mrobot.{package_type}.{name.replace('_', '-')}")
+            for page in device_pages:
+                if not getattr(page, "is_need_generate", lambda: False)():
+                    continue
+                name = getattr(page, "device_name", "").lower()
+                if name:
+                    package_specs.append(f"mrobot.device.{name.replace('_', '-')}")
 
-            # 生成 BSP 代码
-            bsp_result = bsp.generate_bsp(self.project_path, bsp_pages)
+            self.mcode.configure(self.project_path, tuple(sorted(set(package_specs))), bindings)
+            diagnostics = self.mcode.validate(self.project_path)
+            errors = [item for item in diagnostics if item.severity.value == "error"]
+            if errors:
+                raise MCodeError("\n".join(item.message for item in errors))
+            mcode_plan = self.mcode.generate(self.project_path, adopt_legacy=True)
 
-            # 生成 Component 代码  
-            component_result = component.generate_component(self.project_path, component_pages)
-
-            # 生成 Device 代码
-            device_result = device.generate_device(self.project_path, device_pages)
-
-            # During migration, legacy templates still create BSP/component/device
-            # files. MCode records the canonical project model and owns all new
-            # generated outputs through the same API used by the CLI.
-            mcode_plan = self.mcode.generate(self.project_path)
-
-            # 合并结果信息
             combined_result = (
-                f"BSP代码生成:\n{bsp_result}\n\n"
-                f"Component代码生成:\n{component_result}\n\n"
-                f"Device代码生成:\n{device_result}\n\n"
-                f"MCode统一输出: {mcode_plan.changed_count} 个文件变更"
+                f"已解析 {len(mcode_plan.packages)} 个包，"
+                f"生成或更新 {mcode_plan.changed_count} 个文件。\n"
+                "所有输出均由 MCode 统一管理；用户 scaffold 不会被覆盖。"
             )
 
             InfoBar.success(

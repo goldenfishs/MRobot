@@ -1,35 +1,32 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mrobot-mcode"
-version = "0.1.0"
-description = "Headless code generation engine and CLI for the MRobot ecosystem"
+name = "mrobot-desktop"
+version = "0.3.0"
+description = "Desktop frontend for the MRobot embedded framework"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "MRobot" }]
-keywords = ["stm32", "cubemx", "embedded", "code-generation", "mrobot"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Environment :: Console",
-    "Programming Language :: Python :: 3",
-    "Topic :: Software Development :: Code Generators",
+dependencies = [
+    "mrobot-mcode @ git+https://github.com/goldenfishs/MCode.git@v0.3.2",
+    "PyQt5>=5.15",
+    "PyQt-Fluent-Widgets>=1.7",
+    "PyYAML>=6.0",
+    "pyqtgraph>=0.13",
+    "pyserial>=3.5",
+    "requests>=2.31"
 ]
 
 [project.optional-dependencies]
-yaml = ["PyYAML>=6.0"]
-dev = ["PyYAML>=6.0", "pytest>=8.0"]
-
-[project.scripts]
-mcode = "mcode.cli:main"
+dev = ["pytest>=8.0"]
 
 [tool.setuptools.packages.find]
-include = ["mcode*"]
-
-[tool.setuptools.package-data]
-mcode = ["schemas/*.json"]
+include = ["app*"]
+exclude = ["mcode*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -4,7 +4,7 @@
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/goldenfishs/MCode/main/mcode/schemas/package.schema.json",
+  "$schema": "https://raw.githubusercontent.com/goldenfishs/MCode/main/schemas/package.schema.json",
   "schema_version": 1,
   "package": {
     "id": "mrobot.device.bmi088",
@@ -26,4 +26,12 @@
 }
 ```
 
-包通过 `requires` 声明能力，通过 `provides` 暴露能力。能力名称描述语义，例如 `bsp.spi`，不能是 `../../bsp/spi.h` 一类文件路径。v1 解析本地路径和依赖拓扑；远程 registry、签名和 semver 求解将在 lockfile 协议稳定后加入。
+包通过 `requires` 声明能力，通过 `provides` 暴露能力。能力名称描述语义，例如 `bsp.spi`，不能是 `../../bsp/spi.h` 一类文件路径。
+
+官方索引位于 `goldenfishs/mrobot-registry`。MCode 支持搜索、SemVer 约束、递归依赖/能力提供者安装、项目级缓存和 lockfile：
+
+```bash
+mcode package search imu
+mcode package install mrobot.device.bmi088@^0.2.0 --project .
+mcode package remove mrobot.device.bmi088 --project .
+```

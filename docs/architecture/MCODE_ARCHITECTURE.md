@@ -7,7 +7,7 @@
 - **mrobot-mcode**：Python 发布包名；导入名和命令统一为 `mcode`。
 - GUI、CLI、VS Code 插件和 MCP/AI 工具都是前端，不拥有业务规则。
 
-第一阶段只承诺 STM32CubeMX 工程。其他 MCU 平台必须通过 platform pack 接入，不能在 UI 中增加条件分支。
+STM32CubeMX 是完整原生路径。其他 MCU 平台通过 platform pack 和统一项目描述协议接入，不在 UI 中增加条件分支。
 
 ## 单一生成流水线
 
@@ -28,7 +28,7 @@ flowchart LR
     Model --> MCP["MCP / AI"]
 ```
 
-所有前端调用 `MCodeService.inspect/plan/generate/validate`。CLI 的 `--json` 是跨进程前端的首个稳定协议；以后可在不改变模型的前提下增加本地服务或 MCP 包装。
+所有前端调用 `MCodeService.inspect/configure/plan/generate/validate`。CLI 的 `--json` 是跨进程稳定协议；`mcode-mcp` 和 VS Code 插件均为该接口的薄包装。
 
 ## BSP 分层
 
@@ -60,13 +60,11 @@ flowchart LR
 - `goldenfishs/mrobot-board-<board>`：板卡包。
 - `goldenfishs/mrobot-device-<name>`、`mrobot-component-<name>`、`mrobot-algorithm-<name>`、`mrobot-module-<name>`、`mrobot-task-<name>`：可独立发布的功能包。
 
-不要一开始拆出所有旧目录。先选 STM32 平台包和 BMI088 设备包做端到端样板，验证版本、依赖、CI 和发布后，再按真实维护边界迁移。
+## 已完成的迁移基线
 
-## 渐进迁移
-
-1. 在 MRobot 中建立 MCode 核心和兼容适配，冻结新的 GUI 内生成逻辑。
-2. 独立发布 MCode；MRobot 改为依赖它。
-3. 提取 `platform-stm32` 和一个设备包，建立包测试矩阵。
-4. 将旧 assets 逐包迁移；迁移期允许 legacy adapter，但不允许两套解析器继续演化。
-5. 增加 VS Code/MCP 前端；它们只消费 JSON/API。
-6. 核心稳定后再新增 ESP32、CH32、HPM、MSPM0 等 platform pack。
+1. MCode 已独立发布，MRobot 通过固定版本子模块和 Python 依赖消费它。
+2. GUI 生成按钮、CLI、VS Code 和 MCP 均调用统一服务。
+3. STM32CubeMX、F1/F4/H7/G4/L4/U5 家族契约及板级包生成已落地。
+4. 旧 assets 已批量迁移为独立包仓库，MCode 在计划阶段完成兼容模板渲染。
+5. 官方 registry 提供 SemVer、递归依赖、能力提供者和 lockfile。
+6. ESP-IDF、WCH CH32、HPM SDK 和 TI MSPM0 使用统一项目描述协议与独立 platform pack。
