@@ -18,7 +18,7 @@
       <img src="https://img.shields.io/github/last-commit/goldenfishs/MRobot.svg" alt="Last Commit">
     </a>
     <img src="https://img.shields.io/badge/language-Python-blue.svg" alt="Language">
-    <img src="https://img.shields.io/badge/PyQt-6.x-green.svg" alt="PyQt">
+    <img src="https://img.shields.io/badge/PyQt-5.x-green.svg" alt="PyQt">
     <img src="https://img.shields.io/badge/STM32-supported-orange.svg" alt="STM32">
   </p>
 </div>
@@ -39,6 +39,22 @@
 - 🎨 **现代化界面**: 基于QFluentWidgets的现代化UI设计
 - 📦 **丰富的组件库**: 内置大量常用的BSP、组件、设备驱动和功能模块
 
+### MCode：统一代码生成内核
+
+MRobot 是框架和生态名称；`MCode` 是新的无界面代码生成内核。GUI、CLI、VS Code 插件和 AI/MCP 前端将共同调用 `MCodeService`，不再各自解析 `.ioc` 或修改工程文件。
+
+当前基础版本优先支持 STM32CubeMX，并提供稳定 JSON 输出：
+
+```bash
+python -m mcode inspect /path/to/cubemx-project --json
+python -m mcode init /path/to/cubemx-project
+python -m mcode plan /path/to/cubemx-project
+python -m mcode generate /path/to/cubemx-project
+python -m mcode validate /path/to/cubemx-project --json
+```
+
+`plan` 永不写文件；`generate` 使用生成状态和内容哈希保护用户修改。包源码、生成 glue 与用户业务文件分别采用不可变输入、`generated` 和 `scaffold` 所有权策略。详细设计见 [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md) 和 [包清单规范](docs/architecture/PACKAGE_SPEC.md)。
+
 ---
 
 ## 🌟 主要特性
@@ -47,7 +63,7 @@
 - **智能配置解析**: 自动解析STM32CubeMX的.ioc文件，提取硬件配置信息
 - **模板驱动生成**: 基于模板的代码生成机制，支持自定义模板
 - **依赖关系管理**: 自动处理组件和设备之间的依赖关系
-- **用户代码保留**: 使用`/* USER ... BEGIN */ ... /* USER ... END */`标记保护用户代码
+- **用户代码保留**: 新项目通过 generated/scaffold 文件所有权隔离；旧项目兼容 `/* USER ... */` 标记
 - **分层代码生成**: 支持BSP→Component→Device→Module的完整代码生成流程
 
 ### 🎨 界面功能
@@ -189,10 +205,10 @@ User_code/
 
 ### 环境要求
 
-- **Python**: 3.8 或更高版本
+- **Python**: GUI 需要 3.8 或更高版本；MCode 需要 3.10 或更高版本
 - **操作系统**: Windows / macOS / Linux
 - **依赖库**: 
-  - PyQt6
+  - PyQt5
   - QFluentWidgets
   - PyYAML
   - PyInstaller（用于打包）

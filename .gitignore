@@ -17,11 +17,11 @@
 *.dbg*
 *.uvguix.*
 .mxproject
- 
+
 RTE/
 Templates/
 Examples/
- 
+
 !*.uvprojx
 !*.h
 !*.c
@@ -34,3 +34,11 @@ build/
 dist/
 *.spec
 *.exe
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+*.egg-info/
+.mrobot/

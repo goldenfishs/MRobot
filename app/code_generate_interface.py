@@ -5,6 +5,8 @@ from app.tools.analyzing_ioc import analyzing_ioc
 from app.code_page.bsp_interface import bsp
 from app.data_interface import DataInterface
 from app.tools.code_generator import CodeGenerator
+from mcode.errors import MCodeError
+from mcode.service import MCodeService
 
 import os
 import csv
@@ -16,6 +18,13 @@ class CodeGenerateInterface(QWidget):
         super().__init__(parent)
         self.setObjectName("CodeGenerateInterface")
         self.project_path = project_path
+        self.mcode = MCodeService()
+        self.project_model = None
+        try:
+            self.project_model = self.mcode.inspect(project_path)
+        except MCodeError:
+            # The UI reports the actionable diagnostic when generation starts.
+            pass
         
         # 初始化页面缓存
         self.page_cache = {}
@@ -266,6 +275,18 @@ class CodeGenerateInterface(QWidget):
     def generate_code(self):
         """生成所有代码，包括未加载页面"""
         try:
+            # MCode owns project analysis, validation and generated-file state.
+            diagnostics = self.mcode.validate(self.project_path)
+            errors = [item for item in diagnostics if item.severity.value == "error"]
+            if errors:
+                InfoBar.error(
+                    title="MCode 验证失败",
+                    content="\n".join(item.message for item in errors),
+                    parent=self,
+                    duration=5000
+                )
+                return
+
             # 先收集所有页面名（从CSV配置文件读取）
             from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
             csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
@@ -310,8 +331,18 @@ class CodeGenerateInterface(QWidget):
             # 生成 Device 代码
             device_result = device.generate_device(self.project_path, device_pages)
 
+            # During migration, legacy templates still create BSP/component/device
+            # files. MCode records the canonical project model and owns all new
+            # generated outputs through the same API used by the CLI.
+            mcode_plan = self.mcode.generate(self.project_path)
+
             # 合并结果信息
-            combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}\n\nDevice代码生成:\n{device_result}"
+            combined_result = (
+                f"BSP代码生成:\n{bsp_result}\n\n"
+                f"Component代码生成:\n{component_result}\n\n"
+                f"Device代码生成:\n{device_result}\n\n"
+                f"MCode统一输出: {mcode_plan.changed_count} 个文件变更"
+            )
 
             InfoBar.success(
                 title="代码生成结果",
@@ -338,11 +369,11 @@ class CodeGenerateInterface(QWidget):
 
     def _get_freertos_status(self):
         """获取FreeRTOS状态"""
-        ioc_files = [f for f in os.listdir(self.project_path) if f.endswith('.ioc')]
-        if ioc_files:
-            ioc_path = os.path.join(self.project_path, ioc_files[0])
-            return "开启" if analyzing_ioc.is_freertos_enabled_from_ioc(ioc_path) else "未开启"
-        return "未找到.ioc文件"
+        try:
+            model = self.project_model or self.mcode.inspect(self.project_path)
+            return "开启" if model.freertos else "未开启"
+        except MCodeError as exc:
+            return f"解析失败: {exc}"
 
     def _load_csv_and_build_tree(self):
         from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
