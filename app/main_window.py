@@ -17,6 +17,7 @@ from .code_configuration_interface import CodeConfigurationInterface
 from .finance_interface import FinanceInterface
 from .mech_design_interface import MechDesignInterface
 from .about_interface import AboutInterface
+from .ai_interface import AIInterface
 from .tools.update_check_thread import UpdateCheckThread
 from . import __version__
 import base64
@@ -57,6 +58,7 @@ class MainWindow(FluentWindow):
         self.codeConfigurationInterface = CodeConfigurationInterface(self)
         self.financeInterface = FinanceInterface(self)
         self.mechDesignInterface = MechDesignInterface(self)
+        self.aiInterface = AIInterface(self)
         self.aboutInterface = AboutInterface(self)
 
 
@@ -64,6 +66,7 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.homeInterface, FIF.HOME, self.tr('主页'))
         # self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
         self.addSubInterface(self.codeConfigurationInterface, FIF.CODE, self.tr('代码生成'))
+        self.addSubInterface(self.aiInterface, FIF.ROBOT, self.tr('AI 工作台'))
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
         self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
         self.addSubInterface(self.mechDesignInterface, FIF.SETTING, self.tr('机械设计'))

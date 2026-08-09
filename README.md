@@ -5,7 +5,7 @@
 
   **面向机器人嵌入式工程的统一代码生成与开发工具**
 
-  STM32CubeMX 优先 · GUI / CLI / VS Code / MCP 共用内核 · 可独立发布的模块生态
+  STM32CubeMX 优先 · GUI / CLI / VS Code / MCP 共用内核 · 自定义 AI 工作台 · 可独立发布的模块生态
 
   [![Tests](https://github.com/goldenfishs/MRobot/actions/workflows/test.yml/badge.svg)](https://github.com/goldenfishs/MRobot/actions/workflows/test.yml)
   [![Release](https://img.shields.io/github/v/release/goldenfishs/MRobot)](https://github.com/goldenfishs/MRobot/releases/latest)
@@ -40,7 +40,10 @@ flowchart LR
     GUI["MRobot GUI"] --> Service["MCodeService"]
     CLI["mcode CLI"] --> Service
     VSCode["VS Code"] --> Service
-    MCP["MCP / AI"] --> Service
+    MCP["MCP"] --> Service
+    AI["MRobot AI 工作台"] --> AICore["统一 AI Core"]
+    AICore --> Provider["自定义 AI Provider"]
+    AICore -->|"只读工具"| Service
     Service --> Inspect["工程解析"]
     Service --> Registry["包与依赖解析"]
     Service --> Plan["GenerationPlan"]
@@ -61,6 +64,7 @@ flowchart LR
 
 - [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md)
 - [包清单规范](docs/architecture/PACKAGE_SPEC.md)
+- [AI 工作台架构](docs/architecture/AI_WORKBENCH.md)
 - [AI 交接与路线图](AGENTS.md)
 
 ## 当前能力
@@ -169,6 +173,54 @@ python MRobot.py
 
 旧的 `app/code_page/` 页面仍用于收集部分选择，但新的解析和生成规则不得写回 GUI 页面或 `app/tools/code_generator.py`。
 
+## 使用 AI 工作台
+
+MRobot 桌面端内置面向机器人嵌入式开发的 AI 工作台。它借鉴了 Claude Desktop/ChatGPT 的工程上下文与工具授权方式，以及 OpenSquilla 的多 Provider、统一会话内核设计，但所有实现均位于 MRobot 自己的 `app/ai/` 核心中。
+
+当前支持所有实现 OpenAI-compatible `POST /v1/chat/completions` 的服务，包括：
+
+| Provider | Base URL 示例 | API Key 环境变量 |
+|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
+| DeepSeek | `https://api.deepseek.com` | `DEEPSEEK_API_KEY` |
+| 硅基流动 | `https://api.siliconflow.cn/v1` | `SILICONFLOW_API_KEY` |
+| 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `DASHSCOPE_API_KEY` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
+| Ollama 本地 | `http://127.0.0.1:11434/v1` | 不需要 |
+| 自定义服务 | 用户填写的 HTTPS 地址 | 用户填写的变量名 |
+
+使用流程：
+
+1. 从主导航进入“AI 工作台”。
+2. 点击“添加模型”或“模型设置”，选择预设或填写自定义 Base URL、模型 ID。
+3. 在本次运行中输入 API Key，或提前设置对应环境变量。
+4. 点击“测试连接”确认地址、权限和模型列表。
+5. 可选：选择一个 MRobot/CubeMX 工程，并开启“允许只读工程工具”。
+6. 询问 MCU、外设、文件、代码生成计划、冲突或诊断问题。
+
+API Key 不会写入 `profiles.json` 或对话历史。为了跨重启使用，推荐通过系统环境变量或启动脚本注入，不要把密钥放进工程文件。远程自定义接口必须使用 HTTPS；HTTP 只允许 `localhost`、`127.0.0.1` 和 `::1`。
+
+AI 当前可以调用以下只读工具：
+
+- `inspect_project`：读取 MCU、平台、外设、引脚和能力。
+- `plan_generation`：预览 MCode 生成计划，不写文件。
+- `validate_project`：运行配置与生成冲突诊断。
+- `list_project_files`：列出受支持的工程文本文件。
+- `read_project_file`：读取工程内单个白名单文本文件，限制为 32 KiB。
+
+工具层会阻止目录穿越、密钥文件、构建目录和工程外文件。AI 不具备 generate、build、flash、debug 或任意命令执行权限；这些写入或硬件动作必须继续由用户在专用界面确认。
+
+本地 Ollama 示例：
+
+```bash
+ollama pull qwen3:8b
+ollama serve
+```
+
+然后在模型设置中选择“Ollama 本地”，把模型 ID 改为 `qwen3:8b`。默认的 `qwen3:0.6b` 只适合连通性测试，不建议用于复杂工程修改建议。
+
+Provider 元数据保存在系统应用数据目录的 `MRobot/ai/profiles.json`，对话保存在 `MRobot/ai/conversations.json`；两者都不保存 API Key。原生 Anthropic Messages、OpenAI Responses、远程/本地 MCP 连接器、图片输入、用量/成本账本和跨设备同步尚未实现。
+
 ## 项目文件
 
 MCode 使用以下项目级文件：
@@ -252,7 +304,7 @@ plan = service.plan("/path/to/project")
 
 `mcode --json` 为脚本和插件提供稳定机器可读输出。CLI 不重新实现业务规则。
 
-### MCP / AI
+### MCP
 
 安装 MCode 后启动 stdio MCP 服务：
 
@@ -292,6 +344,7 @@ Windows 自动安装只选择 Inno Setup `*-setup.exe`。macOS 和 Linux 使用�
 ```text
 MRobot/
 ├── app/                       # 桌面 GUI 和统一更新服务
+│   └── ai/                    # Provider、会话、只读工具和 AI agent loop
 ├── mcode/                     # 固定版本的 MCode Git 子模块
 ├── assets/                    # GUI 资源与待迁移旧资源
 ├── docs/architecture/         # 架构和包规范
@@ -370,6 +423,8 @@ python tools/build_desktop.py
 - 尚未保证自动修改所有 CubeIDE `.cproject`、Keil、CMake 和 Makefile 工程元数据。
 - GUI 包管理仍在从旧选择页面迁移到完整 registry 浏览、依赖树和冲突界面。
 - MCP 尚未覆盖 CLI/Service 的所有包管理和迁移参数。
+- AI 工作台当前只实现 OpenAI-compatible Chat Completions；尚无原生 Anthropic/Responses adapter 和外部 MCP 连接器。
+- AI 工具刻意保持只读，不能自动生成、构建、烧录或执行任意系统命令。
 - 真机 build/flash/debug 需要明确的板卡、工具链、探针和 action 配置。
 - macOS、Windows 正式代码签名仍待配置。
 
@@ -384,6 +439,7 @@ python tools/build_desktop.py
 5. 验证 STM32CubeProgrammer、OpenOCD、J-Link、ST-Link action profile。
 6. 使用真实板卡完成构建、烧录、复位和串口 smoke test。
 7. STM32 主路径稳定后，再逐个平台实现原生 SDK importer。
+8. 为 AI 工作台增加原生 Responses/Anthropic adapter、MCP 连接器和逐工具授权界面，再评估受确认保护的写操作。
 
 更完整的完成情况与后续任务见 [AGENTS.md](AGENTS.md)。
 

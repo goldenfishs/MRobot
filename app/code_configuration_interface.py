@@ -330,6 +330,10 @@ class CodeConfigurationInterface(QWidget):
         self.tabBar.setCurrentTab("fitPage")
 
     def open_ai_tab(self):
+        window = self.window()
+        if hasattr(window, "aiInterface") and hasattr(window, "switchTo"):
+            window.switchTo(window.aiInterface)
+            return
         # 检查是否已存在标签页，避免重复添加
         for i in range(self.stackedWidget.count()):
             widget = self.stackedWidget.widget(i)

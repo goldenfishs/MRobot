@@ -38,7 +38,7 @@ def test_desktop_version_has_one_runtime_source() -> None:
     version = (ROOT / "app" / "_version.py").read_text(encoding="utf-8")
     about = (ROOT / "app" / "about_interface.py").read_text(encoding="utf-8")
     assert 'dynamic = ["version"]' in project
-    assert '__version__ = "0.4.2"' in version
+    assert '__version__ = "0.5.0"' in version
     assert '__version__ = "1.1.1"' not in about
 
 

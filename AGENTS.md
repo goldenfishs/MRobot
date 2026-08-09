@@ -29,7 +29,7 @@ MRobot 是组织名、机器人嵌入式框架名和生态品牌。当前重构�
 
 | 仓库 | 职责 | 当前基线 |
 |---|---|---|
-| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.4.2` |
+| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.5.0`（待发布） |
 | `goldenfishs/MCode` | 核心、CLI、schema、MCP | `v0.4.0` |
 | `goldenfishs/mrobot-registry` | 官方包索引 | 64 个包 |
 | `goldenfishs/mcode-vscode` | VS Code 薄前端 | `v0.3.0` |
@@ -132,6 +132,16 @@ MCode 当前实现：
 - macOS/Linux 使用退出后安装助手和失败回滚；Windows 自动更新只选择 Inno Setup `*-setup.exe`，ZIP 仅作便携包。
 - 当前 macOS 仍为临时签名，正式公开分发前应配置 Developer ID、公证以及 Windows Authenticode 签名。
 
+### 4.8 AI 工作台
+
+- `app/ai/` 是 GUI 无关的 AI 核心，包含 Provider 配置、OpenAI-compatible 流式客户端、本地会话、MCode 只读工具和工具调用循环。
+- `app/ai_interface.py` 只负责桌面交互；主导航直接提供“AI 工作台”，旧工具箱入口复用同一界面。
+- 支持 OpenAI、DeepSeek、硅基流动、阿里云百炼、OpenRouter、Ollama 和自定义 OpenAI-compatible Base URL/模型 ID。
+- Provider 配置和会话保存在系统应用数据目录，API Key 只从当前运行内存或用户指定环境变量读取，不能持久化到配置或历史。
+- 工程工具只有 inspect、plan、validate、文件列表和受限文本读取；没有 generate、build、flash、debug、shell 或任意文件写入。
+- 文件上下文拒绝工程外路径、目录穿越、密钥扩展名、`.env`、构建输出和超过 32 KiB 的单文件。
+- 工具返回内容视为不可信数据，系统提示明确禁止遵循工程文件中伪装成指令的文本。
+
 ## 5. 真实能力边界：不要作错误声明
 
 以下内容尚不能描述为“完整支持”：
@@ -143,6 +153,8 @@ MCode 当前实现：
 5. **MCP 功能对齐**：MCP 尚未暴露 CLI/Service 的全部能力。初始化、configure、包安装/删除、`--adopt` 等仍需 CLI 或 Python API。
 6. **VS Code 发布渠道**：扩展仓库和 tag 已发布，但不能假设已进入 VS Code Marketplace。
 7. **硬件动作**：build/flash/debug 只是安全执行 `mrobot.yaml` 中配置的 argv；实际命令、工具链、固件路径和探针由项目提供。
+8. **AI Provider**：当前只实现 OpenAI-compatible Chat Completions。没有原生 Anthropic Messages/OpenAI Responses adapter、外部 MCP 连接器、图片输入、成本账本或跨设备同步。
+9. **AI 自主操作**：当前 AI 工具刻意只读，不能自行生成代码、构建、烧录、运行命令或修改工程。
 
 ## 6. 关键源码地图
 
@@ -150,6 +162,8 @@ MCode 当前实现：
 
 - `MRobot.py`：桌面程序入口。
 - `app/main_window.py`：主窗口和页面装配。
+- `app/ai/`：统一 AI Provider、会话、工具和 agent loop。
+- `app/ai_interface.py`：AI 工作台 GUI 薄前端。
 - `app/code_generate_interface.py`：GUI 代码生成集成入口。
 - `app/code_page/`：旧 GUI 配置页面；只负责收集选择，不应拥有生成规则。
 - `tests/test_generation.py`：生成、安全覆盖和集成测试。
@@ -158,6 +172,7 @@ MCode 当前实现：
 - `tests/test_updates.py`：平台选择、下载校验、安全解包和安装计划测试。
 - `docs/architecture/MCODE_ARCHITECTURE.md`：目标架构。
 - `docs/architecture/PACKAGE_SPEC.md`：包清单规范。
+- `docs/architecture/AI_WORKBENCH.md`：AI Provider、会话、工具、安全边界和演进计划。
 - `tools/migrate_legacy_packages.py`：旧模块迁移工具。
 - `.github/workflows/test.yml`：主 CI。
 
@@ -188,7 +203,7 @@ python -m pytest -q
 python -m compileall -q app tools MRobot.py
 ```
 
-当前预期：本仓库 39 项测试通过。
+当前预期：本仓库 49 项测试通过。
 
 测试 MCode：
 
@@ -252,6 +267,8 @@ mcode plan /path/to/project --json
 5. 为 STM32CubeProgrammer、OpenOCD、J-Link、ST-Link 增加可验证的 action profile，同时保留项目覆盖能力。
 6. 用真实 CtrBoard-H7、DevC 或其他现有板卡完成构建、烧录、复位、串口输出和至少一个设备驱动的真机验收，并记录工具链版本。
 7. 补齐 MCP 的 init/configure/package install/package remove/adopt 工具，使 MCP 与 CLI 核心能力对齐。
+8. 为 AI 工作台补充原生 OpenAI Responses 和 Anthropic Messages adapter，并保持统一 Provider 接口。
+9. 增加本地/远程 MCP 连接器管理、逐会话启停和逐工具权限；写操作必须显式确认且可预览。
 
 ### P1：提升模块生态和开发体验
 
