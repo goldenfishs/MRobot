@@ -224,8 +224,24 @@ User_code/
 可以直接从 [GitHub Releases](https://github.com/goldenfishs/MRobot/releases) 下载当前系统的桌面包：
 
 - macOS Apple Silicon：`MRobot-*-macos-arm64.dmg`，打开后拖入 Applications。当前使用临时签名，若 Gatekeeper 阻止首次启动，请在“系统设置 → 隐私与安全性”中确认打开。
-- Windows x64：`MRobot-*-windows-x64.zip`，解压后运行 `MRobot.exe`。
+- Windows x64：推荐 `MRobot-*-windows-x64-setup.exe`；ZIP 是免安装便携版，自动更新只支持安装版。
 - Linux x64：`MRobot-*-linux-x64.tar.gz`，解压后运行 `MRobot/MRobot`。系统仍需提供常见的 X11/Wayland 和桌面图形库。
+
+### 自动更新
+
+桌面程序启动后默认在后台检查 MRobot 更新源，连接失败时自动回退 GitHub Releases。发现新版本时，可在“关于”页面查看版本说明并点击“一键更新”；如勾选“发现更新后自动下载、安装并重启”，则校验成功后自动完成升级。
+
+更新器依次读取 `https://updates.mrobot.cn/stable/update.json`、每个 GitHub Release 自动生成的 `update.json` 和兼容旧版本的 GitHub API；再使用同一套 `UpdateService` 接口完成平台和 CPU 架构匹配、流式下载、文件大小检查与 SHA-256 校验。校验失败时不会执行安装。macOS 和 Linux 使用退出后运行的独立安装助手替换当前版本并重新启动；Windows 使用用户级 Inno Setup 安装程序，不要求管理员权限。
+
+CLI 和其他前端可调用相同接口：
+
+```bash
+mrobot-update --json check
+mrobot-update --json download
+mrobot-update --json install --desktop-path /path/to/MRobot.app
+```
+
+源码运行模式不会覆盖源码本身；`install` 需要指定已安装的桌面程序，日常开发请通过 Git 更新。
 
 从源码运行：
 
@@ -254,7 +270,7 @@ python MRobot.py
 pyinstaller MRobot.spec
 ```
 
-macOS arm64 输出位于 `dist/MRobot.app`；Windows 输出为 `dist/MRobot.exe`。
+macOS arm64 输出位于 `dist/MRobot.app`；Windows 构建还会通过 Inno Setup 在 `release-dist/` 生成可自动更新的安装程序。
 
 ---
 

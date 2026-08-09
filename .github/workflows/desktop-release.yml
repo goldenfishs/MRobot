@@ -45,6 +45,9 @@ jobs:
       - name: Install Fluent Widgets on Windows and Linux
         if: runner.os != 'macOS'
         run: python -m pip install PyQt-Fluent-Widgets
+      - name: Install Inno Setup on Windows
+        if: runner.os == 'Windows'
+        run: choco install innosetup --no-progress --yes
       - name: Install minimal Fluent Widgets macOS bridge
         if: runner.os == 'macOS'
         run: >-
@@ -66,10 +69,18 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
+      - name: Create update manifest
+        run: >-
+          python tools/create_update_manifest.py release-assets
+          --repository "${{ github.repository }}" --tag "${{ github.ref_name }}"
       - name: Create release and upload native packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -78,3 +89,37 @@ jobs:
             gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --generate-notes
           gh release upload "${{ github.ref_name }}" release-assets/* \
             --repo "${{ github.repository }}" --clobber
+      - name: Create MRobot origin manifest
+        env:
+          UPDATE_ORIGIN: https://updates.mrobot.cn
+        run: >-
+          python tools/create_update_manifest.py release-assets
+          --repository "${{ github.repository }}" --tag "${{ github.ref_name }}"
+          --base-url "${UPDATE_ORIGIN}/releases/${{ github.ref_name }}"
+      - name: Configure update origin SSH
+        env:
+          UPDATE_HOST: ${{ secrets.MROBOT_UPDATE_HOST }}
+          UPDATE_KNOWN_HOSTS: ${{ secrets.MROBOT_UPDATE_KNOWN_HOSTS }}
+          UPDATE_SSH_KEY: ${{ secrets.MROBOT_UPDATE_SSH_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${UPDATE_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          printf '%s\n' "${UPDATE_SSH_KEY}" > ~/.ssh/mrobot-update-deploy
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/mrobot-update-deploy
+      - name: Publish to MRobot update origin
+        env:
+          UPDATE_HOST: ${{ secrets.MROBOT_UPDATE_HOST }}
+          UPDATE_USER: ${{ secrets.MROBOT_UPDATE_USER }}
+        run: |
+          ssh -i ~/.ssh/mrobot-update-deploy "${UPDATE_USER}@${UPDATE_HOST}" \
+            "mkdir -p '/srv/mrobot/releases/${{ github.ref_name }}' /srv/mrobot/stable"
+          rsync -az --delay-updates -e "ssh -i ~/.ssh/mrobot-update-deploy" \
+            release-assets/ \
+            "${UPDATE_USER}@${UPDATE_HOST}:/srv/mrobot/releases/${{ github.ref_name }}/"
+          scp -i ~/.ssh/mrobot-update-deploy release-assets/update.json \
+            "${UPDATE_USER}@${UPDATE_HOST}:/srv/mrobot/stable/update.json.next"
+          scp -i ~/.ssh/mrobot-update-deploy release-assets/update.json.sha256 \
+            "${UPDATE_USER}@${UPDATE_HOST}:/srv/mrobot/stable/update.json.sha256.next"
+          ssh -i ~/.ssh/mrobot-update-deploy "${UPDATE_USER}@${UPDATE_HOST}" \
+            "mv /srv/mrobot/stable/update.json.next /srv/mrobot/stable/update.json && \
+             mv /srv/mrobot/stable/update.json.sha256.next /srv/mrobot/stable/update.json.sha256"

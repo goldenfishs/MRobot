@@ -29,7 +29,7 @@ MRobot 是组织名、机器人嵌入式框架名和生态品牌。当前重构�
 
 | 仓库 | 职责 | 当前基线 |
 |---|---|---|
-| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.3.3` |
+| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.4.0`（待发布） |
 | `goldenfishs/MCode` | 核心、CLI、schema、MCP | `v0.4.0` |
 | `goldenfishs/mrobot-registry` | 官方包索引 | 64 个包 |
 | `goldenfishs/mcode-vscode` | VS Code 薄前端 | `v0.3.0` |
@@ -122,6 +122,16 @@ MCode 当前实现：
 - `mcode-skill` 规定 AI 的安全操作顺序和真机边界。
 - MRobot Issue #2 已按 completed 关闭，并附交付链接。
 
+### 4.7 桌面发布和自动更新
+
+- GitHub Actions 在 macOS arm64、Windows x64、Linux x64 原生 runner 上分别构建。
+- `app/update_service.py` 是 GUI、`mrobot-update` CLI 和未来插件共用的更新接口；前端不得重新实现平台选择、下载和校验。
+- 程序启动后默认后台检查更新，“关于”页面可启用自动下载、安装和重启。
+- Release asset 必须带 GitHub SHA-256 digest 或同名 `.sha256`，否则更新器拒绝安装。
+- 发布流水线分别为 `updates.mrobot.cn` 和 GitHub Release 生成 `update.json`；客户端优先访问 MRobot 香港更新源，失败后回退 GitHub 清单和旧版 API。
+- macOS/Linux 使用退出后安装助手和失败回滚；Windows 自动更新只选择 Inno Setup `*-setup.exe`，ZIP 仅作便携包。
+- 当前 macOS 仍为临时签名，正式公开分发前应配置 Developer ID、公证以及 Windows Authenticode 签名。
+
 ## 5. 真实能力边界：不要作错误声明
 
 以下内容尚不能描述为“完整支持”：
@@ -144,6 +154,8 @@ MCode 当前实现：
 - `app/code_page/`：旧 GUI 配置页面；只负责收集选择，不应拥有生成规则。
 - `tests/test_generation.py`：生成、安全覆盖和集成测试。
 - `tests/test_gui_unified.py`：GUI 必须调用 MCode 的架构守卫。
+- `tests/test_packaging.py`：桌面依赖、版本和发布矩阵约束。
+- `tests/test_updates.py`：平台选择、下载校验、安全解包和安装计划测试。
 - `docs/architecture/MCODE_ARCHITECTURE.md`：目标架构。
 - `docs/architecture/PACKAGE_SPEC.md`：包清单规范。
 - `tools/migrate_legacy_packages.py`：旧模块迁移工具。
@@ -171,12 +183,12 @@ git submodule update --init --recursive
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install ./mcode pytest PyYAML
+python -m pip install ./mcode pytest PyYAML requests packaging
 python -m pytest -q
 python -m compileall -q app tools MRobot.py
 ```
 
-当前预期：本仓库 20 项测试通过。
+当前预期：本仓库 39 项测试通过。
 
 测试 MCode：
 
@@ -247,8 +259,9 @@ mcode plan /path/to/project --json
 2. 规范包 include 路径、公共 API、错误码、RTOS/裸机兼容和 C/C++ 互操作。
 3. 增加 registry 发布校验：tag 与 manifest 版本一致、归档哈希、依赖闭环、能力冲突和许可证检查。
 4. 给 board package 增加 MCU、晶振、引脚、板载器件和默认 binding schema。
-5. 发布 macOS Intel 构建、Linux AppImage 和可直接安装的 VSIX；`v0.3.3` 已提供 macOS arm64 DMG、Windows x64 ZIP 和 Linux x64 tar.gz。
-6. 增加从旧 MRobot 项目迁移的 dry-run 报告和回滚/备份说明。
+5. 发布 macOS Intel 构建、Linux AppImage 和可直接安装的 VSIX；`v0.4.0` 构建 macOS arm64 DMG、Windows x64 安装版/ZIP 和 Linux x64 tar.gz。
+6. 配置 macOS Developer ID + notarization 与 Windows Authenticode，消除当前临时签名/未签名发行包的系统安全提示。
+7. 增加从旧 MRobot 项目迁移的 dry-run 报告和回滚/备份说明。
 
 ### P2：多平台原生化
 

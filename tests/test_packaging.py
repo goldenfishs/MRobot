@@ -31,3 +31,33 @@ def test_native_release_matrix_covers_primary_desktop_platforms() -> None:
         assert runner in workflow
     for suffix in (".dmg", ".zip", ".tar.gz"):
         assert suffix in builder
+
+
+def test_desktop_version_has_one_runtime_source() -> None:
+    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    version = (ROOT / "app" / "_version.py").read_text(encoding="utf-8")
+    about = (ROOT / "app" / "about_interface.py").read_text(encoding="utf-8")
+    assert 'dynamic = ["version"]' in project
+    assert '__version__ = "0.4.0"' in version
+    assert '__version__ = "1.1.1"' not in about
+
+
+def test_release_builds_windows_auto_update_installer() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
+    installer = (ROOT / "MRobot.iss").read_text(encoding="utf-8")
+    assert "choco install innosetup" in workflow
+    assert "PrivilegesRequired=lowest" in installer
+    assert "-setup" in installer
+
+
+def test_release_publishes_rate_limit_free_update_manifest() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
+    assert "create_update_manifest.py" in workflow
+    assert "update.json" in (ROOT / "tools" / "create_update_manifest.py").read_text(encoding="utf-8")
+
+
+def test_release_publishes_to_mrobot_update_origin() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
+    assert "https://updates.mrobot.cn" in workflow
+    assert "MROBOT_UPDATE_SSH_KEY" in workflow
+    assert "rsync -az --delay-updates" in workflow

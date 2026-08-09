@@ -14,6 +14,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install ./mcode pytest PyYAML
+      - run: python -m pip install ./mcode pytest PyYAML requests packaging
       - run: python -m pytest
       - run: python -m compileall -q app tools MRobot.py

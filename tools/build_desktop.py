@@ -9,7 +9,6 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import tomllib
 import zipfile
 from pathlib import Path
 
@@ -20,8 +19,9 @@ RELEASE_DIST = ROOT / "release-dist"
 
 
 def project_version() -> str:
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    return str(data["project"]["version"])
+    namespace: dict[str, str] = {}
+    exec((ROOT / "app" / "_version.py").read_text(encoding="utf-8"), namespace)
+    return str(namespace["__version__"])
 
 
 def release_version() -> str:
@@ -82,14 +82,21 @@ def package_macos(version: str, arch: str) -> Path:
     return target
 
 
-def package_windows(version: str, arch: str) -> Path:
+def package_windows(version: str, arch: str) -> tuple[Path, ...]:
     executable = DIST / "MRobot.exe"
     if not executable.is_file():
         raise SystemExit(f"missing Windows executable: {executable}")
     target = RELEASE_DIST / f"MRobot-v{version}-windows-{arch}.zip"
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.write(executable, "MRobot/MRobot.exe")
-    return target
+    compiler = shutil.which("ISCC.exe") or shutil.which("iscc")
+    if not compiler:
+        raise SystemExit("Inno Setup compiler (ISCC.exe) is required for Windows releases")
+    run(compiler, f"/DMyAppVersion={version}", f"/DMyAppArch={arch}", "MRobot.iss")
+    installer = RELEASE_DIST / f"MRobot-v{version}-windows-{arch}-setup.exe"
+    if not installer.is_file():
+        raise SystemExit(f"missing Windows installer: {installer}")
+    return target, installer
 
 
 def package_linux(version: str, arch: str) -> Path:
@@ -103,7 +110,7 @@ def package_linux(version: str, arch: str) -> Path:
     return target
 
 
-def package() -> tuple[Path, Path]:
+def package() -> tuple[Path, ...]:
     version = release_version()
     arch = architecture()
     if RELEASE_DIST.exists():
@@ -111,17 +118,17 @@ def package() -> tuple[Path, Path]:
     RELEASE_DIST.mkdir(parents=True)
 
     if sys.platform == "darwin":
-        artifact = package_macos(version, arch)
+        artifacts = (package_macos(version, arch),)
     elif sys.platform == "win32":
-        artifact = package_windows(version, arch)
+        artifacts = package_windows(version, arch)
     elif sys.platform.startswith("linux"):
-        artifact = package_linux(version, arch)
+        artifacts = (package_linux(version, arch),)
     else:
         raise SystemExit(f"unsupported desktop platform: {sys.platform}")
-    checksum = write_checksum(artifact)
-    print(artifact)
-    print(checksum)
-    return artifact, checksum
+    checksums = tuple(write_checksum(artifact) for artifact in artifacts)
+    for artifact in (*artifacts, *checksums):
+        print(artifact)
+    return (*artifacts, *checksums)
 
 
 def main() -> int:

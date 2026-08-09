@@ -32,6 +32,7 @@ Examples/
 
 build/
 dist/
+release-dist/
 *.spec
 *.exe
 __pycache__/

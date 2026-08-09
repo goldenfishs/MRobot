@@ -1,6 +1,5 @@
-import os
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
-from PyQt5.QtCore import Qt, QUrl, QTimer
+from PyQt5.QtWidgets import QApplication, QCheckBox, QWidget, QVBoxLayout, QHBoxLayout
+from PyQt5.QtCore import QSettings, Qt, QUrl, QTimer
 from PyQt5.QtGui import QDesktopServices
 
 from qfluentwidgets import (
@@ -11,11 +10,9 @@ from qfluentwidgets import (
 )
 
 from .function_fit_interface import FunctionFitInterface
-from app.tools.check_update import check_update
-from app.tools.auto_updater import AutoUpdater, check_update_availability
+from app import __version__
+from app.tools.auto_updater import AutoUpdater
 from app.tools.update_check_thread import UpdateCheckThread
-
-__version__ = "1.1.1"
 
 class AboutInterface(QWidget):
     def __init__(self, parent=None):
@@ -44,6 +41,16 @@ class AboutInterface(QWidget):
         
         current_version_label = BodyLabel(f"当前版本：v{__version__}")
         version_layout.addWidget(current_version_label)
+
+        self.auto_check_box = QCheckBox("启动时自动检查更新")
+        self.auto_install_box = QCheckBox("发现更新后自动下载、安装并重启")
+        settings = QSettings("MRobot", "MRobot")
+        self.auto_check_box.setChecked(settings.value("updates/autoCheck", True, type=bool))
+        self.auto_install_box.setChecked(settings.value("updates/autoInstall", False, type=bool))
+        self.auto_check_box.toggled.connect(lambda enabled: settings.setValue("updates/autoCheck", enabled))
+        self.auto_install_box.toggled.connect(lambda enabled: settings.setValue("updates/autoInstall", enabled))
+        version_layout.addWidget(self.auto_check_box)
+        version_layout.addWidget(self.auto_install_box)
 
         
         layout.addWidget(version_card)
@@ -165,64 +172,16 @@ class AboutInterface(QWidget):
         """检查更新"""
         self.check_update_card.setEnabled(False)
         self.check_update_card.setContent("正在检查更新...")
-        
-        # 延迟执行检查，避免阻塞UI
-        QTimer.singleShot(100, self._perform_check)
-    
-    def _perform_check(self):
-        """执行更新检查"""
-        try:
-            # 获取最新版本信息（包括当前版本的详细信息）
-            latest_info = self._get_latest_release_info()
-            
-            # 检查是否有可用更新
-            self.update_info = check_update_availability(__version__)
-            
-            if self.update_info:
-                self._show_update_available()
-            else:
-                self._show_no_update(latest_info)
-                
-        except Exception as e:
-            self._show_error(f"检查更新失败: {str(e)}")
-    
-    def _get_latest_release_info(self):
-        """获取最新发布信息，不论版本是否需要更新"""
-        try:
-            import requests
-            from packaging.version import parse as vparse
-            
-            url = f"https://api.github.com/repos/goldenfishs/MRobot/releases/latest"
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                release_data = response.json()
-                latest_version = release_data["tag_name"].lstrip("v")
-                
-                # 获取下载URL和文件大小
-                assets = release_data.get('assets', [])
-                asset_size = 0
-                download_url = None
-                
-                if assets:
-                    # 选择第一个资源文件
-                    asset = assets[0]
-                    asset_size = asset.get('size', 0)
-                    download_url = asset.get('browser_download_url', '')
-                
-                return {
-                    'version': latest_version,
-                    'release_notes': release_data.get('body', '暂无更新说明'),
-                    'release_date': release_data.get('published_at', ''),
-                    'asset_size': asset_size,
-                    'download_url': download_url
-                }
-            else:
-                return None
-                
-        except Exception as e:
-            print(f"获取发布信息失败: {e}")
-            return None
+        self.update_check_thread = UpdateCheckThread(__version__)
+        self.update_check_thread.update_found.connect(self.accept_background_update)
+        self.update_check_thread.no_update.connect(self._show_no_update)
+        self.update_check_thread.error_occurred.connect(self._show_error)
+        self.update_check_thread.start()
+
+    def accept_background_update(self, update_info):
+        """接收启动检查或手动检查返回的统一更新信息。"""
+        self.update_info = update_info
+        self._show_update_available()
     
     def _show_update_available(self):
         """显示发现更新"""
@@ -334,10 +293,26 @@ class AboutInterface(QWidget):
         self.updater.signals.download_progress.connect(self.update_download_progress)
         self.updater.signals.status_changed.connect(self.update_status)
         self.updater.signals.error_occurred.connect(self.update_error)
-        self.updater.signals.update_completed.connect(self.update_completed)
+        self.updater.signals.install_ready.connect(self.install_ready)
+        self.updater.signals.update_cancelled.connect(self.update_cancelled)
         
         # 开始更新流程
         self.updater.start()
+
+    def install_ready(self, plan):
+        """启动独立安装助手；当前进程退出后它再替换程序。"""
+        try:
+            self.progress_label.setText("正在启动安装程序，MRobot 即将重新启动…")
+            self.updater.launch_install(plan)
+            QTimer.singleShot(250, QApplication.instance().quit)
+        except Exception as exc:
+            self.update_error(str(exc))
+
+    def update_cancelled(self):
+        self.progress_widget.hide()
+        self.update_btn.setEnabled(True)
+        self.manual_btn.setEnabled(True)
+        self.progress_label.setText("更新已取消")
     
     def update_progress(self, value: int):
         """更新进度"""
@@ -376,106 +351,18 @@ class AboutInterface(QWidget):
         self.update_btn.setEnabled(True)
         self.manual_btn.setEnabled(True)
         
-        # 如果是平台兼容性问题，提供更友好的提示
-        if "Windows 安装程序" in error_msg and "当前系统是" in error_msg:
-            InfoBar.warning(
-                title="平台不兼容",
-                content="检测到 Windows 安装程序，请点击'手动下载'获取适合 macOS 的版本",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=6000
-            )
-        else:
-            InfoBar.error(
-                title="更新失败",
-                content=error_msg,
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=4000
-            )
-    
-    def update_completed(self, file_path=None):
-        """更新完成 - 显示下载文件位置"""
-        print(f"update_completed called with file_path: {file_path}")  # 调试输出
-        
-        self.progress_label.setText("下载完成！")
-        self.progress_bar.setValue(100)
-        
-        # 重新启用按钮
-        self.update_btn.setEnabled(True)
-        self.manual_btn.setEnabled(True)
-        
-        if file_path and os.path.exists(file_path):
-            print(f"File exists: {file_path}")  # 调试输出
-            InfoBar.success(
-                title="下载完成",
-                content="安装文件已下载完成，点击下方按钮打开文件位置",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=5000
-            )
-            
-            # 添加打开文件夹按钮
-            self._add_open_folder_button(file_path)
-        else:
-            print(f"File does not exist or file_path is None: {file_path}")  # 调试输出
-            InfoBar.success(
-                title="下载完成",
-                content="文件下载完成",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=3000
-            )
-    
-    def _add_open_folder_button(self, file_path):
-        """添加打开文件夹按钮"""        
-        def open_file_location():
-            folder_path = os.path.dirname(file_path)
-            # 在 macOS 上使用 Finder 打开文件夹
-            QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path))
-            
-            InfoBar.info(
-                title="已打开文件夹",
-                content=f"文件位置: {folder_path}",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=3000
-            )
-        
-        # 直接替换更新按钮的文本和功能
-        self.update_btn.setText("打开文件位置")
-        self.update_btn.setIcon(FluentIcon.FOLDER)
-        # 断开原有连接
-        self.update_btn.clicked.disconnect()
-        # 连接新功能
-        self.update_btn.clicked.connect(open_file_location)
-        
-        # 修改取消按钮为清理按钮
-        self.cancel_btn.setText("清理临时文件")
-        self.cancel_btn.setIcon(FluentIcon.DELETE)
-        self.cancel_btn.clicked.disconnect()
-        
-        def cleanup_temp_files():
-            if self.updater:
-                self.updater.cleanup()
-            InfoBar.success(
-                title="已清理",
-                content="临时文件已清理完成",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=2000
-            )
-            # 重置界面
-            self.update_info_card.hide()
-            self.check_update_card.setContent("检查是否有新版本可用")
-        
-        self.cancel_btn.clicked.connect(cleanup_temp_files)
+        InfoBar.error(
+            title="更新失败",
+            content=error_msg,
+            parent=self,
+            position=InfoBarPosition.TOP,
+            duration=5000
+        )
     
     def cancel_update(self):
         """取消更新"""
         if hasattr(self, 'updater') and self.updater and self.updater.isRunning():
             self.updater.cancel_update()
-            self.updater.cleanup()
         
         self.update_info_card.hide()
         self.check_update_card.setContent("检查是否有新版本可用")
@@ -491,11 +378,6 @@ class AboutInterface(QWidget):
             position=InfoBarPosition.TOP,
             duration=2000
         )
-    
-    def _restart_app(self):
-        """重启应用程序"""
-        if self.updater:
-            self.updater.restart_application()
     
     def _format_file_size(self, size_bytes: int) -> str:
         """格式化文件大小"""

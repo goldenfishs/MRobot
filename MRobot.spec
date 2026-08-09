@@ -1,11 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
-import tomllib
 from pathlib import Path
 
 
-project_version = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']
+version_namespace = {}
+exec(Path('app/_version.py').read_text(encoding='utf-8'), version_namespace)
+project_version = version_namespace['__version__']
 
 
 a = Analysis(

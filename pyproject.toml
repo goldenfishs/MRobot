@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mrobot-desktop"
-version = "0.3.3"
+dynamic = ["version"]
 description = "Desktop frontend for the MRobot embedded framework"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,12 +24,18 @@ dependencies = [
     "requests>=2.31"
 ]
 
+[project.scripts]
+mrobot-update = "app.update_cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
 exclude = ["mcode*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "app._version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
