@@ -1,6 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
+import tomllib
+from pathlib import Path
+
+
+project_version = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version']
 
 
 a = Analysis(
@@ -51,8 +56,8 @@ if sys.platform == 'darwin':
         bundle_identifier='org.mrobot.desktop',
         info_plist={
             'CFBundleDisplayName': 'MRobot',
-            'CFBundleShortVersionString': '0.3.2',
-            'CFBundleVersion': '0.3.2',
+            'CFBundleShortVersionString': project_version,
+            'CFBundleVersion': project_version,
             'LSMinimumSystemVersion': '11.0',
             'NSHighResolutionCapable': True,
         },
@@ -75,6 +80,7 @@ else:
         disable_windowed_traceback=False,
         argv_emulation=False,
         target_arch=None,
+        icon='assets/logo/MRobot.ico' if sys.platform == 'win32' else None,
         codesign_identity=None,
         entitlements_file=None,
     )

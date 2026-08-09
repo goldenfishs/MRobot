@@ -221,7 +221,11 @@ User_code/
 
 ### 安装步骤
 
-macOS Apple Silicon 用户可以直接从 [GitHub Releases](https://github.com/goldenfishs/MRobot/releases) 下载 `MRobot-*-macos-arm64.dmg`，打开后将 MRobot 拖入 Applications。当前产物使用临时签名，首次启动若被 Gatekeeper 阻止，请在“系统设置 → 隐私与安全性”中确认打开。
+可以直接从 [GitHub Releases](https://github.com/goldenfishs/MRobot/releases) 下载当前系统的桌面包：
+
+- macOS Apple Silicon：`MRobot-*-macos-arm64.dmg`，打开后拖入 Applications。当前使用临时签名，若 Gatekeeper 阻止首次启动，请在“系统设置 → 隐私与安全性”中确认打开。
+- Windows x64：`MRobot-*-windows-x64.zip`，解压后运行 `MRobot.exe`。
+- Linux x64：`MRobot-*-linux-x64.tar.gz`，解压后运行 `MRobot/MRobot`。系统仍需提供常见的 X11/Wayland 和桌面图形库。
 
 从源码运行：
 

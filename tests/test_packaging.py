@@ -22,3 +22,12 @@ def test_frozen_runtime_does_not_write_inside_app_bundle() -> None:
     entrypoint = (ROOT / "MRobot.py").read_text(encoding="utf-8")
     assert "Application Support' / 'MRobot" in entrypoint
     assert "os.path.dirname(sys.executable) if getattr(sys, 'frozen'" not in entrypoint
+
+
+def test_native_release_matrix_covers_primary_desktop_platforms() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
+    builder = (ROOT / "tools" / "build_desktop.py").read_text(encoding="utf-8")
+    for runner in ("macos-15", "windows-2025", "ubuntu-24.04"):
+        assert runner in workflow
+    for suffix in (".dmg", ".zip", ".tar.gz"):
+        assert suffix in builder

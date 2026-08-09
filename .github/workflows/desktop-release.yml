@@ -1,0 +1,80 @@
+name: desktop-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the leading v; defaults to pyproject.toml
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            runner: macos-15
+          - name: Windows x64
+            runner: windows-2025
+          - name: Linux x64
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    env:
+      MROBOT_RELEASE_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install common build dependencies
+        run: >-
+          python -m pip install ./mcode PyQt5 PyYAML Jinja2 openpyxl packaging
+          pyqtgraph pyserial requests pytest pyinstaller
+      - name: Install Fluent Widgets on Windows and Linux
+        if: runner.os != 'macOS'
+        run: python -m pip install PyQt-Fluent-Widgets
+      - name: Install minimal Fluent Widgets macOS bridge
+        if: runner.os == 'macOS'
+        run: >-
+          python -m pip install darkdetect PyCocoa pyobjc-framework-Cocoa
+          pyobjc-framework-Quartz && python -m pip install --no-deps
+          PyQt5-Frameless-Window PyQt-Fluent-Widgets
+      - name: Test
+        run: python -m pytest -q
+      - name: Build native package
+        run: python tools/build_desktop.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}-${{ runner.arch }}
+          path: release-dist/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create release and upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1 || \
+            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --generate-notes
+          gh release upload "${{ github.ref_name }}" release-assets/* \
+            --repo "${{ github.repository }}" --clobber
