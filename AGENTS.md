@@ -29,7 +29,7 @@ MRobot 是组织名、机器人嵌入式框架名和生态品牌。当前重构�
 
 | 仓库 | 职责 | 当前基线 |
 |---|---|---|
-| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.3.1` |
+| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.3.2` |
 | `goldenfishs/MCode` | 核心、CLI、schema、MCP | `v0.4.0` |
 | `goldenfishs/mrobot-registry` | 官方包索引 | 64 个包 |
 | `goldenfishs/mcode-vscode` | VS Code 薄前端 | `v0.3.0` |
@@ -176,7 +176,7 @@ python -m pytest -q
 python -m compileall -q app tools MRobot.py
 ```
 
-当前预期：本仓库 16 项测试通过。
+当前预期：本仓库 19 项测试通过。
 
 测试 MCode：
 
@@ -247,7 +247,7 @@ mcode plan /path/to/project --json
 2. 规范包 include 路径、公共 API、错误码、RTOS/裸机兼容和 C/C++ 互操作。
 3. 增加 registry 发布校验：tag 与 manifest 版本一致、归档哈希、依赖闭环、能力冲突和许可证检查。
 4. 给 board package 增加 MCU、晶振、引脚、板载器件和默认 binding schema。
-5. 发布可直接安装的 VSIX、桌面安装包和明确的版本兼容矩阵。
+5. 发布 Windows、Linux、macOS Intel 构建和可直接安装的 VSIX；macOS Apple Silicon DMG 已从 `v0.3.2` 开始提供。
 6. 增加从旧 MRobot 项目迁移的 dry-run 报告和回滚/备份说明。
 
 ### P2：多平台原生化

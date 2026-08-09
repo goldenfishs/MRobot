@@ -1,11 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+
 
 a = Analysis(
     ['MRobot.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets/logo', 'assets/logo'), ('app', 'app'), ('app/tools', 'app/tools'), ('mcode/schemas', 'mcode/schemas')],
+    datas=[('assets', 'assets'), ('app', 'app'), ('app/tools', 'app/tools'), ('mcode/schemas', 'mcode/schemas')],
     hiddenimports=['mcode', 'mcode.stm32', 'mcode.legacy', 'mcode.registry'],
     hookspath=[],
     hooksconfig={},
@@ -16,23 +18,63 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
-    [],
-    name='MRobot',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-)
+if sys.platform == 'darwin':
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='MRobot',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+    )
+    contents = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=True,
+        name='MRobot',
+    )
+    app = BUNDLE(
+        contents,
+        name='MRobot.app',
+        icon='assets/logo/MRobot.icns',
+        bundle_identifier='org.mrobot.desktop',
+        info_plist={
+            'CFBundleDisplayName': 'MRobot',
+            'CFBundleShortVersionString': '0.3.2',
+            'CFBundleVersion': '0.3.2',
+            'LSMinimumSystemVersion': '11.0',
+            'NSHighResolutionCapable': True,
+        },
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        [],
+        name='MRobot',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        runtime_tmpdir=None,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+    )

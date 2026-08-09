@@ -8,7 +8,7 @@ with redirect_stdout(None):
     from qfluentwidgets import FluentIcon as FIF
     from qfluentwidgets import InfoBar, InfoBarPosition
 
-from .home_interface import HomeInterface
+from .home_interface import HomeInterface, resource_path
 from .serial_terminal_interface import SerialTerminalInterface
 from .part_library_interface import PartLibraryInterface
 from .data_interface import DataInterface
@@ -36,7 +36,7 @@ class MainWindow(FluentWindow):
         setTheme(Theme.AUTO, lazy=True)
 
         self.resize(960, 640)
-        self.setWindowIcon(QIcon('./assets/logo/M2.ico'))
+        self.setWindowIcon(QIcon(resource_path('assets/logo/M2.ico')))
         self.setWindowTitle("MRobot Toolbox")
 
 

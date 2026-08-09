@@ -1,7 +1,22 @@
 import os
 import sys
-# 将当前工作目录设置为程序所在的目录，确保无论从哪里执行，其工作目录都正确设置为程序本身的位置，避免路径错误。
-os.chdir(os.path.dirname(sys.executable) if getattr(sys, 'frozen', False)else os.path.dirname(os.path.abspath(__file__)))
+from pathlib import Path
+
+
+def runtime_working_directory() -> Path:
+    """Return a writable runtime directory without modifying an app bundle."""
+    if not getattr(sys, 'frozen', False):
+        return Path(__file__).resolve().parent
+    if sys.platform == 'darwin':
+        return Path.home() / 'Library' / 'Application Support' / 'MRobot'
+    if sys.platform == 'win32':
+        return Path(os.environ.get('APPDATA', Path.home())) / 'MRobot'
+    return Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local' / 'share')) / 'MRobot'
+
+
+runtime_dir = runtime_working_directory()
+runtime_dir.mkdir(parents=True, exist_ok=True)
+os.chdir(runtime_dir)
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication

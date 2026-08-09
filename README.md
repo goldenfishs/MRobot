@@ -221,6 +221,10 @@ User_code/
 
 ### 安装步骤
 
+macOS Apple Silicon 用户可以直接从 [GitHub Releases](https://github.com/goldenfishs/MRobot/releases) 下载 `MRobot-*-macos-arm64.dmg`，打开后将 MRobot 拖入 Applications。当前产物使用临时签名，首次启动若被 Gatekeeper 阻止，请在“系统设置 → 隐私与安全性”中确认打开。
+
+从源码运行：
+
 1. **克隆仓库**
 ```bash
 git clone --recurse-submodules https://github.com/goldenfishs/MRobot.git
@@ -240,14 +244,13 @@ python MRobot.py
 ### 构建可执行文件
 
 
-使用PyInstaller将程序打包为单个可执行文件：
+使用 PyInstaller 构建当前平台的桌面程序：
 
 ```bash
 pyinstaller MRobot.spec
 ```
-```
 
-构建完成后，可执行文件位于 `dist/MRobot.exe`。
+macOS arm64 输出位于 `dist/MRobot.app`；Windows 输出为 `dist/MRobot.exe`。
 
 ---
 
