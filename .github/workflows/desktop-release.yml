@@ -118,8 +118,5 @@ jobs:
             "${UPDATE_USER}@${UPDATE_HOST}:/srv/mrobot/releases/${{ github.ref_name }}/"
           scp -i ~/.ssh/mrobot-update-deploy release-assets/update.json \
             "${UPDATE_USER}@${UPDATE_HOST}:/srv/mrobot/stable/update.json.next"
-          scp -i ~/.ssh/mrobot-update-deploy release-assets/update.json.sha256 \
-            "${UPDATE_USER}@${UPDATE_HOST}:/srv/mrobot/stable/update.json.sha256.next"
           ssh -i ~/.ssh/mrobot-update-deploy "${UPDATE_USER}@${UPDATE_HOST}" \
-            "mv /srv/mrobot/stable/update.json.next /srv/mrobot/stable/update.json && \
-             mv /srv/mrobot/stable/update.json.sha256.next /srv/mrobot/stable/update.json.sha256"
+            "mv /srv/mrobot/stable/update.json.next /srv/mrobot/stable/update.json"

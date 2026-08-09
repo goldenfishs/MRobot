@@ -149,6 +149,30 @@ def test_origin_tls_failure_falls_back_to_github_manifest() -> None:
     assert api not in session.calls
 
 
+def test_current_manifest_does_not_call_rate_limited_legacy_api() -> None:
+    origin = "https://updates.qutmrobot.cn/stable/update.json"
+    api = "https://api.github.com/repos/goldenfishs/MRobot/releases/latest"
+    manifest = {
+        "schema_version": 1,
+        "version": "0.4.1",
+        "assets": [],
+    }
+    session = FakeSession(
+        {
+            origin: FakeResponse(payload=manifest),
+            api: FakeResponse(status=403),
+        }
+    )
+    service = UpdateService(
+        "0.4.1",
+        system="Darwin",
+        machine="arm64",
+        session=session,
+    )
+    assert service.check() is None
+    assert api not in session.calls
+
+
 def test_all_update_endpoints_failing_returns_short_network_message() -> None:
     origin = "https://updates.qutmrobot.cn/stable/update.json"
     manifest_url = "https://github.com/goldenfishs/MRobot/releases/latest/download/update.json"
@@ -191,7 +215,7 @@ def test_release_manifest_contains_all_native_artifacts_and_digests(tmp_path: Pa
     assert manifest["version"] == "0.4.0"
     assert len(manifest["assets"]) == 4
     assert all(len(asset["sha256"]) == 64 for asset in manifest["assets"])
-    assert (tmp_path / "update.json.sha256").is_file()
+    assert not (tmp_path / "update.json.sha256").exists()
 
     mirror = create_manifest(
         tmp_path,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import platform
 import shutil
@@ -47,13 +46,6 @@ def run(*command: str) -> None:
 
 def build() -> None:
     run(sys.executable, "-m", "PyInstaller", "--clean", "--noconfirm", "MRobot.spec")
-
-
-def write_checksum(artifact: Path) -> Path:
-    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    target = artifact.with_suffix(artifact.suffix + ".sha256")
-    target.write_text(f"{digest}  {artifact.name}\n", encoding="utf-8")
-    return target
 
 
 def package_macos(version: str, arch: str) -> Path:
@@ -125,10 +117,9 @@ def package() -> tuple[Path, ...]:
         artifacts = (package_linux(version, arch),)
     else:
         raise SystemExit(f"unsupported desktop platform: {sys.platform}")
-    checksums = tuple(write_checksum(artifact) for artifact in artifacts)
-    for artifact in (*artifacts, *checksums):
+    for artifact in artifacts:
         print(artifact)
-    return (*artifacts, *checksums)
+    return artifacts
 
 
 def main() -> int:

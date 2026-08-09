@@ -29,7 +29,7 @@ MRobot 是组织名、机器人嵌入式框架名和生态品牌。当前重构�
 
 | 仓库 | 职责 | 当前基线 |
 |---|---|---|
-| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.4.0`（待发布） |
+| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.4.2`（待发布） |
 | `goldenfishs/MCode` | 核心、CLI、schema、MCP | `v0.4.0` |
 | `goldenfishs/mrobot-registry` | 官方包索引 | 64 个包 |
 | `goldenfishs/mcode-vscode` | VS Code 薄前端 | `v0.3.0` |
@@ -127,7 +127,7 @@ MCode 当前实现：
 - GitHub Actions 在 macOS arm64、Windows x64、Linux x64 原生 runner 上分别构建。
 - `app/update_service.py` 是 GUI、`mrobot-update` CLI 和未来插件共用的更新接口；前端不得重新实现平台选择、下载和校验。
 - 程序启动后默认后台检查更新，“关于”页面可启用自动下载、安装和重启。
-- Release asset 必须带 GitHub SHA-256 digest 或同名 `.sha256`，否则更新器拒绝安装。
+- `update.json` 内嵌每个安装包的 SHA-256，GitHub API 回退使用 Release asset digest；不再发布独立 `.sha256` 文件，缺少 digest 时更新器拒绝安装。
 - `updates.qutmrobot.cn` 提供稳定版清单，`download.qutmrobot.cn` 提供版本化安装包；发布流水线同时生成香港源和 GitHub Release 清单，客户端失败时回退 GitHub 清单和旧版 API。
 - macOS/Linux 使用退出后安装助手和失败回滚；Windows 自动更新只选择 Inno Setup `*-setup.exe`，ZIP 仅作便携包。
 - 当前 macOS 仍为临时签名，正式公开分发前应配置 Developer ID、公证以及 Windows Authenticode 签名。
@@ -259,7 +259,7 @@ mcode plan /path/to/project --json
 2. 规范包 include 路径、公共 API、错误码、RTOS/裸机兼容和 C/C++ 互操作。
 3. 增加 registry 发布校验：tag 与 manifest 版本一致、归档哈希、依赖闭环、能力冲突和许可证检查。
 4. 给 board package 增加 MCU、晶振、引脚、板载器件和默认 binding schema。
-5. 发布 macOS Intel 构建、Linux AppImage 和可直接安装的 VSIX；`v0.4.0` 构建 macOS arm64 DMG、Windows x64 安装版/ZIP 和 Linux x64 tar.gz。
+5. 当前已发布 macOS arm64 DMG、Windows x64 安装版/ZIP 和 Linux x64 tar.gz；后续补充 macOS Intel、Linux AppImage 和可直接安装的 VSIX。
 6. 配置 macOS Developer ID + notarization 与 Windows Authenticode，消除当前临时签名/未签名发行包的系统安全提示。
 7. 增加从旧 MRobot 项目迁移的 dry-run 报告和回滚/备份说明。
 

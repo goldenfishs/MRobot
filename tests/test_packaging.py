@@ -38,7 +38,7 @@ def test_desktop_version_has_one_runtime_source() -> None:
     version = (ROOT / "app" / "_version.py").read_text(encoding="utf-8")
     about = (ROOT / "app" / "about_interface.py").read_text(encoding="utf-8")
     assert 'dynamic = ["version"]' in project
-    assert '__version__ = "0.4.1"' in version
+    assert '__version__ = "0.4.2"' in version
     assert '__version__ = "1.1.1"' not in about
 
 
@@ -54,6 +54,8 @@ def test_release_publishes_rate_limit_free_update_manifest() -> None:
     workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
     assert "create_update_manifest.py" in workflow
     assert "update.json" in (ROOT / "tools" / "create_update_manifest.py").read_text(encoding="utf-8")
+    assert "update.json.sha256" not in workflow
+    assert "write_checksum" not in (ROOT / "tools" / "build_desktop.py").read_text(encoding="utf-8")
 
 
 def test_release_publishes_to_mrobot_update_origin() -> None:

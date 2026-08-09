@@ -42,7 +42,6 @@ class ReleaseAsset:
     url: str
     size: int
     sha256: str | None
-    checksum_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -185,10 +184,12 @@ class UpdateService:
     def check(self) -> UpdateInfo | None:
         """Check the MRobot origin, GitHub manifest, then the legacy API."""
         manifest_errors: list[Exception] = []
+        manifest_checked = False
         for manifest_url in self.manifest_urls:
             try:
                 response = self.session.get(manifest_url, timeout=15)
                 if response.status_code == 200:
+                    manifest_checked = True
                     update = self._update_from_manifest(response.json())
                     if update is not None:
                         return update
@@ -197,6 +198,8 @@ class UpdateService:
                     response.raise_for_status()
             except (requests.RequestException, RuntimeError, ValueError, KeyError, InvalidVersion, UpdateError) as exc:
                 manifest_errors.append(exc)
+        if manifest_checked:
+            return None
         try:
             return self._check_legacy_release_api()
         except UpdateError as exc:
@@ -263,21 +266,11 @@ class UpdateService:
             )
         item = min(candidates, key=lambda candidate: candidate[0])[1]
         name = str(item["name"])
-        checksum_name = f"{name}.sha256"
-        checksum_url = next(
-            (
-                str(candidate.get("browser_download_url"))
-                for candidate in items
-                if candidate.get("name") == checksum_name
-            ),
-            None,
-        )
         return ReleaseAsset(
             name=name,
             url=str(item.get("browser_download_url") or item["url"]),
             size=int(item.get("size") or 0),
             sha256=_parse_digest(item.get("digest")) or _parse_digest(f"sha256:{item.get('sha256', '')}"),
-            checksum_url=checksum_url,
         )
 
     def download(self, info: UpdateInfo, progress: ProgressCallback | None = None) -> DownloadedUpdate:
@@ -301,7 +294,7 @@ class UpdateService:
                             progress(downloaded, info.asset.size)
             if info.asset.size and downloaded != info.asset.size:
                 raise UpdateError(f"下载大小不匹配：应为 {info.asset.size}，实际为 {downloaded}")
-            expected = info.asset.sha256 or self._download_checksum(info.asset)
+            expected = info.asset.sha256
             if not expected:
                 raise UpdateError("发布资源缺少 SHA-256，已拒绝安装")
             if digest.hexdigest() != expected:
@@ -310,17 +303,6 @@ class UpdateService:
         except Exception:
             shutil.rmtree(temporary_root, ignore_errors=True)
             raise
-
-    def _download_checksum(self, asset: ReleaseAsset) -> str | None:
-        if not asset.checksum_url:
-            return None
-        try:
-            response = self.session.get(asset.checksum_url, timeout=15)
-            response.raise_for_status()
-            digest = response.text.strip().split()[0].lower()
-        except (requests.RequestException, IndexError) as exc:
-            raise UpdateError(f"下载校验文件失败：{exc}") from exc
-        return digest if len(digest) == 64 and all(c in "0123456789abcdef" for c in digest) else None
 
     def prepare_install(self, downloaded: DownloadedUpdate, process_id: int | None = None) -> InstallPlan:
         if not self.frozen:

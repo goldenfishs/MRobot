@@ -7,8 +7,7 @@ The production update origin is a static Caddy service. Update discovery uses
 ```text
 /srv/mrobot/
 ├── stable/
-│   ├── update.json
-│   └── update.json.sha256
+│   └── update.json
 └── releases/
     └── vX.Y.Z/
         ├── MRobot-vX.Y.Z-macos-arm64.dmg

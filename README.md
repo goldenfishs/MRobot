@@ -1,239 +1,274 @@
 # MRobot
 
 <div align="center">
-  <img src="assets/logo/MRobot.png" height="80" alt="MRobot Logo">
-  
-  **更加高效快捷的机器人开发工具**
-  
-  诞生于 Robocon 和 Robomaster，但绝不仅限于此
-  
-  <p>
-    <a href="https://github.com/goldenfishs/MRobot/blob/master/LICENSE">
-      <img src="https://img.shields.io/github/license/goldenfishs/MRobot.svg" alt="License">
-    </a>
-    <a href="https://github.com/goldenfishs/MRobot">
-      <img src="https://img.shields.io/github/repo-size/goldenfishs/MRobot.svg" alt="Repo Size">
-    </a>
-    <a href="https://github.com/goldenfishs/MRobot/commits/master">
-      <img src="https://img.shields.io/github/last-commit/goldenfishs/MRobot.svg" alt="Last Commit">
-    </a>
-    <img src="https://img.shields.io/badge/language-Python-blue.svg" alt="Language">
-    <img src="https://img.shields.io/badge/PyQt-5.x-green.svg" alt="PyQt">
-    <img src="https://img.shields.io/badge/STM32-supported-orange.svg" alt="STM32">
-  </p>
+  <img src="assets/logo/MRobot.png" height="88" alt="MRobot Logo">
+
+  **面向机器人嵌入式工程的统一代码生成与开发工具**
+
+  STM32CubeMX 优先 · GUI / CLI / VS Code / MCP 共用内核 · 可独立发布的模块生态
+
+  [![Tests](https://github.com/goldenfishs/MRobot/actions/workflows/test.yml/badge.svg)](https://github.com/goldenfishs/MRobot/actions/workflows/test.yml)
+  [![Release](https://img.shields.io/github/v/release/goldenfishs/MRobot)](https://github.com/goldenfishs/MRobot/releases/latest)
+  [![License](https://img.shields.io/github/license/goldenfishs/MRobot)](LICENSE)
 </div>
 
----
+## MRobot 是什么
 
-## 📖 简介
+MRobot 是机器人嵌入式开发框架、工具和模块生态的总称。本仓库提供桌面 GUI、桌面发布、自动更新和 MCode 集成入口。
 
-提起嵌入式开发，大多数开发者都会感到每次繁琐的配置和查阅各种文档的枯燥。对于小型项目，创建优雅的架构又比较费时。有没有办法快速完成基础环境搭建后直接开始写逻辑代码呢？
+[MCode](https://github.com/goldenfishs/MCode) 是无界面的代码生成内核。工程解析、包解析、生成计划、文件写入和校验都由 `MCodeService` 实现；GUI、CLI、VS Code 和 MCP 只是不同前端，不各自维护一套生成规则。
 
-这就是 **MRobot** —— 一个功能完善的机器人工程辅助平台，通过可视化界面简化嵌入式开发流程，帮助开发者高效管理代码、配置和资源，让开发更专注于核心逻辑。
+MRobot 当前优先把 STM32CubeMX 路径做稳定、简单和可验证，同时为其他 MCU/SDK 提供统一的平台扩展边界。
 
-### ✨ 核心优势
+## 下载桌面版
 
-- 🚀 **快速开发**: 自动化代码生成，从.ioc配置直接生成完整代码框架
-- 🎯 **模块化设计**: 清晰的分层架构，支持高度模块化和可扩展性
-- 🛡️ **用户代码保护**: 智能识别并保留用户自定义代码区域
-- 🎨 **现代化界面**: 基于QFluentWidgets的现代化UI设计
-- 📦 **丰富的组件库**: 内置大量常用的BSP、组件、设备驱动和功能模块
+从 [最新 Release](https://github.com/goldenfishs/MRobot/releases/latest) 下载与系统匹配的安装包：
 
-### MCode：统一代码生成内核
+| 系统 | 安装包 | 说明 |
+|---|---|---|
+| macOS Apple Silicon | `MRobot-*-macos-arm64.dmg` | 打开 DMG 后拖入 Applications |
+| Windows x64 | `MRobot-*-windows-x64-setup.exe` | 推荐；支持静默自动更新 |
+| Windows x64 便携版 | `MRobot-*-windows-x64.zip` | 解压运行；不支持自动覆盖安装 |
+| Linux x64 | `MRobot-*-linux-x64.tar.gz` | 解压后运行 `MRobot/MRobot` |
 
-MRobot 是框架和生态名称；`MCode` 是独立的无界面代码生成内核。GUI、CLI、[VS Code 插件](https://github.com/goldenfishs/mcode-vscode) 和 MCP 前端共同调用 `MCodeService`，不再各自解析 `.ioc` 或修改工程文件。MRobot 通过固定版本的 Git 子模块消费 MCode，避免核心源码分叉。
+当前 macOS 包使用临时签名，Windows 包尚未配置商业代码签名。若操作系统阻止首次启动，请在确认下载来源后按系统提示手动允许。公开大规模分发前仍需配置 macOS Developer ID、公证和 Windows Authenticode。
 
-当前基础版本优先支持 STM32CubeMX，并提供稳定 JSON 输出：
+## 核心设计
+
+```mermaid
+flowchart LR
+    GUI["MRobot GUI"] --> Service["MCodeService"]
+    CLI["mcode CLI"] --> Service
+    VSCode["VS Code"] --> Service
+    MCP["MCP / AI"] --> Service
+    Service --> Inspect["工程解析"]
+    Service --> Registry["包与依赖解析"]
+    Service --> Plan["GenerationPlan"]
+    Plan --> Generate["安全生成"]
+    Generate --> Project["用户工程"]
+```
+
+设计原则：
+
+- 所有前端调用同一套核心接口。
+- 先生成可检查的 `GenerationPlan`，再写文件。
+- 包源码是不可变输入，项目 glue code 与业务入口分离。
+- 芯片、板卡、总线能力和设备驱动分层，不为每颗芯片复制整套 BSP。
+- 模块可以独立仓库、独立版本和独立发布。
+- 不静默覆盖用户修改，不通过删除状态文件绕过冲突。
+
+详细设计见：
+
+- [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md)
+- [包清单规范](docs/architecture/PACKAGE_SPEC.md)
+- [AI 交接与路线图](AGENTS.md)
+
+## 当前能力
+
+### STM32CubeMX
+
+STM32CubeMX 是当前最完整的平台路径：
+
+- 解析 `.ioc` 中的 MCU、系列、外设、GPIO label 和 FreeRTOS 能力。
+- STM32 family 契约覆盖 F1、F4、H7、G4、L4、U5。
+- 生成 HAL 句柄绑定，例如 `hspi1`、`huart3`、`hfdcan1`。
+- 从真实 `.ioc` 创建 board package。
+- 将 UART、SPI、I2C、GPIO、PWM、CAN/FDCAN 等能力映射给上层包。
+- 通过 plan、内容哈希、原子写入和 lockfile 保护重复生成。
+
+### 其他平台
+
+| 平台 | 当前状态 |
+|---|---|
+| STM32CubeMX | 原生 `.ioc` 解析，当前主路径 |
+| ESP-IDF | platform pack + `mrobot-project.json` 描述协议 |
+| WCH CH32 | platform pack + 通用描述协议 |
+| HPM SDK | platform pack + 通用描述协议 |
+| TI MSPM0 | platform pack + 通用描述协议 |
+
+非 STM32 平台目前不是完整的原生 SDK 工程解析器。它们共享统一模型和包边界，但仍需要逐个平台补充真实工程解析、编译矩阵和板级验证。
+
+## 五分钟开始使用 MCode
+
+要求 Python 3.10 或更高版本，推荐 Python 3.12。
+
+### 1. 安装
+
+从本仓库安装桌面端和固定版本的 MCode：
 
 ```bash
-python -m mcode inspect /path/to/cubemx-project --json
-python -m mcode init /path/to/cubemx-project
-python -m mcode plan /path/to/cubemx-project
-python -m mcode generate /path/to/cubemx-project
-python -m mcode validate /path/to/cubemx-project --json
-python -m mcode package search bmi088
-python -m mcode package install mrobot.device.bmi088@^0.2.0 --project /path/to/cubemx-project
-python -m mcode run build --project /path/to/cubemx-project
-python -m mcode run flash --project /path/to/cubemx-project
-python -m mcode run debug --project /path/to/cubemx-project
+git clone --recurse-submodules https://github.com/goldenfishs/MRobot.git
+cd MRobot
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 ```
 
-`plan` 永不写文件；`generate` 使用生成状态和内容哈希保护用户修改。官方 [mrobot-registry](https://github.com/goldenfishs/mrobot-registry) 已收录平台、板级、BSP、设备、组件、算法、模块和任务包。详细设计见 [MCode 架构](docs/architecture/MCODE_ARCHITECTURE.md) 和 [包清单规范](docs/architecture/PACKAGE_SPEC.md)。
+Windows PowerShell 激活虚拟环境：
 
----
-
-## 🌟 主要特性
-
-### 💻 代码生成系统
-- **智能配置解析**: 自动解析STM32CubeMX的.ioc文件，提取硬件配置信息
-- **模板驱动生成**: 基于模板的代码生成机制，支持自定义模板
-- **依赖关系管理**: 自动处理组件和设备之间的依赖关系
-- **用户代码保留**: 新项目通过 generated/scaffold 文件所有权隔离；旧项目兼容 `/* USER ... */` 标记
-- **分层代码生成**: 支持BSP→Component→Device→Module的完整代码生成流程
-
-### 🎨 界面功能
-- **代码生成**: 可视化配置界面，快速生成项目代码
-- **数据管理**: 数据可视化和分析工具
-- **财务管理**: 项目财务管理功能
-- **AI辅助**: 集成AI接口，提供智能辅助
-- **机械设计**: 零件库管理、批量导出等工具
-- **函数拟合**: 数据拟合和分析工具
-- **小工具集合**: 实用的小型工具集
-- **串口终端**: 串口通信和调试工具
-- **零件库**: 机械零件库管理
-
-### 🔧 硬件支持
-- **MCU系列**: STM32F1、STM32F4、STM32H7系列
-- **RTOS**: FreeRTOS完整支持
-- **外设接口**:
-  - CAN/FDCAN 总线通信
-  - UART/USART 串口通信
-  - I2C/SPI 通信接口
-  - GPIO 数字输入输出
-  - PWM 脉宽调制输出
-  - Flash 存储读写
-  - DWT 高精度计时
-
-### 📦 组件库
-
-#### BSP层（板级支持包）
-- `can`: CAN/FDCAN总线驱动
-- `gpio`: GPIO驱动（支持中断回调）
-- `uart`: UART/USART驱动（支持DMA和多种回调）
-- `i2c`: I2C通信驱动
-- `spi`: SPI通信驱动
-- `pwm`: PWM输出驱动
-- `dwt`: DWT计时器
-- `mm`: 内存管理
-- `time`: 时间管理
-- `flash`: Flash读写驱动
-
-#### Component层（通用组件）
-- `pid`: PID控制器（支持多种模式）
-- `filter`: 滤波器库
-- `kalman_filter`: 卡尔曼滤波
-- `ahrs`: 姿态解算算法
-- `mixer`: 混合控制器
-- `limiter`: 限幅器
-- `capacity`: 容量计算
-- `crc8/crc16`: 循环冗余校验
-- `error_detect`: 错误检测
-- `cmd`: 命令处理
-- `freertos_cli`: FreeRTOS命令行接口
-- `ui`: UI组件
-- `user_math`: 数学工具库
-
-#### Device层（设备驱动）
-- **电机驱动**:
-  - `motor_rm`: RoboMaster电机（M2006, M3508, GM6020）
-  - `motor_dm`: 大疆电机
-  - `motor_lk`: 雷克电机
-  - `motor_lz`: 雷智电机
-  - `motor_vesc`: VESC电机
-  - `motor_odrive`: ODrive电机
-- **传感器**:
-  - `bmi088`: BMI088 IMU
-  - `ist8310`: IST8310磁力计
-  - `dm_imu`: 大疆IMU
-- **通信**:
-  - `dr16`: DR16遥控器接收
-  - `rc_can`: CAN遥控
-  - `vofa`: VOFA+通信协议
-- **执行器**:
-  - `servo`: 舵机控制
-  - `buzzer`: 蜂鸣器
-  - `led`: LED灯控制
-  - `ws2812`: WS2812灯带控制
-- **其他**:
-  - `ops9`: OPS9设备
-  - `oid`: OID识别
-  - `lcd_driver`: LCD显示驱动
-  - `mrobot`: MRobot专用设备
-
-#### Module层（功能模块）
-- `config`: 配置管理
-- `cmd`: 命令处理模块
-- `gimbal`: 云台控制模块
-- `shoot`: 发射机构控制模块
-
----
-
-## 🏗️ 项目架构
-
-### 系统架构图
-
-```
-MRobot
-├── 应用层
-│   ├── 主界面
-│   ├── 代码生成界面
-│   ├── 数据管理界面
-│   ├── 财务管理界面
-│   └── 工具集界面
-├── 工具层
-│   ├── 代码生成器
-│   ├── IOC解析器
-│   ├── 配置管理器
-│   └── 更新管理器
-├── 资源层
-│   ├── 用户代码库
-│   ├── 配置文件
-│   └── 资源文件
-└── 配置层
-    └── 应用配置
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
-### 用户代码架构
+只使用代码生成内核时，也可以直接安装 MCode：
 
-```
-User_code/
-├── BSP层 (板级支持包)
-│   ├── 硬件抽象接口
-│   └── 外设驱动
-├── Component层 (通用组件)
-│   ├── 算法库
-│   └── 工具函数
-├── Device层 (设备驱动)
-│   ├── 传感器驱动
-│   ├── 执行器驱动
-│   └── 通信设备驱动
-├── Module层 (功能模块)
-│   ├── 业务逻辑
-│   └── 功能集成
-└── Task层 (任务模板)
-    └── 任务框架
+```bash
+python -m pip install "mrobot-mcode @ git+https://github.com/goldenfishs/MCode.git@v0.4.0"
 ```
 
----
+### 2. 检查 CubeMX 工程
 
-## 🚀 快速开始
+将 `/path/to/project` 替换为包含 `.ioc` 的工程目录：
 
-### 环境要求
+```bash
+mcode inspect /path/to/project --json
+mcode init /path/to/project
+```
 
-- **Python**: GUI 与 MCode 均需要 3.10 或更高版本
-- **操作系统**: Windows / macOS / Linux
-- **依赖库**: 
-  - PyQt5
-  - QFluentWidgets
-  - PyYAML
-  - PyInstaller（用于打包）
-  
+### 3. 安装平台和设备包
 
-### 安装步骤
+```bash
+mcode package install mrobot.platform.stm32@^0.2.1 --project /path/to/project
+mcode package install mrobot.device.bmi088@^0.2.0 --project /path/to/project
+```
 
-可以直接从 [GitHub Releases](https://github.com/goldenfishs/MRobot/releases) 下载当前系统的桌面包：
+搜索包：
 
-- macOS Apple Silicon：`MRobot-*-macos-arm64.dmg`，打开后拖入 Applications。当前使用临时签名，若 Gatekeeper 阻止首次启动，请在“系统设置 → 隐私与安全性”中确认打开。
-- Windows x64：推荐 `MRobot-*-windows-x64-setup.exe`；ZIP 是免安装便携版，自动更新只支持安装版。
-- Linux x64：`MRobot-*-linux-x64.tar.gz`，解压后运行 `MRobot/MRobot`。系统仍需提供常见的 X11/Wayland 和桌面图形库。
+```bash
+mcode package search bmi088
+```
 
-### 自动更新
+### 4. 预览、生成和验证
 
-桌面程序启动后默认在后台检查 MRobot 更新源，连接失败时自动回退 GitHub Releases。发现新版本时，可在“关于”页面查看版本说明并点击“一键更新”；如勾选“发现更新后自动下载、安装并重启”，则校验成功后自动完成升级。
+```bash
+mcode plan /path/to/project --json
+mcode generate /path/to/project
+mcode validate /path/to/project --json
+mcode plan /path/to/project --json
+```
 
-更新器依次读取 `https://updates.qutmrobot.cn/stable/update.json`、每个 GitHub Release 自动生成的 `update.json` 和兼容旧版本的 GitHub API；正式安装包由 `https://download.qutmrobot.cn` 提供。随后使用同一套 `UpdateService` 接口完成平台和 CPU 架构匹配、流式下载、文件大小检查与 SHA-256 校验。校验失败时不会执行安装。macOS 和 Linux 使用退出后运行的独立安装助手替换当前版本并重新启动；Windows 使用用户级 Inno Setup 安装程序，不要求管理员权限。
+第一次 `plan` 应只包含预期文件；生成完成后再次 `plan` 不应出现无意义变更。
 
-CLI 和其他前端可调用相同接口：
+## 使用桌面 GUI
+
+安装开发依赖后运行：
+
+```bash
+python MRobot.py
+```
+
+代码生成界面的主路径为：
+
+1. 选择包含 `.ioc` 的 STM32CubeMX 工程。
+2. GUI 调用 `MCodeService.inspect()` 解析工程。
+3. 选择平台、板卡、BSP、设备、组件、算法、模块或任务包。
+4. GUI 写入声明式配置并执行校验。
+5. 查看生成计划和冲突信息。
+6. 确认后调用同一服务生成文件。
+
+旧的 `app/code_page/` 页面仍用于收集部分选择，但新的解析和生成规则不得写回 GUI 页面或 `app/tools/code_generator.py`。
+
+## 项目文件
+
+MCode 使用以下项目级文件：
+
+| 文件 | 是否提交版本控制 | 作用 |
+|---|---|---|
+| `mrobot.yaml` | 是 | 平台、包、bindings 和 actions 的声明式配置 |
+| `mrobot.lock` | 是 | 固定平台输入、精确包版本和内容哈希 |
+| `.mrobot/generated-state.json` | 通常是 | 记录生成文件所有权和上次生成哈希 |
+| `.ioc` | 是 | STM32CubeMX 硬件配置来源 |
+
+`mrobot.yaml` 中的 build、flash、debug 和 clean action 使用 argv 数组。MCode 直接启动命令，不通过 shell 拼接参数。
+
+```bash
+mcode run build --project /path/to/project
+mcode run flash --project /path/to/project
+mcode run debug --project /path/to/project
+mcode run clean --project /path/to/project
+```
+
+这些动作只是安全调度项目提供的工具命令，不代表仓库已经替用户安装工具链、选择探针或完成真机验证。
+
+## 安全生成和用户代码保护
+
+MCode 将输出区分为两类：
+
+- `generated`：由生成器拥有。再次生成前比较内容哈希；发现用户修改时报告冲突并拒绝覆盖。
+- `scaffold`：只创建一次，之后完全归用户所有。
+
+写入过程使用临时文件和原子替换。包和输入版本写入 `mrobot.lock`，保证团队成员能够复现相同计划。
+
+迁移旧工程时可以显式使用：
+
+```bash
+mcode generate /path/to/project --adopt
+```
+
+`--adopt` 只接管包含可识别 `USER ... BEGIN/END` 区域的旧文件并保留区域内容。没有 USER 标记的已有文件仍然是冲突，不会被隐式覆盖。
+
+## 包生态
+
+官方索引位于 [mrobot-registry](https://github.com/goldenfishs/mrobot-registry)。包使用 `mrobot-package.yaml` 描述，支持 SemVer、递归依赖、`requires`/`provides` 能力和项目级缓存。
+
+支持的包类型：
+
+- `platform`：SDK/平台适配。
+- `board`：MCU、晶振、引脚和板载设备信息。
+- `bsp`：GPIO、UART、SPI、CAN 等硬件能力封装。
+- `device`：传感器、执行器和通信设备驱动。
+- `component`：通用组件与基础算法。
+- `algorithm`：可独立组合的算法实现。
+- `module`：云台、底盘、发射等功能模块。
+- `task`：任务入口和调度模板。
+
+常用包命令：
+
+```bash
+mcode package search <keyword>
+mcode package install <package>@<constraint> --project <project>
+mcode package remove <package> --project <project>
+mcode package validate /path/to/package
+mcode package create mrobot.component.example --type component
+mcode package board board.ioc mrobot.board.my-board
+```
+
+新模块应优先创建独立仓库和清单，不再继续扩充本仓库中的旧 `assets/User_code` 目录。
+
+## 统一接口与前端
+
+### Python
+
+```python
+from mcode import MCodeService
+
+service = MCodeService()
+model = service.inspect("/path/to/project")
+plan = service.plan("/path/to/project")
+```
+
+### CLI
+
+`mcode --json` 为脚本和插件提供稳定机器可读输出。CLI 不重新实现业务规则。
+
+### MCP / AI
+
+安装 MCode 后启动 stdio MCP 服务：
+
+```bash
+mcode-mcp
+```
+
+MCP 提供工程检查、计划、生成、验证和包搜索等能力。涉及文件生成时仍应遵循“inspect → plan → 用户确认 → generate → validate”的顺序。
+
+### VS Code
+
+[mcode-vscode](https://github.com/goldenfishs/mcode-vscode) 是薄前端，提供 inspect、plan、generate、validate、build、flash 和 debug 命令。
+
+## 桌面自动更新
+
+桌面 GUI 和 `mrobot-update` CLI 共用 `app/update_service.py`：
 
 ```bash
 mrobot-update --json check
@@ -241,263 +276,128 @@ mrobot-update --json download
 mrobot-update --json install --desktop-path /path/to/MRobot.app
 ```
 
-源码运行模式不会覆盖源码本身；`install` 需要指定已安装的桌面程序，日常开发请通过 Git 更新。
+更新链路：
 
-从源码运行：
+1. 优先读取 `https://updates.qutmrobot.cn/stable/update.json`。
+2. 主清单不可用时读取 GitHub Release 的 `update.json`。
+3. 只有两个清单都不可用时才访问兼容旧版本的 GitHub API。
+4. 从 `https://download.qutmrobot.cn` 下载版本化安装包。
+5. 根据清单内嵌 SHA-256 校验完整文件；不发布独立 `.sha256` 文件。
+6. 校验通过后才准备平台对应的安装流程。
 
-1. **克隆仓库**
+Windows 自动安装只选择 Inno Setup `*-setup.exe`。macOS 和 Linux 使用独立安装助手，在当前进程退出后替换程序；失败时保留或恢复旧程序。源码运行模式不会覆盖源码本身。
+
+## 仓库结构
+
+```text
+MRobot/
+├── app/                       # 桌面 GUI 和统一更新服务
+├── mcode/                     # 固定版本的 MCode Git 子模块
+├── assets/                    # GUI 资源与待迁移旧资源
+├── docs/architecture/         # 架构和包规范
+├── deploy/                    # 更新服务器 Caddy 配置
+├── tests/                     # 集成、架构、发布与更新测试
+├── tools/                     # 构建、清单和迁移工具
+├── MRobot.py                  # 桌面入口
+├── MRobot.spec                # PyInstaller 配置
+└── AGENTS.md                  # 完整 AI 交接说明和路线图
+```
+
+相关仓库：
+
+| 仓库 | 职责 |
+|---|---|
+| [MCode](https://github.com/goldenfishs/MCode) | 无界面核心、CLI、schema、MCP |
+| [mrobot-registry](https://github.com/goldenfishs/mrobot-registry) | 官方包索引 |
+| [mcode-vscode](https://github.com/goldenfishs/mcode-vscode) | VS Code 前端 |
+| [mcode-skill](https://github.com/goldenfishs/mcode-skill) | AI 安全操作工作流 |
+| [mrobot-platform-stm32](https://github.com/goldenfishs/mrobot-platform-stm32) | STM32 平台适配 |
+
+## 本地开发与测试
+
+初始化子模块并安装依赖：
+
 ```bash
-git clone --recurse-submodules https://github.com/goldenfishs/MRobot.git
-cd MRobot
+git submodule update --init --recursive
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e "./mcode[dev]"
+python -m pip install -e ".[dev]"
 ```
 
-2. **安装依赖**
-```bash
-pip install -e .
-```
-
-3. **运行程序**
-```bash
-python MRobot.py
-```
-
-### 构建可执行文件
-
-
-使用 PyInstaller 构建当前平台的桌面程序：
+运行 MRobot 测试：
 
 ```bash
-pyinstaller MRobot.spec
+python -m pytest -q
+python -m compileall -q app tools MRobot.py
 ```
 
-macOS arm64 输出位于 `dist/MRobot.app`；Windows 构建还会通过 Inno Setup 在 `release-dist/` 生成可自动更新的安装程序。
+运行 MCode 测试：
 
----
-
-## 📖 使用指南
-
-### 代码生成流程
-
-1. **准备.ioc文件**
-   - 使用STM32CubeMX配置硬件
-   - 保存.ioc文件到`assets/User_code/ioc/`目录
-
-2. **配置代码生成**
-   - 打开代码生成界面
-   - 选择.ioc文件
-   - 配置BSP、Component、Device、Module
-
-3. **生成代码**
-   - 点击生成按钮
-   - 系统自动解析.ioc配置
-   - 生成完整的代码框架
-
-4. **导出代码**
-   - 将生成的代码导出到目标项目
-   - 开始编写业务逻辑
-
-### 用户代码保护
-
-在生成的代码中，使用以下标记来保护您的自定义代码：
-
-```c
-/* USER INCLUDE BEGIN */
-// 您的自定义头文件
-#include "my_custom_header.h"
-/* USER INCLUDE END */
-
-/* USER CODE BEGIN */
-// 您的自定义代码
-void my_custom_function(void) {
-    // 您的代码逻辑
-}
-/* USER CODE END */
+```bash
+(cd mcode && python -m pytest -q)
 ```
 
-当重新生成代码时，这些区域内的内容将被保留。
+测试通过只能证明自动化范围内的行为，不等同于所有 MCU、编译器、探针和真实板卡均已验证。
 
-### 配置文件说明
+## 构建和发布桌面包
 
-- **config.csv**: 组件和设备配置列表
-- **device/config.yaml**: 设备详细配置
-- **bsp/describe.csv**: BSP描述信息
-- **component/describe.csv**: 组件描述信息
-- **component/dependencies.csv**: 组件依赖关系
-- **module/describe.csv**: 模块描述信息
+在目标系统原生构建：
 
----
-
-## 🎯 应用案例
-
-### Robomaster
-- 全向轮步兵机器人
-- 英雄机器人
-- 哨兵机器人
-
-### Robocon
-- 各类竞赛机器人项目
-
-### 其他应用
-- 教育机器人
-- 科研项目原型
-- 个人DIY项目
-
----
-
-## 🔬 技术细节
-
-### 代码生成原理
-
-1. **配置解析**: `analyzing_ioc.py`解析.ioc文件，提取硬件配置
-2. **模板处理**: `code_generator.py`加载模板并执行替换
-3. **依赖处理**: 根据依赖关系自动添加必要的文件
-4. **代码保护**: 使用正则表达式识别并保留用户代码区域
-
-### 支持的MCU系列
-
-| 系列 | 示例型号 | Flash | RAM | 特性 |
-|------|---------|-------|-----|------|
-| STM32F1 | STM32F103C8T6 | 64KB | 20KB | Cortex-M3 |
-| STM32F4 | STM32F407IGHx | 1MB | 192KB | Cortex-M4, FPU |
-| STM32H7 | STM32H723VGT6 | 1MB | 1MB | Cortex-M7, 双精度FPU |
-
-### 外设配置示例
-
-#### CAN配置
-- 支持标准CAN和FDCAN
-- 自动识别CAN总线和波特率
-- 支持多CAN总线管理
-
-#### UART配置
-- 支持DMA传输
-- 多种回调类型（发送完成、接收完成、空闲检测等）
-- 自动处理中断向量表
-
-#### GPIO配置
-- 支持输入、输出、外部中断模式
-- 自动生成中断回调函数
-- 支持多个GPIO实例
-
----
-
-## 🛠️ 开发指南
-
-### 添加新的BSP驱动
-
-1. 在`assets/User_code/bsp/`创建新目录
-2. 实现驱动代码（.c和.h文件）
-3. 在`bsp/describe.csv`添加描述
-4. 在`config.csv`注册新BSP
-
-### 添加新的组件
-
-1. 在`assets/User_code/component/`创建新目录
-2. 实现组件代码
-3. 在`component/describe.csv`添加描述
-4. 在`component/dependencies.csv`声明依赖
-5. 在`config.csv`注册新组件
-
-### 添加新的设备驱动
-
-1. 在`assets/User_code/device/`创建新目录
-2. 实现设备驱动
-3. 在`device/config.yaml`添加配置
-4. 在`config.csv`注册新设备
-
-### 自定义模板
-
-1. 创建模板文件，使用`/* MARKER */`标记替换位置
-2. 在代码生成器中注册模板路径
-3. 定义替换规则
-
----
-
-## 📝 配置说明
-
-### 应用配置
-
-位于`config/config.json`:
-
-```json
-{
-    "QFluentWidgets": {
-        "ThemeColor": "#fff18cb9",
-        "ThemeMode": "Dark"
-    }
-}
+```bash
+python tools/build_desktop.py
 ```
 
-### IOC配置
+输出位于 `release-dist/`。发布流水线在以下原生 runner 上并行构建：
 
-将STM32CubeMX生成的.ioc文件放置在`assets/User_code/ioc/`目录。
+- macOS 15 / arm64
+- Windows 2025 / x64
+- Ubuntu 24.04 / x64
 
-### 设备配置
+推送符合 `v*` 的 tag 后，GitHub Actions 会：
 
-位于`assets/User_code/device/config.yaml`，使用YAML格式定义设备参数。
+1. 在三个平台运行测试并构建原生包。
+2. 生成内嵌安装包 SHA-256 的 `update.json`。
+3. 创建 GitHub Release。
+4. 上传安装包和 `update.json`。
+5. 将安装包同步到 `download.qutmrobot.cn`。
+6. 原子更新 `updates.qutmrobot.cn/stable/update.json`。
 
----
+## 当前边界
 
-## 🤝 贡献指南
+- STM32CubeMX 之外的平台尚未达到同等原生解析深度。
+- 尚未保证自动修改所有 CubeIDE `.cproject`、Keil、CMake 和 Makefile 工程元数据。
+- GUI 包管理仍在从旧选择页面迁移到完整 registry 浏览、依赖树和冲突界面。
+- MCP 尚未覆盖 CLI/Service 的所有包管理和迁移参数。
+- 真机 build/flash/debug 需要明确的板卡、工具链、探针和 action 配置。
+- macOS、Windows 正式代码签名仍待配置。
 
-我们欢迎任何形式的贡献！
+## 路线图
 
-### 如何贡献
+近期优先级：
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+1. 补充真实 F4/H7/G4/L4/U5 CubeMX 工程和交叉编译矩阵。
+2. 完成 CubeIDE、CMake、Makefile 的生成文件接入。
+3. 在 GUI 中提供 plan、diff、冲突和 adopt 决策界面。
+4. 完整接入 registry 搜索、版本选择、依赖树和能力提供者。
+5. 验证 STM32CubeProgrammer、OpenOCD、J-Link、ST-Link action profile。
+6. 使用真实板卡完成构建、烧录、复位和串口 smoke test。
+7. STM32 主路径稳定后，再逐个平台实现原生 SDK importer。
 
-### 贡献类型
+更完整的完成情况与后续任务见 [AGENTS.md](AGENTS.md)。
 
-- 🐛 Bug修复
-- ✨ 新功能
-- 📝 文档改进
-- 🎨 代码优化
-- ⚡ 性能提升
-- ✅ 测试用例
+## 贡献
 
----
+欢迎提交 Issue 和 Pull Request。修改生成规则时请同时提供：
 
-## 📄 许可证
+- 可检查的 plan 行为。
+- 成功、重复执行、错误和冲突测试。
+- 不丢失用户代码的证据。
+- 对应文档、schema 或迁移说明。
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+模块、设备和算法贡献优先采用独立包仓库，而不是直接复制到桌面仓库。
 
----
+## License
 
-## 🙏 致谢
-
-- **PyQt6**: 用于构建现代化GUI界面
-- **QFluentWidgets**: 提供现代化的UI组件
-- **STM32CubeMX**: 硬件配置工具
-- **FreeRTOS**: 实时操作系统
-- **RoboMaster社区**: 提供的技术支持和灵感
-
----
-
-## 📮 联系方式
-
-- **项目主页**: [https://github.com/goldenfishs/MRobot](https://github.com/goldenfishs/MRobot)
-- **问题反馈**: [GitHub Issues](https://github.com/goldenfishs/MRobot/issues)
-- **讨论区**: [GitHub Discussions](https://github.com/goldenfishs/MRobot/discussions)
-
----
-
-## 📊 项目统计
-
-<div align="center">
-  <img src="https://img.shields.io/badge/code_style-pep8-blue.svg" alt="Code Style">
-  <img src="https://img.shields.io/badge/version-v1.0.0-green.svg" alt="Version">
-</div>
-
----
-
-<div align="center">
-  <p>
-    <b>Made with ❤️ by the MRobot Team</b>
-  </p>
-  <p>
-    让机器人开发更简单、更高效
-  </p>
-</div>
+[MIT](LICENSE)

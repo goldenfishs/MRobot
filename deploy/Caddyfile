@@ -3,7 +3,7 @@
 
 	respond /healthz "ok" 200
 
-	@manifest path /stable/update.json /stable/update.json.sha256
+	@manifest path /stable/update.json
 	header @manifest Cache-Control "no-cache, no-store, must-revalidate"
 
 	@release path /releases/*

@@ -56,8 +56,6 @@ def create_manifest(directory: Path, repository: str, tag: str, base_url: str | 
     }
     target = directory / "update.json"
     target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    checksum = hashlib.sha256(target.read_bytes()).hexdigest()
-    (directory / "update.json.sha256").write_text(f"{checksum}  update.json\n", encoding="utf-8")
     return target
 
 
