@@ -29,7 +29,7 @@ MRobot 是组织名、机器人嵌入式框架名和生态品牌。当前重构�
 
 | 仓库 | 职责 | 当前基线 |
 |---|---|---|
-| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.5.0`（待发布） |
+| `goldenfishs/MRobot` | GUI、生态入口、集成测试 | `v0.5.0` |
 | `goldenfishs/MCode` | 核心、CLI、schema、MCP | `v0.4.0` |
 | `goldenfishs/mrobot-registry` | 官方包索引 | 64 个包 |
 | `goldenfishs/mcode-vscode` | VS Code 薄前端 | `v0.3.0` |
