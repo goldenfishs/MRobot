@@ -24,7 +24,7 @@ from . import __version__
 
 
 DEFAULT_REPOSITORY = "goldenfishs/MRobot"
-DEFAULT_UPDATE_ORIGIN = "https://updates.mrobot.cn"
+DEFAULT_UPDATE_ORIGIN = "https://updates.qutmrobot.cn"
 GITHUB_API_VERSION = "2022-11-28"
 
 

@@ -1,7 +1,7 @@
 # MRobot update origin
 
 The production update origin is a static Caddy service at
-`https://updates.mrobot.cn`. It contains no application runtime or database.
+`https://updates.qutmrobot.cn`. It contains no application runtime or database.
 
 ```text
 /srv/mrobot/

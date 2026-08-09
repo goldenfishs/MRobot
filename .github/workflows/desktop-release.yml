@@ -91,7 +91,7 @@ jobs:
             --repo "${{ github.repository }}" --clobber
       - name: Create MRobot origin manifest
         env:
-          UPDATE_ORIGIN: https://updates.mrobot.cn
+          UPDATE_ORIGIN: https://updates.qutmrobot.cn
         run: >-
           python tools/create_update_manifest.py release-assets
           --repository "${{ github.repository }}" --tag "${{ github.ref_name }}"

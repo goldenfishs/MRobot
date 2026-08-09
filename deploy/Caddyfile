@@ -18,7 +18,7 @@
 	file_server
 }
 
-updates.mrobot.cn {
+updates.qutmrobot.cn {
 	import mrobot_static
 }
 

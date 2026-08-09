@@ -38,7 +38,7 @@ def test_desktop_version_has_one_runtime_source() -> None:
     version = (ROOT / "app" / "_version.py").read_text(encoding="utf-8")
     about = (ROOT / "app" / "about_interface.py").read_text(encoding="utf-8")
     assert 'dynamic = ["version"]' in project
-    assert '__version__ = "0.4.0"' in version
+    assert '__version__ = "0.4.1"' in version
     assert '__version__ = "1.1.1"' not in about
 
 
@@ -58,6 +58,6 @@ def test_release_publishes_rate_limit_free_update_manifest() -> None:
 
 def test_release_publishes_to_mrobot_update_origin() -> None:
     workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
-    assert "https://updates.mrobot.cn" in workflow
+    assert "https://updates.qutmrobot.cn" in workflow
     assert "MROBOT_UPDATE_SSH_KEY" in workflow
     assert "rsync -az --delay-updates" in workflow

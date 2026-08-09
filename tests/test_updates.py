@@ -85,7 +85,7 @@ def release_payload(version: str = "0.4.0") -> dict:
 
 
 def test_check_prefers_rate_limit_free_update_manifest() -> None:
-    manifest_url = "https://updates.mrobot.cn/stable/update.json"
+    manifest_url = "https://updates.qutmrobot.cn/stable/update.json"
     manifest = {
         "schema_version": 1,
         "version": "0.4.0",
@@ -113,7 +113,7 @@ def test_check_prefers_rate_limit_free_update_manifest() -> None:
 
 
 def test_origin_tls_failure_falls_back_to_github_manifest() -> None:
-    origin = "https://updates.mrobot.cn/stable/update.json"
+    origin = "https://updates.qutmrobot.cn/stable/update.json"
     manifest_url = "https://github.com/goldenfishs/MRobot/releases/latest/download/update.json"
     api = "https://api.github.com/repos/goldenfishs/MRobot/releases/latest"
     payload = release_payload()
@@ -150,7 +150,7 @@ def test_origin_tls_failure_falls_back_to_github_manifest() -> None:
 
 
 def test_all_update_endpoints_failing_returns_short_network_message() -> None:
-    origin = "https://updates.mrobot.cn/stable/update.json"
+    origin = "https://updates.qutmrobot.cn/stable/update.json"
     manifest_url = "https://github.com/goldenfishs/MRobot/releases/latest/download/update.json"
     api = "https://api.github.com/repos/goldenfishs/MRobot/releases/latest"
     ssl_error = requests.exceptions.SSLError("very long TLS implementation detail")
@@ -197,11 +197,11 @@ def test_release_manifest_contains_all_native_artifacts_and_digests(tmp_path: Pa
         tmp_path,
         "goldenfishs/MRobot",
         "v0.4.0",
-        "https://updates.mrobot.cn/releases/v0.4.0",
+        "https://updates.qutmrobot.cn/releases/v0.4.0",
     )
     mirror_manifest = json.loads(mirror.read_text(encoding="utf-8"))
     assert all(
-        asset["url"].startswith("https://updates.mrobot.cn/releases/v0.4.0/")
+        asset["url"].startswith("https://updates.qutmrobot.cn/releases/v0.4.0/")
         for asset in mirror_manifest["assets"]
     )
 

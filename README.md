@@ -231,7 +231,7 @@ User_code/
 
 桌面程序启动后默认在后台检查 MRobot 更新源，连接失败时自动回退 GitHub Releases。发现新版本时，可在“关于”页面查看版本说明并点击“一键更新”；如勾选“发现更新后自动下载、安装并重启”，则校验成功后自动完成升级。
 
-更新器依次读取 `https://updates.mrobot.cn/stable/update.json`、每个 GitHub Release 自动生成的 `update.json` 和兼容旧版本的 GitHub API；再使用同一套 `UpdateService` 接口完成平台和 CPU 架构匹配、流式下载、文件大小检查与 SHA-256 校验。校验失败时不会执行安装。macOS 和 Linux 使用退出后运行的独立安装助手替换当前版本并重新启动；Windows 使用用户级 Inno Setup 安装程序，不要求管理员权限。
+更新器依次读取 `https://updates.qutmrobot.cn/stable/update.json`、每个 GitHub Release 自动生成的 `update.json` 和兼容旧版本的 GitHub API；再使用同一套 `UpdateService` 接口完成平台和 CPU 架构匹配、流式下载、文件大小检查与 SHA-256 校验。校验失败时不会执行安装。macOS 和 Linux 使用退出后运行的独立安装助手替换当前版本并重新启动；Windows 使用用户级 Inno Setup 安装程序，不要求管理员权限。
 
 CLI 和其他前端可调用相同接口：
 
