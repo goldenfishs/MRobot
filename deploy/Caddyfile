@@ -22,6 +22,10 @@ updates.qutmrobot.cn {
 	import mrobot_static
 }
 
+download.qutmrobot.cn {
+	import mrobot_static
+}
+
 # Keep an HTTP-only endpoint for health checks before DNS is configured.
 http://43.161.216.136 {
 	import mrobot_static

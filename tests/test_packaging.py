@@ -58,6 +58,8 @@ def test_release_publishes_rate_limit_free_update_manifest() -> None:
 
 def test_release_publishes_to_mrobot_update_origin() -> None:
     workflow = (ROOT / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
-    assert "https://updates.qutmrobot.cn" in workflow
+    update_service = (ROOT / "app" / "update_service.py").read_text(encoding="utf-8")
+    assert "https://updates.qutmrobot.cn" in update_service
+    assert "https://download.qutmrobot.cn" in workflow
     assert "MROBOT_UPDATE_SSH_KEY" in workflow
     assert "rsync -az --delay-updates" in workflow

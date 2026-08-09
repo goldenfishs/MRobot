@@ -91,11 +91,11 @@ jobs:
             --repo "${{ github.repository }}" --clobber
       - name: Create MRobot origin manifest
         env:
-          UPDATE_ORIGIN: https://updates.qutmrobot.cn
+          DOWNLOAD_ORIGIN: https://download.qutmrobot.cn
         run: >-
           python tools/create_update_manifest.py release-assets
           --repository "${{ github.repository }}" --tag "${{ github.ref_name }}"
-          --base-url "${UPDATE_ORIGIN}/releases/${{ github.ref_name }}"
+          --base-url "${DOWNLOAD_ORIGIN}/releases/${{ github.ref_name }}"
       - name: Configure update origin SSH
         env:
           UPDATE_HOST: ${{ secrets.MROBOT_UPDATE_HOST }}

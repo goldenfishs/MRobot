@@ -1,7 +1,8 @@
 # MRobot update origin
 
-The production update origin is a static Caddy service at
-`https://updates.qutmrobot.cn`. It contains no application runtime or database.
+The production update origin is a static Caddy service. Update discovery uses
+`https://updates.qutmrobot.cn`, while versioned installers use
+`https://download.qutmrobot.cn`. It contains no application runtime or database.
 
 ```text
 /srv/mrobot/
@@ -27,4 +28,5 @@ DNS must contain this record before Caddy can obtain the TLS certificate:
 
 ```text
 updates  A  43.161.216.136
+download A  43.161.216.136
 ```

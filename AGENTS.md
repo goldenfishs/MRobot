@@ -128,7 +128,7 @@ MCode 当前实现：
 - `app/update_service.py` 是 GUI、`mrobot-update` CLI 和未来插件共用的更新接口；前端不得重新实现平台选择、下载和校验。
 - 程序启动后默认后台检查更新，“关于”页面可启用自动下载、安装和重启。
 - Release asset 必须带 GitHub SHA-256 digest 或同名 `.sha256`，否则更新器拒绝安装。
-- 发布流水线分别为 `updates.qutmrobot.cn` 和 GitHub Release 生成 `update.json`；客户端优先访问 MRobot 香港更新源，失败后回退 GitHub 清单和旧版 API。
+- `updates.qutmrobot.cn` 提供稳定版清单，`download.qutmrobot.cn` 提供版本化安装包；发布流水线同时生成香港源和 GitHub Release 清单，客户端失败时回退 GitHub 清单和旧版 API。
 - macOS/Linux 使用退出后安装助手和失败回滚；Windows 自动更新只选择 Inno Setup `*-setup.exe`，ZIP 仅作便携包。
 - 当前 macOS 仍为临时签名，正式公开分发前应配置 Developer ID、公证以及 Windows Authenticode 签名。
 

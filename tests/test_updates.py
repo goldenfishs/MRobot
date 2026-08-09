@@ -197,11 +197,11 @@ def test_release_manifest_contains_all_native_artifacts_and_digests(tmp_path: Pa
         tmp_path,
         "goldenfishs/MRobot",
         "v0.4.0",
-        "https://updates.qutmrobot.cn/releases/v0.4.0",
+        "https://download.qutmrobot.cn/releases/v0.4.0",
     )
     mirror_manifest = json.loads(mirror.read_text(encoding="utf-8"))
     assert all(
-        asset["url"].startswith("https://updates.qutmrobot.cn/releases/v0.4.0/")
+        asset["url"].startswith("https://download.qutmrobot.cn/releases/v0.4.0/")
         for asset in mirror_manifest["assets"]
     )
 
