@@ -9,6 +9,12 @@
 	@release path /releases/*
 	header @release Cache-Control "public, max-age=31536000, immutable"
 
+	@parts_manifest path /parts/v1/catalog.json
+	header @parts_manifest Cache-Control "no-cache, no-store, must-revalidate"
+
+	@parts_files path /parts/v1/files/*
+	header @parts_files Cache-Control "public, max-age=604800, immutable"
+
 	header {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"

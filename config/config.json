@@ -1,5 +1,10 @@
 {
     "QFluentWidgets": {
+        "FontFamilies": [
+            "Segoe UI",
+            "Microsoft YaHei",
+            "PingFang SC"
+        ],
         "ThemeColor": "#fff18cb9",
         "ThemeMode": "Dark"
     }

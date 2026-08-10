@@ -171,11 +171,13 @@ python MRobot.py
 5. 查看生成计划和冲突信息。
 6. 确认后调用同一服务生成文件。
 
-旧的 `app/code_page/` 页面仍用于收集部分选择，但新的解析和生成规则不得写回 GUI 页面或 `app/tools/code_generator.py`。
+桌面端现在直接浏览官方 registry，并通过 `MCodeService` 完成包安装、删除、计划预览和生成；主仓库不再保留第二套模板或生成器。
 
 ## 使用 AI 工作台
 
 MRobot 桌面端内置面向机器人嵌入式开发的 AI 工作台。它借鉴了 Claude Desktop/ChatGPT 的工程上下文与工具授权方式，以及 OpenSquilla 的多 Provider、统一会话内核设计，但所有实现均位于 MRobot 自己的 `app/ai/` 核心中。
+
+AI 工作台当前是 **Beta 实验性功能，默认关闭**。关闭时不会创建 AI 页面，主导航和迷你工具箱也不会显示 AI 入口。用户必须在“关于 → 实验性功能”中明确启用后才能使用；该选择会保存在本机，也可随时关闭。
 
 当前支持所有实现 OpenAI-compatible `POST /v1/chat/completions` 的服务，包括：
 
@@ -191,12 +193,13 @@ MRobot 桌面端内置面向机器人嵌入式开发的 AI 工作台。它借鉴
 
 使用流程：
 
-1. 从主导航进入“AI 工作台”。
-2. 点击“添加模型”或“模型设置”，选择预设或填写自定义 Base URL、模型 ID。
-3. 在本次运行中输入 API Key，或提前设置对应环境变量。
-4. 点击“测试连接”确认地址、权限和模型列表。
-5. 可选：选择一个 MRobot/CubeMX 工程，并开启“允许只读工程工具”。
-6. 询问 MCU、外设、文件、代码生成计划、冲突或诊断问题。
+1. 在“关于 → 实验性功能”中启用“MRobot AI 工作台（Beta）”。
+2. 从主导航或迷你工具箱进入“AI 工作台 Beta”。
+3. 点击“添加模型”或“模型设置”，选择预设或填写自定义 Base URL、模型 ID。
+4. 在本次运行中输入 API Key，或提前设置对应环境变量。
+5. 点击“测试连接”确认地址、权限和模型列表。
+6. 可选：选择一个 MRobot/CubeMX 工程，并开启“允许只读工程工具”。
+7. 询问 MCU、外设、文件、代码生成计划、冲突或诊断问题。
 
 API Key 不会写入 `profiles.json` 或对话历史。为了跨重启使用，推荐通过系统环境变量或启动脚本注入，不要把密钥放进工程文件。远程自定义接口必须使用 HTTPS；HTTP 只允许 `localhost`、`127.0.0.1` 和 `::1`。
 
@@ -220,6 +223,24 @@ ollama serve
 然后在模型设置中选择“Ollama 本地”，把模型 ID 改为 `qwen3:8b`。默认的 `qwen3:0.6b` 只适合连通性测试，不建议用于复杂工程修改建议。
 
 Provider 元数据保存在系统应用数据目录的 `MRobot/ai/profiles.json`，对话保存在 `MRobot/ai/conversations.json`；两者都不保存 API Key。原生 Anthropic Messages、OpenAI Responses、远程/本地 MCP 连接器、图片输入、用量/成本账本和跨设备同步尚未实现。
+
+## 使用零件库
+
+桌面端零件库默认连接 MRobot 的 HTTPS 静态服务：
+
+- 在线目录：`https://download.qutmrobot.cn/parts/v1/catalog.json`
+- 文件下载：`https://download.qutmrobot.cn/parts/v1/files/`
+- 本地安装目录：系统“文档/MRobot/零件库”
+
+应用只下载约百 KB 的目录文件，选中零件后再按需加载预览，用户点击下载时才获取原始模型。目录会缓存在系统缓存目录，网络暂时不可用时仍可浏览已缓存的条目。
+
+1. 打开主导航中的“零件库”。
+2. 等待顶部状态显示“云端已连接”或“离线缓存”。
+3. 使用集合、分类、格式和关键词筛选零件。
+4. 选择零件后查看格式、大小、云端路径和同目录预览图。
+5. 点击“下载此文件”保存到 `文档/MRobot/零件库`，或使用“下载所在目录”把装配体与同目录文件一起保存。
+
+点击“离线资料包”可挂载 ZIP 作为断网后备；若下载目录中存在 `零件库.zip`，云端和缓存均不可用时会自动发现它。大型 ZIP 会被直接索引而不是整包解压，GBK/GB18030 编码的旧中文文件名会自动修复。云端和 ZIP 路径都会拒绝绝对路径及 `..` 目录穿越，下载与导出支持协作式取消。旧的 `http://qutrobot.top:5000` 明文服务和客户端内置密钥不再使用。
 
 ## 项目文件
 
@@ -275,6 +296,14 @@ mcode generate /path/to/project --adopt
 - `module`：云台、底盘、发射等功能模块。
 - `task`：任务入口和调度模板。
 
+本次从旧模板树拆出的较大代码组已经有独立仓库：
+
+- [mrobot-component-cpp](https://github.com/goldenfishs/mrobot-component-cpp)：容器、控制器、滤波、数学、轨迹、计时和 CMSIS-DSP 工具。
+- [mrobot-component-mrlink](https://github.com/goldenfishs/mrobot-component-mrlink)：UART、USB、FDCAN 通道上的类型化帧协议。
+- [mrobot-device-motor-cpp](https://github.com/goldenfishs/mrobot-device-motor-cpp)：DM、LZ、RM 电机的 C++ 类型层、控制器和软限位学习。
+
+基础 device/motor 包的配套升级通过各自仓库的 Draft PR 审核。新包进入 registry 前仍需完成 tag、索引更新和板级验证。
+
 常用包命令：
 
 ```bash
@@ -286,7 +315,7 @@ mcode package create mrobot.component.example --type component
 mcode package board board.ioc mrobot.board.my-board
 ```
 
-新模块应优先创建独立仓库和清单，不再继续扩充本仓库中的旧 `assets/User_code` 目录。
+每个模块使用独立仓库和清单发布。主仓库中的旧 `assets/User_code` 已删除，运行时只从 registry 解析版本化包。
 
 ## 统一接口与前端
 
@@ -344,7 +373,8 @@ Windows 自动安装只选择 Inno Setup `*-setup.exe`。macOS 和 Linux 使用�
 ```text
 MRobot/
 ├── app/                       # 桌面 GUI 和统一更新服务
-│   └── ai/                    # Provider、会话、只读工具和 AI agent loop
+│   ├── ai/                    # Provider、会话、只读工具和 AI agent loop
+│   └── part_library/          # ZIP 索引、中文编码修复和安全按需导出
 ├── mcode/                     # 固定版本的 MCode Git 子模块
 ├── assets/                    # GUI 资源与待迁移旧资源
 ├── docs/architecture/         # 架构和包规范
@@ -421,7 +451,7 @@ python tools/build_desktop.py
 
 - STM32CubeMX 之外的平台尚未达到同等原生解析深度。
 - 尚未保证自动修改所有 CubeIDE `.cproject`、Keil、CMake 和 Makefile 工程元数据。
-- GUI 包管理仍在从旧选择页面迁移到完整 registry 浏览、依赖树和冲突界面。
+- GUI 已提供 registry 浏览、类型筛选、包选择和生成计划确认；依赖树可视化、版本切换和包更新提示仍待增强。
 - MCP 尚未覆盖 CLI/Service 的所有包管理和迁移参数。
 - AI 工作台当前只实现 OpenAI-compatible Chat Completions；尚无原生 Anthropic/Responses adapter 和外部 MCP 连接器。
 - AI 工具刻意保持只读，不能自动生成、构建、烧录或执行任意系统命令。
@@ -434,8 +464,8 @@ python tools/build_desktop.py
 
 1. 补充真实 F4/H7/G4/L4/U5 CubeMX 工程和交叉编译矩阵。
 2. 完成 CubeIDE、CMake、Makefile 的生成文件接入。
-3. 在 GUI 中提供 plan、diff、冲突和 adopt 决策界面。
-4. 完整接入 registry 搜索、版本选择、依赖树和能力提供者。
+3. 在现有 plan/冲突/adopt 确认界面中增加逐文件 diff。
+4. 为 registry 浏览器增加版本选择、依赖树和能力提供者视图。
 5. 验证 STM32CubeProgrammer、OpenOCD、J-Link、ST-Link action profile。
 6. 使用真实板卡完成构建、烧录、复位和串口 smoke test。
 7. STM32 主路径稳定后，再逐个平台实现原生 SDK importer。

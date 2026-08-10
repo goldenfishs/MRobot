@@ -5,12 +5,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from PyQt5.QtCore import QSettings
 
 from app.ai.client import AIClientError, OpenAICompatibleClient, validate_base_url
 from app.ai.config import AIConversationStore, AIProfileStore
 from app.ai.models import AIProviderConfig, AssistantTurn, Conversation, ToolCall
 from app.ai.service import MRobotAssistant
 from app.ai.tools import MRobotToolRegistry
+from app.feature_flags import AI_BETA_KEY, is_ai_beta_enabled, set_ai_beta_enabled
 from tests.helpers import write_config, write_ioc
 
 
@@ -91,7 +93,7 @@ def test_openai_compatible_stream_collects_text_usage_and_fragmented_tool_calls(
     )
     session = FakeSession([response])
     chunks: list[str] = []
-    client = OpenAICompatibleClient(config(), api_key="secret", session=session)
+    client = OpenAICompatibleClient(config(protocol="chat"), api_key="secret", session=session)
     result = client.complete_turn([{"role": "user", "content": "检查工程"}], on_text=chunks.append)
     assert result.content == "正在检查"
     assert chunks == ["正在", "检查"]
@@ -102,6 +104,70 @@ def test_openai_compatible_stream_collects_text_usage_and_fragmented_tool_calls(
     assert url == "https://ai.example.com/v1/chat/completions"
     assert request["headers"]["Authorization"] == "Bearer secret"
     assert "secret" not in json.dumps(request["json"])
+
+
+def test_openai_compatible_accepts_non_streaming_chat_json() -> None:
+    response = StreamResponse(
+        [json.dumps({"choices": [{"message": {"content": "普通 JSON 也可以"}}], "usage": {"total_tokens": 9}})]
+    )
+    chunks: list[str] = []
+    client = OpenAICompatibleClient(config(protocol="chat"), session=FakeSession([response]))
+    result = client.complete_turn([{"role": "user", "content": "你好"}], on_text=chunks.append)
+    assert result.content == "普通 JSON 也可以"
+    assert result.usage == {"total_tokens": 9}
+    assert chunks == ["普通 JSON 也可以"]
+
+
+def test_openai_compatible_decodes_stream_bytes_as_utf8() -> None:
+    line = ("data: " + json.dumps({"choices": [{"delta": {"content": "中文正常"}}]}, ensure_ascii=False)).encode("utf-8")
+    response = StreamResponse([line, b"data: [DONE]"])
+    result = OpenAICompatibleClient(config(protocol="chat"), session=FakeSession([response])).complete_turn(
+        [{"role": "user", "content": "你好"}]
+    )
+    assert result.content == "中文正常"
+
+
+def test_responses_stream_collects_text_tool_call_and_usage() -> None:
+    response = StreamResponse(
+        [
+            sse({"type": "response.output_text.delta", "delta": "正在分析"}),
+            sse(
+                {
+                    "type": "response.output_item.done",
+                    "output_index": 1,
+                    "item": {
+                        "type": "function_call",
+                        "call_id": "call_r1",
+                        "name": "inspect_project",
+                        "arguments": "{}",
+                    },
+                }
+            ),
+            sse({"type": "response.completed", "response": {"usage": {"input_tokens": 5, "output_tokens": 3}}}),
+        ]
+    )
+    session = FakeSession([response])
+    client = OpenAICompatibleClient(config(protocol="responses"), session=session)
+    result = client.complete_turn([{"role": "system", "content": "只读"}, {"role": "user", "content": "检查"}])
+    assert result.content == "正在分析"
+    assert result.tool_calls == (ToolCall("call_r1", "inspect_project", "{}"),)
+    assert result.usage["input_tokens"] == 5
+    assert session.requests[0][1] == "https://ai.example.com/v1/responses"
+    assert session.requests[0][2]["json"]["instructions"] == "只读"
+
+
+def test_auto_protocol_falls_back_to_chat_when_responses_is_missing() -> None:
+    missing = StreamResponse([], status=404)
+    chat = StreamResponse([sse({"choices": [{"delta": {"content": "兼容成功"}}]}), "data: [DONE]"])
+    session = FakeSession([missing, chat])
+    result = OpenAICompatibleClient(config(protocol="auto"), session=session).complete_turn(
+        [{"role": "user", "content": "你好"}]
+    )
+    assert result.content == "兼容成功"
+    assert [request[1] for request in session.requests] == [
+        "https://ai.example.com/v1/responses",
+        "https://ai.example.com/v1/chat/completions",
+    ]
 
 
 def test_model_listing_uses_models_endpoint() -> None:
@@ -133,6 +199,19 @@ def test_conversations_are_local_and_bounded(tmp_path: Path) -> None:
     store.save_all(conversations)
     loaded = store.load()
     assert [item.title for item in loaded] == ["对话 2", "对话 1"]
+
+
+def test_conversation_load_repairs_previously_misdecoded_utf8() -> None:
+    corrupted = "你好，我是 MRobot".encode("utf-8").decode("cp1252")
+    conversation = Conversation.from_dict(
+        {
+            "title": corrupted,
+            "provider": "测试模型",
+            "messages": [{"role": "assistant", "content": corrupted}],
+        }
+    )
+    assert conversation.title == "你好，我是 MRobot"
+    assert conversation.messages[0]["content"] == "你好，我是 MRobot"
 
 
 def test_project_tools_are_read_only_and_block_path_escape_and_secrets(tmp_path: Path) -> None:
@@ -199,7 +278,16 @@ def test_assistant_executes_tool_then_returns_final_answer() -> None:
     assert [message["role"] for message in result.messages] == ["user", "assistant", "tool", "assistant"]
 
 
-def test_main_navigation_exposes_ai_workbench() -> None:
+def test_ai_beta_feature_flag_defaults_off_and_persists(tmp_path: Path) -> None:
+    settings = QSettings(str(tmp_path / "settings.ini"), QSettings.IniFormat)
+    assert is_ai_beta_enabled(settings) is False
+    set_ai_beta_enabled(True, settings)
+    assert settings.value(AI_BETA_KEY, False, type=bool) is True
+    assert is_ai_beta_enabled(settings) is True
+
+
+def test_main_navigation_gates_ai_workbench_behind_beta_flag() -> None:
     source = (Path(__file__).resolve().parents[1] / "app" / "main_window.py").read_text(encoding="utf-8")
-    assert "self.aiInterface = AIInterface" in source
-    assert "self.addSubInterface(self.aiInterface, FIF.ROBOT" in source
+    assert "if is_ai_beta_enabled():" in source
+    assert "AI 工作台 Beta" in source
+    assert "def set_ai_beta_enabled" in source

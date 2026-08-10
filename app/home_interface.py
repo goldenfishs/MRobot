@@ -56,7 +56,7 @@ class HomeInterface(QWidget):
         content_layout.addWidget(subtitle)
 
         # 欢迎语
-        welcome = BodyLabel("欢迎使用 MRobot Toolbox！一站式支持代码生成、硬件管理、串口调试与零件库下载。")
+        welcome = BodyLabel("欢迎使用 MRobot Toolbox！一站式支持代码生成、硬件管理、串口调试与零件库管理。")
         welcome.setAlignment(Qt.AlignCenter)
         content_layout.addWidget(welcome)
 

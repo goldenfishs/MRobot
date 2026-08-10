@@ -172,13 +172,15 @@ class AIProviderClient(Protocol):
 - 本地多会话和工程绑定。
 - 五个 MCode/文件只读工具。
 - 主导航 AI 工作台和模型连接测试。
+- 默认关闭的 Beta 功能开关；关闭时不加载页面、不显示导航和工具箱入口。
+- Markdown、代码块、表格和流式富文本渲染。
 - URL、路径、密钥文件、工具轮次和输出大小限制。
 
 ### v0.5.x
 
 - 原生 OpenAI Responses adapter。
 - 原生 Anthropic Messages adapter。
-- Markdown/代码块渲染和一键复制。
+- 代码块一键复制。
 - 用量、token 和估算成本显示。
 - 删除 Provider、清除全部历史和无历史模式。
 - Provider 能力探测，自动关闭不支持的工具或 streaming 参数。

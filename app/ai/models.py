@@ -52,12 +52,27 @@ PROVIDER_PRESETS: dict[str, dict[str, object]] = {
 }
 
 
+def _repair_utf8_mojibake(value: str) -> str:
+    """Recover text previously decoded as Latin-1/Windows-1252 instead of UTF-8."""
+    original_cjk = sum("\u3400" <= char <= "\u9fff" for char in value)
+    for encoding in ("latin-1", "cp1252"):
+        try:
+            repaired = value.encode(encoding).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+        repaired_cjk = sum("\u3400" <= char <= "\u9fff" for char in repaired)
+        if repaired_cjk >= 2 and repaired_cjk > original_cjk:
+            return repaired
+    return value
+
+
 @dataclass(frozen=True)
 class AIProviderConfig:
     name: str
     base_url: str
     model: str
     api_key_env: str = ""
+    protocol: str = "auto"
     temperature: float = 0.2
     timeout: int = 120
     enable_tools: bool = True
@@ -72,6 +87,7 @@ class AIProviderConfig:
             base_url=str(value.get("base_url") or ""),
             model=str(value.get("model") or ""),
             api_key_env=str(value.get("api_key_env") or ""),
+            protocol=str(value.get("protocol") or "auto"),
             temperature=float(value.get("temperature", 0.2)),
             timeout=int(value.get("timeout", 120)),
             enable_tools=bool(value.get("enable_tools", True)),
@@ -148,10 +164,18 @@ class Conversation:
     @classmethod
     def from_dict(cls, value: dict[str, object]) -> "Conversation":
         raw_messages = value.get("messages")
-        messages = [item for item in raw_messages if isinstance(item, dict)] if isinstance(raw_messages, list) else []
+        messages: list[dict[str, Any]] = []
+        if isinstance(raw_messages, list):
+            for item in raw_messages:
+                if not isinstance(item, dict):
+                    continue
+                message = dict(item)
+                if isinstance(message.get("content"), str):
+                    message["content"] = _repair_utf8_mojibake(message["content"])
+                messages.append(message)
         return cls(
             conversation_id=str(value.get("conversation_id") or uuid4().hex),
-            title=str(value.get("title") or "新对话"),
+            title=_repair_utf8_mojibake(str(value.get("title") or "新对话")),
             provider=str(value.get("provider") or "Ollama 本地"),
             project_root=str(value.get("project_root") or ""),
             messages=messages,
