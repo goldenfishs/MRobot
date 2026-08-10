@@ -135,12 +135,22 @@ MCode 当前实现：
 ### 4.8 AI 工作台
 
 - `app/ai/` 是 GUI 无关的 AI 核心，包含 Provider 配置、OpenAI-compatible 流式客户端、本地会话、MCode 只读工具和工具调用循环。
-- `app/ai_interface.py` 只负责桌面交互；主导航直接提供“AI 工作台”，旧工具箱入口复用同一界面。
+- `app/ai_interface.py` 只负责桌面交互；AI 工作台是默认关闭的 Beta 功能，统一由 `app/feature_flags.py` 的 `features/aiBetaEnabled` 控制。
+- 未启用时不得创建 AI 页面，也不得在主导航或迷你工具箱显示入口；用户只可从“关于 → 实验性功能”明确启用，启用后两个入口复用同一个 AI 工作台实例。
 - 支持 OpenAI、DeepSeek、硅基流动、阿里云百炼、OpenRouter、Ollama 和自定义 OpenAI-compatible Base URL/模型 ID。
 - Provider 配置和会话保存在系统应用数据目录，API Key 只从当前运行内存或用户指定环境变量读取，不能持久化到配置或历史。
 - 工程工具只有 inspect、plan、validate、文件列表和受限文本读取；没有 generate、build、flash、debug、shell 或任意文件写入。
 - 文件上下文拒绝工程外路径、目录穿越、密钥扩展名、`.env`、构建输出和超过 32 KiB 的单文件。
 - 工具返回内容视为不可信数据，系统提示明确禁止遵循工程文件中伪装成指令的文本。
+
+### 4.9 零件库
+
+- `app/part_library/` 是 GUI 无关的云端/离线零件资料核心，负责 HTTPS manifest、目录缓存、按需下载、ZIP 索引、GBK/GB18030 中文文件名修复、类型分类和安全导出。
+- 正式目录是 `https://download.qutmrobot.cn/parts/v1/catalog.json`，原始文件位于同源的 `parts/v1/files/`；目录不可长期缓存，版本化文件可以缓存。
+- `app/part_library_interface.py` 只负责桌面交互。网络、预览和下载都必须放在工作线程，不能阻塞 UI；下载内容不能写入应用安装目录。
+- 默认安装目录是系统“文档/MRobot/零件库”；本地目录缓存位于系统缓存目录。`QSettings` 的 `parts/archivePath` 仅保存用户选择的离线资料包路径。
+- 云端不可用时先使用目录缓存；缓存也不可用时才挂载用户配置或下载目录中自动发现的 ZIP。大型资料包必须直接挂载，不能在启动时整包解压。
+- 不得恢复旧的 `http://qutrobot.top:5000` 明文服务或客户端明文密钥。下载和导出必须拒绝绝对路径及 `..` 路径穿越，并使用可协作取消的工作线程，不得调用 `QThread.terminate()`。
 
 ## 5. 真实能力边界：不要作错误声明
 
@@ -164,12 +174,16 @@ MCode 当前实现：
 - `app/main_window.py`：主窗口和页面装配。
 - `app/ai/`：统一 AI Provider、会话、工具和 agent loop。
 - `app/ai_interface.py`：AI 工作台 GUI 薄前端。
+- `app/part_library/`：云端目录、目录缓存、按需下载、离线 ZIP 索引与安全导出核心。
+- `app/part_library_interface.py`：零件库 GUI 薄前端。
+- `tools/build_part_catalog.py`：从离线 ZIP 生成可静态部署的云端目录与文件树。
 - `app/code_generate_interface.py`：GUI 代码生成集成入口。
 - `app/code_page/`：旧 GUI 配置页面；只负责收集选择，不应拥有生成规则。
 - `tests/test_generation.py`：生成、安全覆盖和集成测试。
 - `tests/test_gui_unified.py`：GUI 必须调用 MCode 的架构守卫。
 - `tests/test_packaging.py`：桌面依赖、版本和发布矩阵约束。
 - `tests/test_updates.py`：平台选择、下载校验、安全解包和安装计划测试。
+- `tests/test_part_library.py`：云端目录、离线缓存、安全下载、ZIP 兼容和静态目录构建测试。
 - `docs/architecture/MCODE_ARCHITECTURE.md`：目标架构。
 - `docs/architecture/PACKAGE_SPEC.md`：包清单规范。
 - `docs/architecture/AI_WORKBENCH.md`：AI Provider、会话、工具、安全边界和演进计划。
@@ -203,7 +217,7 @@ python -m pytest -q
 python -m compileall -q app tools MRobot.py
 ```
 
-当前预期：本仓库 49 项测试通过。
+当前预期：本仓库 70 项测试通过。
 
 测试 MCode：
 

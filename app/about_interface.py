@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QApplication, QCheckBox, QWidget, QVBoxLayout, QHBoxLayout
-from PyQt5.QtCore import QSettings, Qt, QUrl, QTimer
+from PyQt5.QtCore import QSettings, Qt, QUrl, QTimer, pyqtSignal
 from PyQt5.QtGui import QDesktopServices
 
 from qfluentwidgets import (
@@ -11,10 +11,13 @@ from qfluentwidgets import (
 
 from .function_fit_interface import FunctionFitInterface
 from app import __version__
+from app.feature_flags import is_ai_beta_enabled, set_ai_beta_enabled
 from app.tools.auto_updater import AutoUpdater
 from app.tools.update_check_thread import UpdateCheckThread
 
 class AboutInterface(QWidget):
+    ai_beta_changed = pyqtSignal(bool)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("aboutInterface")
@@ -54,6 +57,22 @@ class AboutInterface(QWidget):
 
         
         layout.addWidget(version_card)
+
+        beta_card = ElevatedCardWidget()
+        beta_layout = QVBoxLayout(beta_card)
+        beta_layout.setContentsMargins(24, 20, 24, 20)
+        beta_layout.setSpacing(8)
+        beta_layout.addWidget(StrongBodyLabel("实验性功能"))
+        beta_description = BodyLabel(
+            "AI 工作台仍处于 Beta 阶段。默认不会显示，也不会在启动时加载；启用后才会出现在导航栏和迷你工具箱中。"
+        )
+        beta_description.setWordWrap(True)
+        beta_layout.addWidget(beta_description)
+        self.ai_beta_box = QCheckBox("启用 MRobot AI 工作台（Beta）")
+        self.ai_beta_box.setChecked(is_ai_beta_enabled(settings))
+        self.ai_beta_box.toggled.connect(self._on_ai_beta_toggled)
+        beta_layout.addWidget(self.ai_beta_box)
+        layout.addWidget(beta_card)
         
         # 检查更新按钮
         self.check_update_card = PrimaryPushSettingCard(
@@ -72,6 +91,15 @@ class AboutInterface(QWidget):
         layout.addWidget(self.update_info_card)
         
         layout.addStretch()
+
+    def _on_ai_beta_toggled(self, enabled: bool) -> None:
+        set_ai_beta_enabled(enabled)
+        self.ai_beta_changed.emit(enabled)
+
+    def set_ai_beta_enabled(self, enabled: bool) -> None:
+        self.ai_beta_box.blockSignals(True)
+        self.ai_beta_box.setChecked(enabled)
+        self.ai_beta_box.blockSignals(False)
     
     def _setup_update_info_card(self):
         """设置更新信息卡片"""

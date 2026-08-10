@@ -10,7 +10,6 @@ import sys
 import shutil
 import tempfile
 from .function_fit_interface import FunctionFitInterface
-from .ai_interface import AIInterface
 from .tools.update_code import update_code
 from .code_generate_interface import CodeGenerateInterface
 from .tools.code_generator import CodeGenerator
@@ -331,17 +330,5 @@ class CodeConfigurationInterface(QWidget):
 
     def open_ai_tab(self):
         window = self.window()
-        if hasattr(window, "aiInterface") and hasattr(window, "switchTo"):
-            window.switchTo(window.aiInterface)
-            return
-        # 检查是否已存在标签页，避免重复添加
-        for i in range(self.stackedWidget.count()):
-            widget = self.stackedWidget.widget(i)
-            if widget.objectName() == "aiPage":
-                self.stackedWidget.setCurrentWidget(widget)
-                self.tabBar.setCurrentTab("aiPage")
-                return
-        ai_page = AIInterface(self)
-        self.addSubInterface(ai_page, "aiPage", "AI问答")
-        self.stackedWidget.setCurrentWidget(ai_page)
-        self.tabBar.setCurrentTab("aiPage")
+        if hasattr(window, "open_ai_workspace"):
+            window.open_ai_workspace()

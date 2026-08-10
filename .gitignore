@@ -17,6 +17,7 @@
 *.dbg*
 *.uvguix.*
 .mxproject
+.DS_Store
 
 RTE/
 Templates/
@@ -33,6 +34,7 @@ Examples/
 build/
 dist/
 release-dist/
+part-dist/
 *.spec
 *.exe
 __pycache__/

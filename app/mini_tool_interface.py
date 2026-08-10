@@ -1,10 +1,10 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QSizePolicy
 from PyQt5.QtCore import Qt
 from qfluentwidgets import PushSettingCard, FluentIcon, TabBar
+from .feature_flags import is_ai_beta_enabled
 
 # 延迟导入：避免在启动时加载大型库
 # from .function_fit_interface import FunctionFitInterface
-from .ai_interface import AIInterface
 
 class MiniToolInterface(QWidget):
     def __init__(self, parent=None):
@@ -43,10 +43,11 @@ class MiniToolInterface(QWidget):
         self.aiCard = PushSettingCard(
             text="▶ 启动",
             icon=FluentIcon.ROBOT,
-            title="MRobot AI 工作台",
-            content="连接自定义 AI，并使用只读 MCode 工具理解当前机器人工程。",
+            title="MRobot AI 工作台（Beta）",
+            content="实验性功能：连接自定义 AI，并使用只读 MCode 工具理解当前机器人工程。",
         )
         mainLayout.addWidget(self.aiCard)
+        self.aiCard.setVisible(is_ai_beta_enabled())
         self.aiCard.clicked.connect(self.open_ai_tab)
         # 添加主页面到堆叠窗口
         self.addSubInterface(self.mainPage, "mainPage", "工具箱主页")
@@ -105,19 +106,9 @@ class MiniToolInterface(QWidget):
         self.tabBar.setCurrentTab("fitPage")
 
     def open_ai_tab(self):
-        # 主窗口已经持有唯一 AI 工作台实例，避免多个页面同时写同一份会话历史。
         window = self.window()
-        if hasattr(window, "aiInterface") and hasattr(window, "switchTo"):
-            window.switchTo(window.aiInterface)
-            return
-        # 检查是否已存在标签页，避免重复添加
-        for i in range(self.stackedWidget.count()):
-            widget = self.stackedWidget.widget(i)
-            if widget.objectName() == "aiPage":
-                self.stackedWidget.setCurrentWidget(widget)
-                self.tabBar.setCurrentTab("aiPage")
-                return
-        ai_page = AIInterface(self)
-        self.addSubInterface(ai_page, "aiPage", "AI问答")
-        self.stackedWidget.setCurrentWidget(ai_page)
-        self.tabBar.setCurrentTab("aiPage")
+        if hasattr(window, "open_ai_workspace"):
+            window.open_ai_workspace()
+
+    def set_ai_beta_enabled(self, enabled: bool) -> None:
+        self.aiCard.setVisible(enabled)

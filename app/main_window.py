@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QSettings, Qt, QSize, QTimer
+from PyQt5.QtCore import QSettings, Qt, QSize, QTimer, QRect
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
@@ -17,25 +17,29 @@ from .code_configuration_interface import CodeConfigurationInterface
 from .finance_interface import FinanceInterface
 from .mech_design_interface import MechDesignInterface
 from .about_interface import AboutInterface
-from .ai_interface import AIInterface
+from .feature_flags import is_ai_beta_enabled, set_ai_beta_enabled
 from .tools.update_check_thread import UpdateCheckThread
 from . import __version__
 import base64
+import sys
+import os
 
 
 class MainWindow(FluentWindow):
     def __init__(self):
         super().__init__()
+        self._navigation_ready = False
         self.initWindow()
         self.initInterface()
         self.initNavigation()
+        self._navigation_ready = True
 
         QTimer.singleShot(2500, self.check_updates_in_background)
 
     def initWindow(self):
-        self.setMicaEffectEnabled(False)
         setThemeColor('#f18cb9', lazy=True)
         setTheme(Theme.AUTO, lazy=True)
+        self._enable_native_window_effect()
 
         self.resize(960, 640)
         self.setWindowIcon(QIcon(resource_path('assets/logo/M2.ico')))
@@ -49,6 +53,33 @@ class MainWindow(FluentWindow):
         self.show()
         QApplication.processEvents()
 
+    def _enable_native_window_effect(self):
+        """Enable native window chrome without placing a view over Qt content."""
+        if os.environ.get('QT_QPA_PLATFORM') == 'offscreen':
+            return
+        if sys.platform == 'darwin':
+            try:
+                # qframelesswindow's macOS acrylic helper creates a
+                # QMacCocoaViewContainer.  Depending on the initialization
+                # order that container can cover every Qt child widget.  Keep
+                # the real AppKit title-bar controls and native window colour,
+                # but do not add an extra Cocoa view to the content hierarchy.
+                import Cocoa
+                from qframelesswindow.utils.mac_utils import getNSWindow
+
+                ns_window = getNSWindow(self.winId())
+                ns_window.setTitlebarAppearsTransparent_(True)
+                ns_window.setBackgroundColor_(Cocoa.NSColor.windowBackgroundColor())
+            except Exception as exc:
+                print(f"macOS 原生窗口材质启用失败: {exc}")
+        elif sys.platform == 'win32':
+            self.setMicaEffectEnabled(True)
+
+    def systemTitleBarRect(self, size):
+        if sys.platform == 'darwin':
+            return QRect(10, 7 if not self.isFullScreen() else 0, 75, size.height())
+        return super().systemTitleBarRect(size)
+
     def initInterface(self):
         self.homeInterface = HomeInterface(self)
         self.serialTerminalInterface = SerialTerminalInterface(self)
@@ -58,21 +89,35 @@ class MainWindow(FluentWindow):
         self.codeConfigurationInterface = CodeConfigurationInterface(self)
         self.financeInterface = FinanceInterface(self)
         self.mechDesignInterface = MechDesignInterface(self)
-        self.aiInterface = AIInterface(self)
+        self.aiInterface = None
+        if is_ai_beta_enabled():
+            self._create_ai_interface()
         self.aboutInterface = AboutInterface(self)
+        self.aboutInterface.ai_beta_changed.connect(self.set_ai_beta_enabled)
+        self.miniToolInterface.set_ai_beta_enabled(is_ai_beta_enabled())
 
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, self.tr('主页'))
         # self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
         self.addSubInterface(self.codeConfigurationInterface, FIF.CODE, self.tr('代码生成'))
-        self.addSubInterface(self.aiInterface, FIF.ROBOT, self.tr('AI 工作台'))
+        if self.aiInterface is not None:
+            self.addSubInterface(self.aiInterface, FIF.ROBOT, self.tr('AI 工作台 Beta'), isTransparent=True)
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
-        self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
+        self.addSubInterface(self.partLibraryInterface, FIF.ZIP_FOLDER, self.tr('零件库'))
         self.addSubInterface(self.mechDesignInterface, FIF.SETTING, self.tr('机械设计'))
         # self.addSubInterface(self.financeInterface, FIF.DOCUMENT, self.tr('财务做账'))
         self.addSubInterface(self.miniToolInterface, FIF.LIBRARY, self.tr('迷你工具箱'))
         self.addSubInterface(self.aboutInterface, FIF.INFO, self.tr('关于'), position=NavigationItemPosition.BOTTOM)
+
+        if sys.platform == 'darwin':
+            # Reserve the first navigation row for native traffic-light buttons.
+            return_button = self.navigationInterface.panel.returnButton
+            return_button.setEnabled(False)
+            return_button.setIcon(QIcon())
+            return_button.setToolTip("")
+            return_button.setAttribute(Qt.WA_TransparentForMouseEvents)
+            self.titleBar.hBoxLayout.setContentsMargins(50, 0, 0, 0)
 
 
 
@@ -84,6 +129,64 @@ class MainWindow(FluentWindow):
             None,
             NavigationItemPosition.BOTTOM
         )
+
+    def _create_ai_interface(self):
+        if self.aiInterface is None:
+            from .ai_interface import AIInterface
+
+            self.aiInterface = AIInterface(self)
+        return self.aiInterface
+
+    def _insert_ai_navigation(self) -> None:
+        interface = self._create_ai_interface()
+        if self.stackedWidget.indexOf(interface) >= 0:
+            return
+        interface.setProperty("isStackedTransparent", True)
+        self.stackedWidget.addWidget(interface)
+        self.navigationInterface.insertItem(
+            4,  # return/menu controls occupy the first two layout positions
+            routeKey=interface.objectName(),
+            icon=FIF.ROBOT,
+            text=self.tr("AI 工作台 Beta"),
+            onClick=lambda: self.switchTo(interface),
+            tooltip=self.tr("AI 工作台 Beta"),
+        )
+        self._updateStackedBackground()
+
+    def set_ai_beta_enabled(self, enabled: bool) -> None:
+        """Persist and immediately apply the explicit AI Beta opt-in."""
+        set_ai_beta_enabled(enabled)
+        self.aboutInterface.set_ai_beta_enabled(enabled)
+        self.miniToolInterface.set_ai_beta_enabled(enabled)
+        if not self._navigation_ready:
+            return
+        if enabled:
+            self._insert_ai_navigation()
+            return
+        if self.aiInterface is None:
+            return
+        if self.stackedWidget.currentWidget() is self.aiInterface:
+            self.switchTo(self.homeInterface)
+        self.navigationInterface.removeWidget(self.aiInterface.objectName())
+        self.stackedWidget.removeWidget(self.aiInterface)
+        self.aiInterface.close()
+        self.aiInterface.deleteLater()
+        self.aiInterface = None
+        self._updateStackedBackground()
+
+    def open_ai_workspace(self) -> bool:
+        if not is_ai_beta_enabled():
+            InfoBar.info(
+                title="AI 工作台尚未启用",
+                content="请先在“关于 → 实验性功能”中启用 MRobot AI 工作台（Beta）。",
+                parent=self,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+            )
+            return False
+        self._insert_ai_navigation()
+        self.switchTo(self.aiInterface)
+        return True
     
     def _safe_toggle_theme(self):
         """安全地切换主题，避免字典迭代异常"""
