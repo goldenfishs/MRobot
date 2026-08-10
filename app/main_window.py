@@ -11,7 +11,6 @@ with redirect_stdout(None):
 from .home_interface import HomeInterface, resource_path
 from .serial_terminal_interface import SerialTerminalInterface
 from .part_library_interface import PartLibraryInterface
-from .data_interface import DataInterface
 from .mini_tool_interface import MiniToolInterface
 from .code_configuration_interface import CodeConfigurationInterface
 from .finance_interface import FinanceInterface

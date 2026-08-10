@@ -1,518 +1,491 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy, QTreeWidget, QTreeWidgetItem, QStackedWidget
-from PyQt5.QtCore import Qt
-from qfluentwidgets import TitleLabel, BodyLabel, PushButton, TreeWidget, FluentIcon, InfoBar
-from app.tools.analyzing_ioc import analyzing_ioc
-from app.code_page.bsp_interface import bsp
-from app.data_interface import DataInterface
-from app.tools.code_generator import CodeGenerator
+from __future__ import annotations
+
+from pathlib import Path
+
+from PyQt5.QtCore import QThread, Qt, pyqtSignal
+from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QPlainTextEdit,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+from qfluentwidgets import (
+    BodyLabel,
+    CaptionLabel,
+    CardWidget,
+    CheckBox,
+    ComboBox,
+    FluentIcon,
+    InfoBar,
+    InfoBarPosition,
+    PrimaryPushButton,
+    ProgressRing,
+    PushButton,
+    SearchLineEdit,
+    StrongBodyLabel,
+    TableWidget,
+    TitleLabel,
+)
+
+from mcode.config import CONFIG_NAME, MCodeConfig
 from mcode.errors import MCodeError
+from mcode.models import ChangeAction, GenerationPlan
+from mcode.packages import version_key
+from mcode.registry import RegistryEntry
 from mcode.service import MCodeService
 
-import os
-import csv
-import sys
-import importlib
+
+PACKAGE_TYPE_LABELS = {
+    "platform": "平台",
+    "board": "板卡",
+    "bsp": "BSP",
+    "device": "设备",
+    "component": "组件",
+    "algorithm": "算法",
+    "module": "模块",
+    "task": "任务",
+}
+
+PLATFORM_PACKAGES = {
+    "stm32cubemx": "mrobot.platform.stm32",
+    "esp-idf": "mrobot.platform.esp-idf",
+    "wch-ch32": "mrobot.platform.wch-ch32",
+    "hpm-sdk": "mrobot.platform.hpm-sdk",
+    "ti-mspm0": "mrobot.platform.ti-mspm0",
+}
+
+
+def package_type(package_id: str) -> str:
+    parts = package_id.split(".")
+    return parts[1] if len(parts) > 2 else "component"
+
+
+def latest_registry_entries(entries: tuple[RegistryEntry, ...]) -> tuple[RegistryEntry, ...]:
+    latest: dict[str, RegistryEntry] = {}
+    for entry in entries:
+        previous = latest.get(entry.package_id)
+        if previous is None or version_key(entry.version) > version_key(previous.version):
+            latest[entry.package_id] = entry
+    return tuple(sorted(latest.values(), key=lambda item: (package_type(item.package_id), item.package_id)))
+
+
+def describe_plan(plan: GenerationPlan) -> tuple[str, str]:
+    counts = {action: 0 for action in ChangeAction}
+    lines: list[str] = []
+    labels = {
+        ChangeAction.CREATE: "新增",
+        ChangeAction.UPDATE: "更新",
+        ChangeAction.DELETE: "删除",
+        ChangeAction.NOOP: "不变",
+        ChangeAction.SKIP: "保留",
+        ChangeAction.CONFLICT: "冲突",
+    }
+    for change in plan.changes:
+        counts[change.action] += 1
+        lines.append(f"[{labels[change.action]}] {change.path}\n    {change.reason}")
+    summary = (
+        f"{len(plan.packages)} 个包 · "
+        f"新增 {counts[ChangeAction.CREATE]} · "
+        f"更新 {counts[ChangeAction.UPDATE]} · "
+        f"删除 {counts[ChangeAction.DELETE]} · "
+        f"冲突 {counts[ChangeAction.CONFLICT]}"
+    )
+    return summary, "\n".join(lines) or "没有文件变更。"
+
+
+class RegistryLoadThread(QThread):
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(self, project_path: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.project_path = project_path
+
+    def run(self) -> None:
+        try:
+            service = MCodeService()
+            root = Path(self.project_path)
+            self.completed.emit(latest_registry_entries(service.search_packages(root)))
+        except (MCodeError, OSError, ValueError, RuntimeError) as exc:
+            self.failed.emit(str(exc))
+
+
+class PreparePlanThread(QThread):
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(
+        self,
+        project_path: str,
+        selected_ids: set[str],
+        managed_ids: set[str],
+        adopt_legacy: bool,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.project_path = project_path
+        self.selected_ids = selected_ids
+        self.managed_ids = managed_ids
+        self.adopt_legacy = adopt_legacy
+
+    def run(self) -> None:
+        try:
+            root = Path(self.project_path)
+            service = MCodeService()
+            if not (root / CONFIG_NAME).exists():
+                service.initialize(root)
+            config = MCodeConfig.load(root)
+            current_ids = {
+                item.package_id
+                for item in config.packages
+                if item.enabled and item.package_id
+            }
+            for package_id in sorted(self.selected_ids - current_ids):
+                service.install_package(root, package_id)
+            for package_id in sorted((current_ids & self.managed_ids) - self.selected_ids):
+                service.remove_package(root, package_id)
+            self.completed.emit(service.plan(root, adopt_legacy=self.adopt_legacy))
+        except (MCodeError, OSError, ValueError, RuntimeError) as exc:
+            self.failed.emit(str(exc))
+
+
+class GenerateThread(QThread):
+    completed = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(self, project_path: str, adopt_legacy: bool, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.project_path = project_path
+        self.adopt_legacy = adopt_legacy
+
+    def run(self) -> None:
+        try:
+            plan = MCodeService().generate(self.project_path, adopt_legacy=self.adopt_legacy)
+            self.completed.emit(plan)
+        except (MCodeError, OSError, ValueError, RuntimeError) as exc:
+            self.failed.emit(str(exc))
+
+
+class GenerationPlanDialog(QDialog):
+    def __init__(self, plan: GenerationPlan, allow_generate: bool, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("MCode 生成计划")
+        self.setMinimumSize(720, 520)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 22, 24, 22)
+        root.setSpacing(12)
+        title = TitleLabel("生成计划", self)
+        root.addWidget(title)
+        summary, detail = describe_plan(plan)
+        summary_label = StrongBodyLabel(summary, self)
+        root.addWidget(summary_label)
+        hint = BodyLabel(
+            "请先确认文件范围。冲突不会被覆盖，scaffold 文件仍归用户所有。",
+            self,
+        )
+        hint.setWordWrap(True)
+        root.addWidget(hint)
+        details = QPlainTextEdit(self)
+        details.setReadOnly(True)
+        details.setPlainText(detail)
+        root.addWidget(details, 1)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        close_button = PushButton("关闭", self)
+        close_button.clicked.connect(self.reject)
+        buttons.addWidget(close_button)
+        if allow_generate:
+            generate_button = PrimaryPushButton(FluentIcon.PLAY, "确认生成", self)
+            generate_button.clicked.connect(self.accept)
+            buttons.addWidget(generate_button)
+        root.addLayout(buttons)
+
 
 class CodeGenerateInterface(QWidget):
-    def __init__(self, project_path, parent=None):
+    """Thin desktop frontend for MCode registry, plan and generation APIs."""
+
+    def __init__(self, project_path: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("CodeGenerateInterface")
-        self.project_path = project_path
+        self.project_path = str(Path(project_path).resolve())
         self.mcode = MCodeService()
         self.project_model = None
+        self.catalog_entries: tuple[RegistryEntry, ...] = ()
+        self._registry_thread: RegistryLoadThread | None = None
+        self._plan_thread: PreparePlanThread | None = None
+        self._generate_thread: GenerateThread | None = None
+        self._pending_generate = False
+        self._populating = False
+        self._build_ui()
+        self.refresh()
+
+    def _build_ui(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 20, 24, 20)
+        root.setSpacing(14)
+
+        project_card = CardWidget(self)
+        project_layout = QHBoxLayout(project_card)
+        project_layout.setContentsMargins(20, 16, 16, 16)
+        project_layout.setSpacing(12)
+        text = QVBoxLayout()
+        text.setSpacing(2)
+        self.title_label = TitleLabel("MCode 代码生成", project_card)
+        self.project_label = BodyLabel("正在解析工程…", project_card)
+        self.project_meta = CaptionLabel("", project_card)
+        text.addWidget(self.title_label)
+        text.addWidget(self.project_label)
+        text.addWidget(self.project_meta)
+        project_layout.addLayout(text, 1)
+        self.project_progress = ProgressRing(project_card)
+        self.project_progress.setFixedSize(22, 22)
+        self.project_progress.hide()
+        project_layout.addWidget(self.project_progress)
+        refresh_button = PushButton(FluentIcon.SYNC, "刷新", project_card)
+        refresh_button.clicked.connect(self.refresh)
+        project_layout.addWidget(refresh_button)
+        self.validate_button = PushButton(FluentIcon.ACCEPT, "校验工程", project_card)
+        self.validate_button.clicked.connect(self.validate_project)
+        project_layout.addWidget(self.validate_button)
+        root.addWidget(project_card)
+
+        filters = CardWidget(self)
+        filter_layout = QHBoxLayout(filters)
+        filter_layout.setContentsMargins(14, 12, 14, 12)
+        filter_layout.setSpacing(10)
+        self.search_edit = SearchLineEdit(filters)
+        self.search_edit.setPlaceholderText("搜索包名、说明或能力")
+        self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.textChanged.connect(self._apply_filters)
+        filter_layout.addWidget(self.search_edit, 1)
+        self.type_combo = ComboBox(filters)
+        self.type_combo.addItem("全部类型", userData="all")
+        for key, label in PACKAGE_TYPE_LABELS.items():
+            self.type_combo.addItem(label, userData=key)
+        self.type_combo.currentIndexChanged.connect(self._apply_filters)
+        filter_layout.addWidget(self.type_combo)
+        self.selection_label = CaptionLabel("0 个已选择", filters)
+        self.selection_label.setMinimumWidth(90)
+        self.selection_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        filter_layout.addWidget(self.selection_label)
+        root.addWidget(filters)
+
+        self.package_table = TableWidget(self)
+        self.package_table.setColumnCount(4)
+        self.package_table.setHorizontalHeaderLabels(["包", "版本", "类型", "说明"])
+        self.package_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.package_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.package_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.package_table.verticalHeader().hide()
+        header = self.package_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
+        self.package_table.itemChanged.connect(self._selection_changed)
+        root.addWidget(self.package_table, 1)
+
+        action_card = CardWidget(self)
+        action_layout = QHBoxLayout(action_card)
+        action_layout.setContentsMargins(16, 12, 16, 12)
+        action_layout.setSpacing(12)
+        self.status_label = BodyLabel("正在加载官方包索引…", action_card)
+        action_layout.addWidget(self.status_label, 1)
+        self.adopt_checkbox = CheckBox("迁移旧 USER 区域", action_card)
+        self.adopt_checkbox.setToolTip("仅接管同时含有可识别 USER BEGIN/END 标记的旧文件")
+        action_layout.addWidget(self.adopt_checkbox)
+        self.preview_button = PushButton(FluentIcon.VIEW, "应用并预览", action_card)
+        self.preview_button.clicked.connect(lambda: self.prepare_plan(False))
+        self.preview_button.setEnabled(False)
+        action_layout.addWidget(self.preview_button)
+        self.generate_button = PrimaryPushButton(FluentIcon.PLAY, "预览后生成", action_card)
+        self.generate_button.clicked.connect(lambda: self.prepare_plan(True))
+        self.generate_button.setEnabled(False)
+        action_layout.addWidget(self.generate_button)
+        root.addWidget(action_card)
+
+    def refresh(self) -> None:
         try:
-            self.project_model = self.mcode.inspect(project_path)
-        except MCodeError:
-            # The UI reports the actionable diagnostic when generation starts.
-            pass
-        
-        # 初始化页面缓存
-        self.page_cache = {}
-
-        self._init_ui()
-
-    def _init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setAlignment(Qt.AlignTop)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-
-        top_layout = self._create_top_layout()
-        main_layout.addLayout(top_layout)
-
-        content_layout = QHBoxLayout()
-        content_layout.setContentsMargins(0, 10, 0, 0)
-        main_layout.addLayout(content_layout)
-
-        # 左侧树形列表（使用qfluentwidgets的TreeWidget）
-        self.tree = TreeWidget()
-        self.tree.setHeaderHidden(True)
-        self.tree.setMaximumWidth(250)
-        self.tree.setBorderRadius(8)
-        self.tree.setBorderVisible(True)
-        content_layout.addWidget(self.tree)
-
-        # 右侧内容区
-        self.stack = QStackedWidget()
-        content_layout.addWidget(self.stack)
-
-        self._load_csv_and_build_tree()
-        self.tree.itemClicked.connect(self.on_tree_item_clicked)
-
-    def _create_top_layout(self):
-        """创建顶部横向布局"""
-        top_layout = QHBoxLayout()
-        top_layout.setAlignment(Qt.AlignTop)
-
-        # 项目名称标签
-        project_name = os.path.basename(self.project_path)
-        name_label = BodyLabel(f"项目名称: {project_name}")
-        name_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        top_layout.addWidget(name_label)
-
-        # FreeRTOS状态标签
-        freertos_label = BodyLabel(f"FreeRTOS: {self._get_freertos_status()}")
-        freertos_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        top_layout.addWidget(freertos_label)
-
-        # 自动生成FreeRTOS任务按钮
-        auto_task_btn = PushButton(FluentIcon.SEND, "配置FreeRTOS")
-        auto_task_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        auto_task_btn.clicked.connect(self.on_freertos_task_btn_clicked)
-        top_layout.addWidget(auto_task_btn, alignment=Qt.AlignRight)
-
-        # 配置并生成FreeRTOS任务按钮
-        freertos_task_btn = PushButton(FluentIcon.SETTING, "创建任务")
-        freertos_task_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        freertos_task_btn.clicked.connect(self.on_task_code_btn_clicked)
-        top_layout.addWidget(freertos_task_btn, alignment=Qt.AlignRight)
-
-        # 配置cmake按钮
-        cmake_btn = PushButton(FluentIcon.FOLDER, "配置cmake")
-        cmake_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        cmake_btn.clicked.connect(self.on_cmake_config_btn_clicked)
-        top_layout.addWidget(cmake_btn, alignment=Qt.AlignRight)
-
-        # 生成代码按钮
-        generate_btn = PushButton(FluentIcon.PROJECTOR,"生成代码")
-        generate_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        generate_btn.clicked.connect(self.generate_code)
-        top_layout.addWidget(generate_btn, alignment=Qt.AlignRight)
-
-        return top_layout
-
-    def on_task_code_btn_clicked(self):
-        # 检查是否开启 FreeRTOS
-        ioc_files = [f for f in os.listdir(self.project_path) if f.endswith('.ioc')]
-        if ioc_files:
-            ioc_path = os.path.join(self.project_path, ioc_files[0])
-            if not analyzing_ioc.is_freertos_enabled_from_ioc(ioc_path):
-                InfoBar.error(
-                    title="错误",
-                    content="请先在 .ioc 文件中开启 FreeRTOS，再进行任务配置！",
-                    parent=self,
-                    duration=3000
-                )
-                return
-        else:
-            InfoBar.error(
-                title="错误",
-                content="未找到 .ioc 文件，无法检测 FreeRTOS 状态！",
-                parent=self,
-                duration=3000
+            self.project_model = self.mcode.inspect(self.project_path)
+            model = self.project_model
+            self.project_label.setText(Path(self.project_path).name)
+            self.project_meta.setText(
+                f"{model.platform} · {model.mcu or 'MCU 未识别'} · "
+                f"FreeRTOS {'已启用' if model.freertos else '未启用'} · "
+                f"{len(model.peripherals)} 个外设"
             )
+        except MCodeError as exc:
+            self.project_label.setText(Path(self.project_path).name)
+            self.project_meta.setText(f"工程解析失败：{exc}")
+        self.load_registry()
+
+    def load_registry(self) -> None:
+        if self._registry_thread and self._registry_thread.isRunning():
             return
+        self._set_busy(True, "正在同步官方包索引…")
+        self._registry_thread = RegistryLoadThread(self.project_path, self)
+        self._registry_thread.completed.connect(self._registry_loaded)
+        self._registry_thread.failed.connect(self._operation_failed)
+        self._registry_thread.finished.connect(lambda: self._set_busy(False))
+        self._registry_thread.start()
 
-        # 直接弹出任务配置对话框并生成代码
-        dlg = DataInterface()
-        dlg.project_path = self.project_path
-        result = dlg.open_task_config_dialog()
-        # 生成任务成功后弹出 InfoBar 提示
-        if getattr(dlg, "task_generate_success", False):
-            InfoBar.success(
-                title="任务生成成功",
-                content="FreeRTOS任务代码已生成！",
-                parent=self,
-                duration=2000
-            )
+    def _registry_loaded(self, value: object) -> None:
+        self.catalog_entries = tuple(value)  # type: ignore[arg-type]
+        self._populate_table()
+        self.status_label.setText(f"官方索引已连接，共 {len(self.catalog_entries)} 个包")
 
-    def on_freertos_task_btn_clicked(self):
-        # 检查是否开启 FreeRTOS
-        ioc_files = [f for f in os.listdir(self.project_path) if f.endswith('.ioc')]
-        if ioc_files:
-            ioc_path = os.path.join(self.project_path, ioc_files[0])
-            if not analyzing_ioc.is_freertos_enabled_from_ioc(ioc_path):
-                InfoBar.error(
-                    title="错误",
-                    content="请先在 .ioc 文件中开启 FreeRTOS，再自动生成任务！",
-                    parent=self,
-                    duration=3000
-                )
-                return
-        else:
-            InfoBar.error(
-                title="错误",
-                content="未找到 .ioc 文件，无法检测 FreeRTOS 状态！",
-                parent=self,
-                duration=3000
+    def _populate_table(self) -> None:
+        config = MCodeConfig.load(Path(self.project_path))
+        selected = {
+            item.package_id
+            for item in config.packages
+            if item.enabled and item.package_id
+        }
+        required = PLATFORM_PACKAGES.get(config.platform)
+        if required:
+            selected.add(required)
+        self._populating = True
+        self.package_table.setRowCount(len(self.catalog_entries))
+        for row, entry in enumerate(self.catalog_entries):
+            item = QTableWidgetItem(entry.package_id)
+            item.setData(Qt.UserRole, entry.package_id)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if entry.package_id in selected else Qt.Unchecked)
+            if entry.package_id == required:
+                item.setFlags(item.flags() & ~Qt.ItemIsUserCheckable)
+                item.setToolTip("当前工程平台的必选包")
+            self.package_table.setItem(row, 0, item)
+            self.package_table.setItem(row, 1, QTableWidgetItem(entry.version))
+            type_name = PACKAGE_TYPE_LABELS.get(package_type(entry.package_id), package_type(entry.package_id))
+            self.package_table.setItem(row, 2, QTableWidgetItem(type_name))
+            description = entry.description or "暂无说明"
+            if entry.provides:
+                description += " · " + ", ".join(entry.provides)
+            self.package_table.setItem(row, 3, QTableWidgetItem(description))
+        self._populating = False
+        self._selection_changed()
+        self._apply_filters()
+        self.preview_button.setEnabled(bool(self.catalog_entries))
+        self.generate_button.setEnabled(bool(self.catalog_entries))
+
+    def _apply_filters(self) -> None:
+        query = self.search_edit.text().strip().lower()
+        selected_type = self.type_combo.currentData() or "all"
+        for row, entry in enumerate(self.catalog_entries):
+            haystack = " ".join((entry.package_id, entry.description, *entry.provides)).lower()
+            visible = (not query or query in haystack) and (
+                selected_type == "all" or package_type(entry.package_id) == selected_type
             )
+            self.package_table.setRowHidden(row, not visible)
+
+    def _selection_changed(self, *_args) -> None:
+        if self._populating:
             return
+        self.selection_label.setText(f"{len(self._selected_ids())} 个已选择")
 
-        # 自动生成FreeRTOS任务代码
-        from app.data_interface import DataInterface
-        di = DataInterface()
-        di.project_path = self.project_path
-        di.generate_freertos_task()
+    def _selected_ids(self) -> set[str]:
+        selected: set[str] = set()
+        for row in range(self.package_table.rowCount()):
+            item = self.package_table.item(row, 0)
+            if item and item.checkState() == Qt.Checked:
+                selected.add(str(item.data(Qt.UserRole)))
+        return selected
+
+    def prepare_plan(self, generate_after: bool) -> None:
+        if self._plan_thread and self._plan_thread.isRunning():
+            return
+        self._pending_generate = generate_after
+        self._set_busy(True, "正在安装所选包并计算生成计划…")
+        self._plan_thread = PreparePlanThread(
+            self.project_path,
+            self._selected_ids(),
+            {entry.package_id for entry in self.catalog_entries},
+            self.adopt_checkbox.isChecked(),
+            self,
+        )
+        self._plan_thread.completed.connect(self._plan_prepared)
+        self._plan_thread.failed.connect(self._operation_failed)
+        self._plan_thread.finished.connect(lambda: self._set_busy(False))
+        self._plan_thread.start()
+
+    def _plan_prepared(self, value: object) -> None:
+        plan: GenerationPlan = value  # type: ignore[assignment]
+        allow_generate = self._pending_generate and not plan.has_errors
+        dialog = GenerationPlanDialog(plan, allow_generate, self)
+        if plan.has_errors:
+            self.status_label.setText("计划包含冲突，请查看详情后修复")
+            dialog.exec()
+            return
+        self.status_label.setText("包配置已保存，生成计划可执行")
+        if dialog.exec() and allow_generate:
+            self._run_generate()
+
+    def _run_generate(self) -> None:
+        if self._generate_thread and self._generate_thread.isRunning():
+            return
+        self._set_busy(True, "正在原子写入生成文件…")
+        self._generate_thread = GenerateThread(
+            self.project_path,
+            self.adopt_checkbox.isChecked(),
+            self,
+        )
+        self._generate_thread.completed.connect(self._generation_completed)
+        self._generate_thread.failed.connect(self._operation_failed)
+        self._generate_thread.finished.connect(lambda: self._set_busy(False))
+        self._generate_thread.start()
+
+    def _generation_completed(self, value: object) -> None:
+        plan: GenerationPlan = value  # type: ignore[assignment]
+        self.status_label.setText(f"生成完成：{plan.changed_count} 个文件发生变化")
         InfoBar.success(
-            title="自动生成成功",
-            content="FreeRTOS任务代码已自动生成！",
+            title="MCode 生成完成",
+            content=f"已解析 {len(plan.packages)} 个包，写入 {plan.changed_count} 个文件。",
             parent=self,
-            duration=2000
+            position=InfoBarPosition.TOP,
+            duration=5000,
         )
 
-    def on_cmake_config_btn_clicked(self):
-        """配置cmake，自动更新CMakeLists.txt中的源文件列表"""
-        try:
-            from app.tools.update_cmake_sources import find_user_c_files, update_cmake_sources,update_cmake_includes
-            from pathlib import Path
-            
-            # 构建User目录和CMakeLists.txt路径，规范化路径分隔符
-            user_dir = os.path.normpath(os.path.join(self.project_path, "User"))
-            cmake_file = os.path.normpath(os.path.join(self.project_path, "CMakeLists.txt"))
-            
-            print(f"项目路径: {self.project_path}")
-            print(f"User目录路径: {user_dir}")
-            print(f"CMakeLists.txt路径: {cmake_file}")
-            
-            # 检查User目录是否存在
-            if not os.path.exists(user_dir):
-                InfoBar.error(
-                    title="错误",
-                    content=f"User目录不存在: {user_dir}",
-                    parent=self,
-                    duration=3000
-                )
-                return
-            
-            # 检查CMakeLists.txt是否存在
-            if not os.path.exists(cmake_file):
-                InfoBar.error(
-                    title="错误", 
-                    content=f"CMakeLists.txt文件不存在: {cmake_file}",
-                    parent=self,
-                    duration=3000
-                )
-                return
-            
-            # 查找User目录下的所有.c文件
-            print("开始查找.c文件...")
-            c_files = find_user_c_files(user_dir)
-            print(f"找到 {len(c_files)} 个.c文件")
-            
-            if not c_files:
-                InfoBar.warning(
-                    title="警告",
-                    content="在User目录下没有找到.c文件",
-                    parent=self,
-                    duration=3000
-                )
-                return
-            
-            # 更新CMakeLists.txt
-            print("开始更新CMakeLists.txt...")
-            sources_success = update_cmake_sources(cmake_file, c_files)
-            includes_success = update_cmake_includes(cmake_file, user_dir)
-            
-            if sources_success and includes_success:
-                InfoBar.success(
-                    title="配置成功",
-                    content=f"已成功更新CMakeLists.txt，共添加了 {len(c_files)} 个源文件",
-                    parent=self,
-                    duration=3000
-                )
-            elif sources_success:
-                InfoBar.warning(
-                    title="部分成功",
-                    content=f"源文件更新成功，但include路径更新失败",
-                    parent=self,
-                    duration=3000
-                )
-            elif includes_success:
-                InfoBar.warning(
-                    title="部分成功", 
-                    content=f"include路径更新成功，但源文件更新失败",
-                    parent=self,
-                    duration=3000
-                )
-            else:
-                InfoBar.error(
-                    title="配置失败",
-                    content="更新CMakeLists.txt失败，请检查文件格式",
-                    parent=self,
-                    duration=3000
-                )
-                
-        except ImportError as e:
-            print(f"导入错误: {e}")
+    def validate_project(self) -> None:
+        diagnostics = self.mcode.validate(self.project_path)
+        errors = [item for item in diagnostics if item.severity.value == "error"]
+        warnings = [item for item in diagnostics if item.severity.value == "warning"]
+        if errors:
             InfoBar.error(
-                title="导入错误",
-                content=f"无法导入cmake配置模块: {str(e)}",
+                title="工程校验失败",
+                content="；".join(item.message for item in errors),
                 parent=self,
-                duration=3000
+                position=InfoBarPosition.TOP,
+                duration=6000,
             )
-        except Exception as e:
-            print(f"cmake配置错误: {e}")
-            import traceback
-            traceback.print_exc()
-            InfoBar.error(
-                title="配置失败",
-                content=f"cmake配置过程中出现错误: {str(e)}",
-                parent=self,
-                duration=3000
-            )
-
-
-
-    def generate_code(self):
-        """通过 MCode 的唯一生成流水线安装选中包并生成代码。"""
-        try:
-            # 先收集所有页面名（从CSV配置文件读取）
-            from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
-            csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
-            all_class_names = []
-            if os.path.exists(csv_path):
-                with open(csv_path, newline='', encoding='utf-8') as f:
-                    reader = csv.reader(f)
-                    for row in reader:
-                        row = [cell.strip() for cell in row if cell.strip()]
-                        if not row:
-                            continue
-                        main_title = row[0]
-                        for sub in row[1:]:
-                            class_name = f"{main_title}_{sub}".replace("-", "_")
-                            all_class_names.append(class_name)
-
-            # 创建所有页面对象（无论是否点击过）
-            bsp_pages = []
-            component_pages = []
-            device_pages = []
-            for class_name in all_class_names:
-                widget = self._get_or_create_page(class_name)
-                if widget:
-                    if hasattr(widget, '_generate_bsp_code_internal') and widget not in bsp_pages:
-                        bsp_pages.append(widget)
-                    elif hasattr(widget, '_generate_component_code_internal') and widget not in component_pages:
-                        component_pages.append(widget)
-                    elif hasattr(widget, '_generate_device_code_internal') and widget not in device_pages:
-                        device_pages.append(widget)
-
-            algorithms = {"ahrs", "filter", "kalman_filter", "limiter", "mixer", "pid", "user_math"}
-            package_specs = ["mrobot.platform.stm32"]
-            bindings = {}
-            for page in bsp_pages:
-                if not getattr(page, "is_need_generate", lambda: False)():
-                    continue
-                name = getattr(page, "yaml_key", getattr(page, "peripheral_name", "")).lower()
-                if name:
-                    package_specs.append(f"mrobot.bsp.{name.replace('_', '-')}")
-                if hasattr(page, "_collect_configs"):
-                    for logical_name, instance in page._collect_configs():
-                        bindings[f"BSP_{name.upper()}_{logical_name.upper()}"] = instance
-            for page in component_pages:
-                if not getattr(page, "is_need_generate", lambda: False)():
-                    continue
-                name = getattr(page, "component_name", "").lower()
-                package_type = "algorithm" if name in algorithms else "component"
-                if name:
-                    package_specs.append(f"mrobot.{package_type}.{name.replace('_', '-')}")
-            for page in device_pages:
-                if not getattr(page, "is_need_generate", lambda: False)():
-                    continue
-                name = getattr(page, "device_name", "").lower()
-                if name:
-                    package_specs.append(f"mrobot.device.{name.replace('_', '-')}")
-
-            self.mcode.configure(self.project_path, tuple(sorted(set(package_specs))), bindings)
-            diagnostics = self.mcode.validate(self.project_path)
-            errors = [item for item in diagnostics if item.severity.value == "error"]
-            if errors:
-                raise MCodeError("\n".join(item.message for item in errors))
-            mcode_plan = self.mcode.generate(self.project_path, adopt_legacy=True)
-
-            combined_result = (
-                f"已解析 {len(mcode_plan.packages)} 个包，"
-                f"生成或更新 {mcode_plan.changed_count} 个文件。\n"
-                "所有输出均由 MCode 统一管理；用户 scaffold 不会被覆盖。"
-            )
-
-            InfoBar.success(
-                title="代码生成结果",
-                content=combined_result,
-                parent=self,
-                duration=5000
-            )
-
-        except ImportError as e:
-            InfoBar.error(
-                title="导入错误", 
-                content=f"模块导入失败: {str(e)}",
-                parent=self,
-                duration=3000
-            )
-        except Exception as e:
-            InfoBar.error(
-                title="生成失败",
-                content=f"代码生成过程中出现错误: {str(e)}",
-                parent=self,
-                duration=3000
-            )
-
-
-    def _get_freertos_status(self):
-        """获取FreeRTOS状态"""
-        try:
-            model = self.project_model or self.mcode.inspect(self.project_path)
-            return "开启" if model.freertos else "未开启"
-        except MCodeError as exc:
-            return f"解析失败: {exc}"
-
-    def _load_csv_and_build_tree(self):
-        from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
-        csv_path = os.path.join(CodeGenerator.get_assets_dir("User_code"), "config.csv")
-        print(f"加载CSV路径: {csv_path}")
-        if not os.path.exists(csv_path):
-            print(f"配置文件未找到: {csv_path}")
             return
-        self.tree.clear()
-        with open(csv_path, newline='', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                row = [cell.strip() for cell in row if cell.strip()]
-                if not row:
-                    continue
-                main_title = row[0]
-                main_item = QTreeWidgetItem([main_title])
-                
-                # 特殊处理 module
-                if main_title == 'module':
-                    # 扫描 module 目录
-                    module_dir = CodeGenerator.get_assets_dir("User_code/module")
-                    if os.path.exists(module_dir):
-                        for item in os.listdir(module_dir):
-                            item_path = os.path.join(module_dir, item)
-                            if not os.path.isdir(item_path):
-                                continue
-                            if item.startswith('.') or item == 'config':
-                                continue
-                            
-                            # 检查是否直接包含代码
-                            has_direct_code = any(
-                                f.endswith(('.c', '.h'))
-                                for f in os.listdir(item_path)
-                                if os.path.isfile(os.path.join(item_path, f))
-                            )
-                            
-                            if has_direct_code:
-                                # 直接的模块（如 cmd）
-                                sub_item = QTreeWidgetItem([item])
-                                main_item.addChild(sub_item)
-                            else:
-                                # 有子类型的模块（如 gimbal）
-                                module_type_item = QTreeWidgetItem([item])
-                                has_subtypes = False
-                                for subitem in os.listdir(item_path):
-                                    subitem_path = os.path.join(item_path, subitem)
-                                    if not os.path.isdir(subitem_path):
-                                        continue
-                                    if subitem.startswith('.'):
-                                        continue
-                                    has_code = any(
-                                        f.endswith(('.c', '.h'))
-                                        for f in os.listdir(subitem_path)
-                                        if os.path.isfile(os.path.join(subitem_path, f))
-                                    )
-                                    if has_code:
-                                        subtype_item = QTreeWidgetItem([subitem])
-                                        module_type_item.addChild(subtype_item)
-                                        has_subtypes = True
-                                
-                                if has_subtypes:
-                                    main_item.addChild(module_type_item)
-                else:
-                    # 其他模块保持原逻辑
-                    for sub in row[1:]:
-                        sub_item = QTreeWidgetItem([sub])
-                        main_item.addChild(sub_item)
-                
-                self.tree.addTopLevelItem(main_item)
-        self.tree.repaint()
+        InfoBar.success(
+            title="工程校验通过",
+            content=f"没有错误，{len(warnings)} 条警告。",
+            parent=self,
+            position=InfoBarPosition.TOP,
+            duration=3000,
+        )
 
-    def on_tree_item_clicked(self, item, column):
-        if item.parent():
-            # 判断层级
-            if item.parent().parent():
-                # 三级树（module/type/instance）
-                root_title = item.parent().parent().text(0)
-                type_title = item.parent().text(0)
-                instance_title = item.text(0)
-                class_name = f"{root_title}_{type_title}_{instance_title}".replace("-", "_")
-            else:
-                # 二级树（category/item）
-                main_title = item.parent().text(0)
-                sub_title = item.text(0)
-                class_name = f"{main_title}_{sub_title}".replace("-", "_")
-            
-            widget = self._get_or_create_page(class_name)
-            if widget:
-                self.stack.setCurrentWidget(widget)
+    def _operation_failed(self, message: str) -> None:
+        self.status_label.setText("操作失败")
+        InfoBar.error(
+            title="MCode 操作失败",
+            content=message,
+            parent=self,
+            position=InfoBarPosition.TOP,
+            duration=7000,
+        )
 
-    def _get_or_create_page(self, class_name):
-        """获取或创建页面"""
-        if class_name in self.page_cache:
-            return self.page_cache[class_name]
-        
-        # 如果是第一次创建组件页面，初始化组件管理器
-        if not hasattr(self, 'component_manager'):
-            from app.code_page.component_interface import ComponentManager
-            self.component_manager = ComponentManager()
-        
-        try:
-            if class_name.startswith('bsp_'):
-                # BSP页面
-                from app.code_page.bsp_interface import get_bsp_page
-                # 提取外设名，如 bsp_error_detect -> error_detect
-                periph_name = class_name[len('bsp_'):]  # 移除 .replace("_", " ")
-                page = get_bsp_page(periph_name, self.project_path)
-            elif class_name.startswith('component_'):
-                from app.code_page.component_interface import get_component_page
-                comp_name = class_name[len('component_'):]  # 移除 .replace("_", " ")
-                page = get_component_page(comp_name, self.project_path, self.component_manager)
-                self.component_manager.register_component(page.component_name, page)
-            elif class_name.startswith('device_'):
-                # Device页面
-                from app.code_page.device_interface import get_device_page
-                device_name = class_name[len('device_'):]  # 移除 device_ 前缀
-                page = get_device_page(device_name, self.project_path)
-            elif class_name.startswith('module_'):
-                # Module页面
-                from app.code_page.module_interface import get_module_page
-                # 解析: module_type 或 module_type_instance
-                parts = class_name[len('module_'):].split('_', 1)
-                if len(parts) == 2:
-                    module_type = parts[0]
-                    instance = parts[1]
-                    page = get_module_page(module_type, instance, self.project_path, self)
-                else:
-                    module_type = parts[0]
-                    page = get_module_page(module_type, None, self.project_path, self)
-            else:
-                print(f"未知的页面类型: {class_name}")
-                return None
-            
-            self.page_cache[class_name] = page
-            self.stack.addWidget(page)
-            return page
-        except Exception as e:
-            print(f"创建页面 {class_name} 失败: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
+    def _set_busy(self, busy: bool, message: str | None = None) -> None:
+        self.project_progress.setVisible(busy)
+        self.preview_button.setEnabled(not busy and bool(self.catalog_entries))
+        self.generate_button.setEnabled(not busy and bool(self.catalog_entries))
+        self.validate_button.setEnabled(not busy)
+        if message:
+            self.status_label.setText(message)

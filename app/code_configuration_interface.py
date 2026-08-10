@@ -1,334 +1,136 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QStackedWidget, QSizePolicy
+from __future__ import annotations
+
+from pathlib import Path
+
 from PyQt5.QtCore import Qt
-from qfluentwidgets import PushSettingCard, FluentIcon, TabBar
-from qfluentwidgets import TitleLabel, BodyLabel, PushButton, FluentIcon
-from PyQt5.QtWidgets import QFileDialog, QHBoxLayout
-from qfluentwidgets import ComboBox, PrimaryPushButton, SubtitleLabel
-from qfluentwidgets import MessageBoxBase, InfoBar
-import os
-import sys
-import shutil
-import tempfile
-from .function_fit_interface import FunctionFitInterface
-from .tools.update_code import update_code
+from PyQt5.QtWidgets import QFileDialog, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget
+from qfluentwidgets import BodyLabel, FluentIcon, InfoBar, PushButton, TabBar, TitleLabel
+
+from mcode.errors import MCodeError
+from mcode.service import MCodeService
+
 from .code_generate_interface import CodeGenerateInterface
-from .tools.code_generator import CodeGenerator
-
-
-class PresetIocDialog(MessageBoxBase):
-    """预设IOC选择对话框 - Fluent设计风格"""
-    def __init__(self, preset_files, parent=None):
-        super().__init__(parent)
-        self.preset_files = preset_files
-        self.titleLabel = SubtitleLabel("选择要使用的IOC模版")
-        
-        # 选择下拉框
-        self.select_label = BodyLabel("预设IOC：")
-        self.preset_combo = ComboBox()
-        
-        for preset in preset_files:
-            self.preset_combo.addItem(preset['name'])
-        
-        # 添加控件到布局
-        self.viewLayout.addWidget(self.titleLabel)
-        self.viewLayout.addSpacing(12)
-        
-        select_layout = QHBoxLayout()
-        select_layout.addWidget(self.select_label)
-        select_layout.addWidget(self.preset_combo, 1)
-        self.viewLayout.addLayout(select_layout)
-        
-        # 设置对话框属性
-        self.widget.setMinimumWidth(400)
-        self.yesButton.setText("保存到")
-        self.cancelButton.setText("取消")
-    
-    def get_selected_preset(self):
-        """获取选中的预设"""
-        selected_index = self.preset_combo.currentIndex()
-        if 0 <= selected_index < len(self.preset_files):
-            return self.preset_files[selected_index]
-        return None
+from .function_fit_interface import FunctionFitInterface
 
 
 class CodeConfigurationInterface(QWidget):
-    def __init__(self, parent=None):
+    """Project picker and tab host for the unified MCode frontend."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("CodeConfigurationInterface")
+        self.mcode = MCodeService()
+
         self.vBoxLayout = QVBoxLayout(self)
         self.vBoxLayout.setAlignment(Qt.AlignTop)
-        self.vBoxLayout.setContentsMargins(10, 0, 10, 10) # 设置外边距
-
-        # 顶部标签栏，横向拉伸
+        self.vBoxLayout.setContentsMargins(10, 0, 10, 10)
         self.tabBar = TabBar(self)
         self.tabBar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.vBoxLayout.addWidget(self.tabBar)
-
         self.stackedWidget = QStackedWidget(self)
         self.vBoxLayout.addWidget(self.stackedWidget)
 
-        # 初始主页面
         self.mainPage = QWidget(self)
-        mainLayout = QVBoxLayout(self.mainPage)
-        mainLayout.setAlignment(Qt.AlignTop)
-        mainLayout.setSpacing(28) # 设置间距
-        mainLayout.setContentsMargins(48, 48, 48, 48) # 设置内容边距
-
-        #添加空行
-        title = TitleLabel("MRobot 代码生成")
+        main_layout = QVBoxLayout(self.mainPage)
+        main_layout.setAlignment(Qt.AlignCenter)
+        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(48, 48, 48, 48)
+        title = TitleLabel("MCode 代码生成", self.mainPage)
         title.setAlignment(Qt.AlignCenter)
-        mainLayout.addWidget(title)
-
-        subtitle = BodyLabel("请选择您的由CUBEMX生成的工程路径（.ico所在的目录），然后开启代码之旅！")
+        main_layout.addWidget(title)
+        subtitle = BodyLabel(
+            "选择 STM32CubeMX 或其他 MCode 工程，直接从官方 registry 安装模块、预览计划并安全生成。",
+            self.mainPage,
+        )
         subtitle.setAlignment(Qt.AlignCenter)
-        mainLayout.addWidget(subtitle)
+        subtitle.setWordWrap(True)
+        main_layout.addWidget(subtitle)
+        detail = BodyLabel(
+            "GUI、CLI、VS Code 和 AI 共用同一个 MCodeService；桌面端不再携带或更新旧模板副本。",
+            self.mainPage,
+        )
+        detail.setAlignment(Qt.AlignCenter)
+        detail.setWordWrap(True)
+        main_layout.addWidget(detail)
+        self.choose_btn = PushButton(FluentIcon.FOLDER, "选择工程目录", self.mainPage)
+        self.choose_btn.setFixedWidth(220)
+        self.choose_btn.clicked.connect(self.choose_project_folder)
+        main_layout.addWidget(self.choose_btn, alignment=Qt.AlignCenter)
 
-        desc = BodyLabel("支持自动配置和生成任务，自主选择模块代码倒入，自动识别cubemx配置！")
-        desc.setAlignment(Qt.AlignCenter)
-        mainLayout.addWidget(desc)
-
-        mainLayout.addSpacing(18)
-
-        self.choose_btn = PushButton(FluentIcon.FOLDER, "选择项目路径")
-        self.choose_btn.setFixedWidth(200)
-        mainLayout.addWidget(self.choose_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        self.update_template_btn = PushButton(FluentIcon.SYNC, "更新代码库")
-        self.update_template_btn.setFixedWidth(200)
-        mainLayout.addWidget(self.update_template_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        self.preset_ioc_btn = PushButton(FluentIcon.LIBRARY, "获取预设IOC")
-        self.preset_ioc_btn.setFixedWidth(200)
-        mainLayout.addWidget(self.preset_ioc_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        mainLayout.addSpacing(10)
-        mainLayout.addStretch()
-
-        # 添加主页面到堆叠窗口
         self.addSubInterface(self.mainPage, "mainPage", "代码生成主页")
-
-        self.setLayout(self.vBoxLayout)
-
-        # 信号连接
         self.stackedWidget.currentChanged.connect(self.onCurrentIndexChanged)
         self.tabBar.tabCloseRequested.connect(self.onCloseTab)
-        self.choose_btn.clicked.connect(self.choose_project_folder)  # 启用选择项目路径按钮
-        self.update_template_btn.clicked.connect(self.on_update_template)
-        self.preset_ioc_btn.clicked.connect(self.use_preset_ioc)  # 启用预设工程按钮
 
-
-    def on_update_template(self):
-        def info(parent):
-            InfoBar.success(
-                title="更新成功",
-                content="用户模板已更新到最新版本！",
-                parent=parent,
-                duration=2000
-            )
-        def error(parent, msg):
-            InfoBar.error(
-                title="更新失败",
-                content=f"用户模板更新失败: {msg}",
-                parent=parent,
-                duration=3000
-            )
-        update_code(parent=self, info_callback=info, error_callback=error)
-
-    def get_preset_ioc_files(self):
-        """获取预设的ioc文件列表"""
+    def _is_project(self, folder_path: str) -> tuple[bool, str]:
         try:
-            # 使用CodeGenerator统一的assets路径获取方法
-            preset_ioc_dir = CodeGenerator.get_assets_dir("User_code/ioc")
-            
-            if not os.path.exists(preset_ioc_dir):
-                return []
-            
-            ioc_files = []
-            for filename in os.listdir(preset_ioc_dir):
-                if filename.endswith('.ioc'):
-                    ioc_files.append({
-                        'name': os.path.splitext(filename)[0],
-                        'filename': filename,
-                        'path': os.path.join(preset_ioc_dir, filename)
-                    })
-            return ioc_files
-        except Exception as e:
-            print(f"获取预设ioc文件失败: {e}")
-            return []
+            model = self.mcode.inspect(folder_path)
+            return True, f"{model.platform} · {model.mcu or 'MCU 未识别'}"
+        except MCodeError as exc:
+            return False, str(exc)
 
-    def use_preset_ioc(self):
-        """使用预设ioc文件"""
-        preset_files = self.get_preset_ioc_files()
-        if not preset_files:
-            InfoBar.warning(
-                title="无预设工程",
-                content="未找到可用的预设工程文件",
-                parent=self,
-                duration=2000
-            )
+    def open_project_from_path(self, folder_path: str) -> None:
+        root = Path(folder_path).expanduser().resolve()
+        if not root.is_dir():
+            InfoBar.error(title="工程不存在", content=f"目录不存在：{root}", parent=self, duration=3000)
             return
-
-        # 创建Fluent风格的对话框
-        dialog = PresetIocDialog(preset_files, self)
-        if dialog.exec():
-            selected_preset = dialog.get_selected_preset()
-            if selected_preset:
-                self.save_preset_template(selected_preset)
-
-    def save_preset_template(self, preset_info):
-        """保存预设模板到用户指定位置"""
-        try:
-            # 让用户选择保存位置
-            save_dir = QFileDialog.getExistingDirectory(
-                self, 
-                f"选择保存 {preset_info['name']} 模板的位置",
-                os.path.expanduser("~")
-            )
-            
-            if not save_dir:
-                return
-            
-            # 复制ioc文件到用户选择的目录
-            target_path = os.path.join(save_dir, preset_info['filename'])
-            
-            # 检查目标文件是否已存在
-            if os.path.exists(target_path):
-                from qfluentwidgets import Dialog
-                dialog = Dialog("文件已存在", f"目标位置已存在 {preset_info['filename']}，是否覆盖？", self)
-                if dialog.exec() != Dialog.Accepted:
-                    return
-            
-            # 复制文件
-            shutil.copy2(preset_info['path'], target_path)
-            
-            InfoBar.success(
-                title="模板保存成功",
-                content=f"预设模板 {preset_info['name']} 已保存到:\n{target_path}",
-                parent=self,
-                duration=3000
-            )
-                
-        except Exception as e:
-            InfoBar.error(
-                title="保存失败",
-                content=f"保存预设模板失败: {str(e)}",
-                parent=self,
-                duration=3000
-            )
-
-    def open_project_from_path(self, folder_path):
-        """从指定路径打开工程"""
-        try:
-            if not os.path.exists(folder_path):
-                return
-                
-            ioc_files = [f for f in os.listdir(folder_path) if f.endswith('.ioc')]
-            if ioc_files:
-                # 检查是否已存在 codeGenPage 标签页
-                for i in range(self.stackedWidget.count()):
-                    widget = self.stackedWidget.widget(i)
-                    if widget is not None and widget.objectName() == "codeGenPage":
-                        # 如果已存在，则切换到该标签页，并更新路径显示
-                        if hasattr(widget, "project_path"):
-                            widget.project_path = folder_path
-                            if hasattr(widget, "refresh"):
-                                widget.refresh()
-                        self.stackedWidget.setCurrentWidget(widget)
-                        self.tabBar.setCurrentTab("codeGenPage")
-                        return
-                
-                # 不存在则新建
-                code_gen_page = CodeGenerateInterface(folder_path, self)
-                self.addSubInterface(code_gen_page, "codeGenPage", "代码生成")
-                self.stackedWidget.setCurrentWidget(code_gen_page)
-                self.tabBar.setCurrentTab("codeGenPage")
-            else:
-                InfoBar.error(
-                    title="未找到.ioc文件",
-                    content="所选文件夹不是有效的CUBEMX工程目录",
-                    parent=self,
-                    duration=3000
-                )
-        except Exception as e:
-            InfoBar.error(
-                title="打开工程失败",
-                content=f"打开工程失败: {str(e)}",
-                parent=self,
-                duration=3000
-            )
-
-    def choose_project_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "选择CUBEMX工程目录")
-        if not folder:
+        valid, message = self._is_project(str(root))
+        if not valid:
+            InfoBar.error(title="无法识别工程", content=message, parent=self, duration=5000)
             return
-        ioc_files = [f for f in os.listdir(folder) if f.endswith('.ioc')]
-        if ioc_files:
-            # 检查是否已存在 codeGenPage 标签页
-            for i in range(self.stackedWidget.count()):
-                widget = self.stackedWidget.widget(i)
-                if widget is not None and widget.objectName() == "codeGenPage":
-                    # 如果已存在，则切换到该标签页，并更新路径显示
-                    if hasattr(widget, "project_path"):
-                        widget.project_path = folder
-                        if hasattr(widget, "refresh"):
-                            widget.refresh()
-                    self.stackedWidget.setCurrentWidget(widget)
-                    self.tabBar.setCurrentTab("codeGenPage")
-                    return
-            # 不存在则新建
-            code_gen_page = CodeGenerateInterface(folder, self)
-            self.addSubInterface(code_gen_page, "codeGenPage", "代码生成")
-            self.stackedWidget.setCurrentWidget(code_gen_page)
-            self.tabBar.setCurrentTab("codeGenPage")
-        else:
-            InfoBar.error(
-                title="未找到.ioc文件",
-                content="所选文件夹不是有效的CUBEMX工程目录，请重新选择。",
-                parent=self,
-                duration=3000
-            )
+        for index in range(self.stackedWidget.count()):
+            widget = self.stackedWidget.widget(index)
+            if widget is not None and widget.objectName() == "codeGenPage":
+                self.stackedWidget.removeWidget(widget)
+                self.tabBar.removeTab(index)
+                widget.deleteLater()
+                break
+        page = CodeGenerateInterface(str(root), self)
+        self.addSubInterface(page, "codeGenPage", root.name)
+        self.stackedWidget.setCurrentWidget(page)
+        self.tabBar.setCurrentTab("codeGenPage")
+        InfoBar.success(title="工程已打开", content=message, parent=self, duration=2500)
 
+    def choose_project_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "选择 MCode 工程目录")
+        if folder:
+            self.open_project_from_path(folder)
 
-    def addSubInterface(self, widget: QWidget, objectName: str, text: str):
+    def addSubInterface(self, widget: QWidget, objectName: str, text: str) -> None:
         widget.setObjectName(objectName)
         self.stackedWidget.addWidget(widget)
         self.tabBar.addTab(
             routeKey=objectName,
             text=text,
-            onClick=lambda: self.stackedWidget.setCurrentWidget(widget)
+            onClick=lambda: self.stackedWidget.setCurrentWidget(widget),
         )
 
-    def onCurrentIndexChanged(self, index):
+    def onCurrentIndexChanged(self, index: int) -> None:
         widget = self.stackedWidget.widget(index)
-        self.tabBar.setCurrentTab(widget.objectName())
+        if widget is not None:
+            self.tabBar.setCurrentTab(widget.objectName())
 
-    def onAddNewTab(self):
-        pass  # 可自定义添加新标签页逻辑
-
-    def onCloseTab(self, index: int):
+    def onCloseTab(self, index: int) -> None:
         item = self.tabBar.tabItem(index)
         widget = self.findChild(QWidget, item.routeKey())
-        # 禁止关闭主页
-        if widget.objectName() == "mainPage":
+        if widget is None or widget.objectName() == "mainPage":
             return
         self.stackedWidget.removeWidget(widget)
         self.tabBar.removeTab(index)
         widget.deleteLater()
 
-    def open_fit_tab(self):
-        # 检查是否已存在标签页，避免重复添加
-        for i in range(self.stackedWidget.count()):
-            widget = self.stackedWidget.widget(i)
+    def open_fit_tab(self) -> None:
+        for index in range(self.stackedWidget.count()):
+            widget = self.stackedWidget.widget(index)
             if widget.objectName() == "fitPage":
                 self.stackedWidget.setCurrentWidget(widget)
                 self.tabBar.setCurrentTab("fitPage")
                 return
-        fit_page = FunctionFitInterface(self)
-        self.addSubInterface(fit_page, "fitPage", "曲线拟合")
-        self.stackedWidget.setCurrentWidget(fit_page)
+        page = FunctionFitInterface(self)
+        self.addSubInterface(page, "fitPage", "曲线拟合")
+        self.stackedWidget.setCurrentWidget(page)
         self.tabBar.setCurrentTab("fitPage")
 
-    def open_ai_tab(self):
+    def open_ai_tab(self) -> None:
         window = self.window()
         if hasattr(window, "open_ai_workspace"):
             window.open_ai_workspace()

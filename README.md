@@ -171,7 +171,7 @@ python MRobot.py
 5. 查看生成计划和冲突信息。
 6. 确认后调用同一服务生成文件。
 
-旧的 `app/code_page/` 页面仍用于收集部分选择，但新的解析和生成规则不得写回 GUI 页面或 `app/tools/code_generator.py`。
+桌面端现在直接浏览官方 registry，并通过 `MCodeService` 完成包安装、删除、计划预览和生成；主仓库不再保留第二套模板或生成器。
 
 ## 使用 AI 工作台
 
@@ -296,6 +296,14 @@ mcode generate /path/to/project --adopt
 - `module`：云台、底盘、发射等功能模块。
 - `task`：任务入口和调度模板。
 
+本次从旧模板树拆出的较大代码组已经有独立仓库：
+
+- [mrobot-component-cpp](https://github.com/goldenfishs/mrobot-component-cpp)：容器、控制器、滤波、数学、轨迹、计时和 CMSIS-DSP 工具。
+- [mrobot-component-mrlink](https://github.com/goldenfishs/mrobot-component-mrlink)：UART、USB、FDCAN 通道上的类型化帧协议。
+- [mrobot-device-motor-cpp](https://github.com/goldenfishs/mrobot-device-motor-cpp)：DM、LZ、RM 电机的 C++ 类型层、控制器和软限位学习。
+
+基础 device/motor 包的配套升级通过各自仓库的 Draft PR 审核。新包进入 registry 前仍需完成 tag、索引更新和板级验证。
+
 常用包命令：
 
 ```bash
@@ -307,7 +315,7 @@ mcode package create mrobot.component.example --type component
 mcode package board board.ioc mrobot.board.my-board
 ```
 
-新模块应优先创建独立仓库和清单，不再继续扩充本仓库中的旧 `assets/User_code` 目录。
+每个模块使用独立仓库和清单发布。主仓库中的旧 `assets/User_code` 已删除，运行时只从 registry 解析版本化包。
 
 ## 统一接口与前端
 
@@ -443,7 +451,7 @@ python tools/build_desktop.py
 
 - STM32CubeMX 之外的平台尚未达到同等原生解析深度。
 - 尚未保证自动修改所有 CubeIDE `.cproject`、Keil、CMake 和 Makefile 工程元数据。
-- GUI 包管理仍在从旧选择页面迁移到完整 registry 浏览、依赖树和冲突界面。
+- GUI 已提供 registry 浏览、类型筛选、包选择和生成计划确认；依赖树可视化、版本切换和包更新提示仍待增强。
 - MCP 尚未覆盖 CLI/Service 的所有包管理和迁移参数。
 - AI 工作台当前只实现 OpenAI-compatible Chat Completions；尚无原生 Anthropic/Responses adapter 和外部 MCP 连接器。
 - AI 工具刻意保持只读，不能自动生成、构建、烧录或执行任意系统命令。
@@ -456,8 +464,8 @@ python tools/build_desktop.py
 
 1. 补充真实 F4/H7/G4/L4/U5 CubeMX 工程和交叉编译矩阵。
 2. 完成 CubeIDE、CMake、Makefile 的生成文件接入。
-3. 在 GUI 中提供 plan、diff、冲突和 adopt 决策界面。
-4. 完整接入 registry 搜索、版本选择、依赖树和能力提供者。
+3. 在现有 plan/冲突/adopt 确认界面中增加逐文件 diff。
+4. 为 registry 浏览器增加版本选择、依赖树和能力提供者视图。
 5. 验证 STM32CubeProgrammer、OpenOCD、J-Link、ST-Link action profile。
 6. 使用真实板卡完成构建、烧录、复位和串口 smoke test。
 7. STM32 主路径稳定后，再逐个平台实现原生 SDK importer。

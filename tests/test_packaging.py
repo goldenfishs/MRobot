@@ -13,9 +13,9 @@ def test_desktop_dependencies_cover_runtime_imports() -> None:
 
 def test_bundle_contains_complete_assets_and_uses_meipass() -> None:
     spec = (ROOT / "MRobot.spec").read_text(encoding="utf-8")
-    generator = (ROOT / "app" / "tools" / "code_generator.py").read_text(encoding="utf-8")
+    home = (ROOT / "app" / "home_interface.py").read_text(encoding="utf-8")
     assert "('assets', 'assets')" in spec
-    assert "getattr(sys, '_MEIPASS'" in generator
+    assert "hasattr(sys, '_MEIPASS')" in home
 
 
 def test_frozen_runtime_does_not_write_inside_app_bundle() -> None:
