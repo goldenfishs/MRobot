@@ -7,6 +7,8 @@ on:
 jobs:
   core:
     runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
         with:
@@ -14,6 +16,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install ./mcode pytest PyYAML requests packaging
+      - run: python -m pip install -e ".[dev]"
       - run: python -m pytest
+      - run: python -m pytest -q --import-mode=importlib tests
+        working-directory: mcode
       - run: python -m compileall -q app tools MRobot.py
