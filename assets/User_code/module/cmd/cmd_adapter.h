@@ -45,6 +45,7 @@ typedef struct {
  * - bool CMD_DR16_IsOnline(void *data);
  */
 #define CMD_DECLARE_ADAPTER(NAME, var, TYPE) \
+    extern TYPE var; \
     int8_t CMD_##NAME##_Init(void *data); \
     int8_t CMD_##NAME##_GetInput(void *data, CMD_RawInput_t *output); \
     bool CMD_##NAME##_IsOnline(void *data);
@@ -87,27 +88,6 @@ typedef struct {
     CMD_DECLARE_ADAPTER(VT13, vt13, VT13_t)
     #define CMD_RC_ADAPTER_NAME VT13
     #define CMD_RC_ADAPTER_VAR  vt13
-#endif
-
-/* ========================================================================== */
-/*                        NUC/AI适配器配置                                     */
-/* ========================================================================== */
-#if CMD_ENABLE_SRC_NUC
-  #include "module/vision_bridge.h"
-  extern AI_cmd_t cmd_ai;
-  int8_t CMD_NUC_AdapterInit(void *data);
-  int8_t CMD_NUC_GetInput(void *data, CMD_RawInput_t *output);
-  bool CMD_NUC_IsOnline(void *data);
-#endif
-
-/* ========================================================================== */
-/*                        REF/裁判系统适配器配置                                */
-/* ========================================================================== */
-#if CMD_ENABLE_SRC_REF
-  extern CMD_RawInput_REF_t cmd_ref;
-  int8_t CMD_REF_AdapterInit(void *data);
-  int8_t CMD_REF_GetInput(void *data, CMD_RawInput_t *output);
-  bool CMD_REF_IsOnline(void *data);
 #endif
 
 /* ========================================================================== */

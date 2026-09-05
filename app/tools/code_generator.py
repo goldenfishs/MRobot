@@ -97,11 +97,19 @@ class CodeGenerator:
             assets_dir = ""
             
             if getattr(sys, 'frozen', False):
-                # PyInstaller 将只读模板放在 _MEIPASS；macOS app 中该路径
-                # 指向 Contents/Frameworks，并通过符号链接连接 Resources。
-                bundle_root = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-                assets_dir = os.path.join(bundle_root, "assets")
-                print(f"打包环境：使用内置资源目录: {assets_dir}")
+                # 打包后的环境 - 始终使用可执行文件所在目录
+                # 这样可以使用安装目录下的文件，而不是打包进去的文件
+                exe_dir = os.path.dirname(sys.executable)
+                assets_dir = os.path.join(exe_dir, "assets")
+                print(f"打包环境：使用可执行文件目录: {assets_dir}")
+                
+                # 如果assets目录不存在，创建它
+                if not os.path.exists(assets_dir):
+                    try:
+                        os.makedirs(assets_dir, exist_ok=True)
+                        print(f"创建assets目录: {assets_dir}")
+                    except Exception as e:
+                        print(f"创建assets目录失败: {e}")
             else:
                 # 开发环境
                 current_dir = os.path.dirname(os.path.abspath(__file__))

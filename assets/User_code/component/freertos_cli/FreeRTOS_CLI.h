@@ -28,9 +28,6 @@
 #ifndef COMMAND_INTERPRETER_H
 #define COMMAND_INTERPRETER_H
 
-#include <stddef.h>
-#include "FreeRTOS.h"
-
 /* This config should be defined in FreeRTOSConfig.h. But due to the limition of CubeMX I put it here. */
 #define configCOMMAND_INT_MAX_OUTPUT_SIZE  512
 

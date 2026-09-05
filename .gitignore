@@ -10,18 +10,17 @@
 *.lst
 *.ini
 *.iex
-*.pyc
 *.sct
 *.scvd
 *.uvguix
 *.dbg*
 *.uvguix.*
 .mxproject
-
+ 
 RTE/
 Templates/
 Examples/
-
+ 
 !*.uvprojx
 !*.h
 !*.c
@@ -32,14 +31,5 @@ Examples/
 
 build/
 dist/
-release-dist/
 *.spec
 *.exe
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.venv/
-venv/
-*.egg-info/
-.mrobot/

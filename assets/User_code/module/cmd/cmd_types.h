@@ -6,7 +6,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "cmd_feature.h"          /* 功能特性开关 */
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,94 +23,22 @@ extern "C" {
 /* ========================================================================== */
 /*                            输入源配置宏表                                    */
 /* ========================================================================== */
-/*
- * 使用方法：在 cmd_feature.h 中设置各 CMD_ENABLE_SRC_xxx 宏。
- * 格式: X(枚举名, 适配器初始化函数, 获取数据函数)
+/* 
+ * 使用方法：在config中定义需要启用的输入源
+ * 格式: X(枚举名, 优先级, 适配器初始化函数, 获取数据函数)
  */
-
-/* 各输入源条件展开辅助宏 */
-#if CMD_ENABLE_SRC_RC
-  #define _X_SRC_RC(X)   X(RC,  CMD_RC_AdapterInit,  CMD_RC_GetInput)
-#else
-  #define _X_SRC_RC(X)
-#endif
-
-#if CMD_ENABLE_SRC_PC
-  #define _X_SRC_PC(X)   X(PC,  CMD_PC_AdapterInit,  CMD_PC_GetInput)
-#else
-  #define _X_SRC_PC(X)
-#endif
-
-#if CMD_ENABLE_SRC_NUC
-  #define _X_SRC_NUC(X)  X(NUC, CMD_NUC_AdapterInit, CMD_NUC_GetInput)
-#else
-  #define _X_SRC_NUC(X)
-#endif
-
-#if CMD_ENABLE_SRC_REF
-  #define _X_SRC_REF(X)  X(REF, CMD_REF_AdapterInit, CMD_REF_GetInput)
-#else
-  #define _X_SRC_REF(X)
-#endif
-
 #define CMD_INPUT_SOURCE_TABLE(X) \
-    _X_SRC_RC(X)  \
-    _X_SRC_PC(X)  \
-    _X_SRC_NUC(X) \
-    _X_SRC_REF(X)
-
-/* 各输出模块条件展开辅助宏 */
-#if CMD_ENABLE_MODULE_CHASSIS
-  #define _X_MOD_CHASSIS(X)  X(CHASSIS, Chassis_CMD_t, chassis)
-#else
-  #define _X_MOD_CHASSIS(X)
-#endif
-
-#if CMD_ENABLE_MODULE_GIMBAL
-  #define _X_MOD_GIMBAL(X)   X(GIMBAL,  Gimbal_CMD_t,  gimbal)
-#else
-  #define _X_MOD_GIMBAL(X)
-#endif
-
-#if CMD_ENABLE_MODULE_SHOOT
-  #define _X_MOD_SHOOT(X)    X(SHOOT,   Shoot_CMD_t,   shoot)
-#else
-  #define _X_MOD_SHOOT(X)
-#endif
-
-#if CMD_ENABLE_MODULE_TRACK
-  #define _X_MOD_TRACK(X)    X(TRACK,   Track_CMD_t,   track)
-#else
-  #define _X_MOD_TRACK(X)
-#endif
-
-#if CMD_ENABLE_MODULE_ARM
-  #define _X_MOD_ARM(X)      X(ARM,     Arm_CMD_t,     arm)
-#else
-  #define _X_MOD_ARM(X)
-#endif
-
-#if CMD_ENABLE_MODULE_REFUI
-  #define _X_MOD_REFUI(X)    X(REFUI,   Referee_UI_CMD_t, refui)
-#else
-  #define _X_MOD_REFUI(X)
-#endif
-
-#if CMD_ENABLE_MODULE_BALANCE_CHASSIS
-  #define _X_MOD_BALANCE_CHASSIS(X)  X(BALANCE_CHASSIS, Chassis_CMD_t, balance_chassis)
-#else
-  #define _X_MOD_BALANCE_CHASSIS(X)
-#endif
+    X(RC,  CMD_RC_AdapterInit,  CMD_RC_GetInput)  \
+    X(PC,  CMD_PC_AdapterInit,  CMD_PC_GetInput)  \
+    X(NUC, CMD_NUC_AdapterInit, CMD_NUC_GetInput) \
+    X(REF, CMD_REF_AdapterInit, CMD_REF_GetInput)
 
 /* 输出模块配置宏表 */
 #define CMD_OUTPUT_MODULE_TABLE(X) \
-    _X_MOD_CHASSIS(X) \
-    _X_MOD_GIMBAL(X)  \
-    _X_MOD_SHOOT(X)   \
-    _X_MOD_TRACK(X)   \
-    _X_MOD_ARM(X)     \
-    _X_MOD_REFUI(X)   \
-    _X_MOD_BALANCE_CHASSIS(X) \
+    X(CHASSIS, Chassis_CMD_t, chassis) \
+    X(GIMBAL,  Gimbal_CMD_t,  gimbal)  \
+    X(SHOOT,   Shoot_CMD_t,   shoot)
+
 
 /* ========================================================================== */
 /*                              输入源枚举                                      */
@@ -165,6 +92,11 @@ typedef enum {
     CMD_KEY_NUM
 } CMD_KeyIndex_t;
 
+/* 裁判系统数据 */
+typedef struct {
+    uint8_t game_status;       /* 比赛状态 */
+} CMD_Referee_t;
+
 typedef struct {
   CMD_Joystick_t joy_left;   /* 左摇杆 */
   CMD_Joystick_t joy_right;  /* 右摇杆 */
@@ -177,95 +109,60 @@ typedef struct {
   CMD_Keyboard_t keyboard;
 } CMD_RawInput_PC_t;
 
-/* AI输入数据 */
 typedef struct {
-  uint8_t mode;
-  struct {
-    struct {
-      float yaw;
-      float pit;
-    } setpoint;
-    struct {
-      float pit;
-      float yaw;
-    } accl;
-    struct {
-      float pit;
-      float yaw;
-    } vel;
-  } gimbal;
+  int a;
 } CMD_RawInput_NUC_t;
 
-#if CMD_ENABLE_SRC_REF
-#include "device/referee_proto_types.h" 
-/* 裁判系统原始输入，包含需转发给各模块的完整子集 */
 typedef struct {
-    Referee_ForChassis_t chassis;
-    Referee_ForShoot_t   shoot;
-    Referee_ForCap_t     cap;
-    Referee_ForAI_t      ai;
+  CMD_Referee_t referee;
 } CMD_RawInput_REF_t;
-#endif
 
 /* 统一的原始输入结构 - 所有设备适配后都转换成这个格式 */
 typedef struct {
     bool online[CMD_SRC_NUM];
 
-#if CMD_ENABLE_SRC_RC
     /* 遥控器部分 */
     CMD_RawInput_RC_t rc;
-#endif
 
-#if CMD_ENABLE_SRC_PC
     /* PC部分 */
     CMD_RawInput_PC_t pc;
-#endif
 
-#if CMD_ENABLE_SRC_NUC
     /* NUC部分 */
+    /* 暂无定义，预留扩展 */
     CMD_RawInput_NUC_t nuc;
-#endif
 
-#if CMD_ENABLE_SRC_REF
     /* REF部分 - 裁判系统数据 */
     CMD_RawInput_REF_t ref;
-#endif
 } CMD_RawInput_t;
 
 /* ========================================================================== */
 /*                              模块掩码                                        */
 /* ========================================================================== */
 typedef enum {
-    CMD_MODULE_NONE            = (1 << 0),
-    CMD_MODULE_CHASSIS         = (1 << 1),
-    CMD_MODULE_GIMBAL          = (1 << 2),
-    CMD_MODULE_SHOOT           = (1 << 3),
-    CMD_MODULE_TRACK           = (1 << 4),
-    CMD_MODULE_ARM             = (1 << 5),
-    CMD_MODULE_REFUI           = (1 << 6),
-    CMD_MODULE_BALANCE_CHASSIS = (1 << 7),
-    CMD_MODULE_ALL             = 0xFE
-
+    CMD_MODULE_NONE    = (1 << 0),
+    CMD_MODULE_CHASSIS = (1 << 1),
+    CMD_MODULE_GIMBAL  = (1 << 2),
+    CMD_MODULE_SHOOT   = (1 << 3),
+    CMD_MODULE_ALL     = 0x0E
 } CMD_ModuleMask_t;
 
 /* ========================================================================== */
 /*                              行为定义                                        */
 /* ========================================================================== */
 /* 行为-按键映射宏表 */
-#define BEHAVIOR_CONFIG_COUNT (12)
+#define BEHAVIOR_CONFIG_COUNT (11)
 #define CMD_BEHAVIOR_TABLE(X) \
-  X(FORE,           CMD_KEY_W,     CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(BACK,           CMD_KEY_S,     CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(LEFT,           CMD_KEY_A,     CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(RIGHT,          CMD_KEY_D,     CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(ACCELERATE,     CMD_KEY_SHIFT, CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(ROTOR,          CMD_KEY_CTRL,  CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(FIRE,           CMD_KEY_L_CLICK,  CMD_ACTIVE_PRESSED,   CMD_MODULE_SHOOT)   \
+  X(FORE,           CMD_KEY_W,     CMD_ACTIVE_PRESSED,      CMD_MODULE_CHASSIS) \
+  X(BACK,           CMD_KEY_S,     CMD_ACTIVE_PRESSED,      CMD_MODULE_CHASSIS) \
+  X(LEFT,           CMD_KEY_A,     CMD_ACTIVE_PRESSED,      CMD_MODULE_CHASSIS) \
+  X(RIGHT,          CMD_KEY_D,     CMD_ACTIVE_PRESSED,      CMD_MODULE_CHASSIS) \
+  X(ACCELERATE,     CMD_KEY_SHIFT, CMD_ACTIVE_PRESSED,      CMD_MODULE_CHASSIS) \
+  X(DECELERATE,     CMD_KEY_CTRL,  CMD_ACTIVE_PRESSED,      CMD_MODULE_CHASSIS) \
+  X(FIRE,           CMD_KEY_L_CLICK,  CMD_ACTIVE_PRESSED,      CMD_MODULE_SHOOT)   \
   X(FIRE_MODE,      CMD_KEY_B,     CMD_ACTIVE_RISING_EDGE,  CMD_MODULE_SHOOT)   \
-  X(CLIMB,          CMD_KEY_R,     CMD_ACTIVE_PRESSED,      CMD_MODULE_BALANCE_CHASSIS) \
-  X(AUTOAIM,        CMD_KEY_R_CLICK,     CMD_ACTIVE_PRESSED,  CMD_MODULE_NONE) \
-  X(CHECKSOURCERCPC,CMD_KEY_CTRL|CMD_KEY_SHIFT|CMD_KEY_V, CMD_ACTIVE_RISING_EDGE, CMD_MODULE_NONE) \
-  X(RESET,          CMD_KEY_CTRL|CMD_KEY_SHIFT|CMD_KEY_G,     CMD_ACTIVE_RISING_EDGE,      CMD_MODULE_NONE)
+  X(ROTOR,          CMD_KEY_E,     CMD_ACTIVE_PRESSED,  CMD_MODULE_CHASSIS) \
+  X(AUTOAIM,        CMD_KEY_R,     CMD_ACTIVE_RISING_EDGE,  CMD_MODULE_GIMBAL | CMD_MODULE_SHOOT) \
+  X(CHECKSOURCERCPC, CMD_KEY_CTRL|CMD_KEY_SHIFT|CMD_KEY_V, CMD_ACTIVE_RISING_EDGE, CMD_MODULE_NONE)
 /* 触发类型 */
 typedef enum {
     CMD_ACTIVE_PRESSED,       /* 按住时触发 */
@@ -293,7 +190,6 @@ typedef enum {
 #define CMD_KEY_PRESSED(kb, key)   (((kb)->bitmap >> (key)) & 1)
 #define CMD_KEY_SET(kb, key)       ((kb)->bitmap |= (1 << (key)))
 #define CMD_KEY_CLEAR(kb, key)     ((kb)->bitmap &= ~(1 << (key)))
-
 
 #ifdef __cplusplus
 }

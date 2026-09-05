@@ -18,9 +18,6 @@
 /* USER STRUCT END */
 
 /* Private function --------------------------------------------------------- */
-/* USER PRIVATE CODE BEGIN */
-
-/* USER PRIVATE CODE END */
 /* Exported functions ------------------------------------------------------- */
 void {{task_function}}(void *argument) {
   (void)argument; /* 未使用argument，消除警告 */

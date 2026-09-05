@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QSettings, Qt, QSize, QTimer
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
@@ -8,7 +8,7 @@ with redirect_stdout(None):
     from qfluentwidgets import FluentIcon as FIF
     from qfluentwidgets import InfoBar, InfoBarPosition
 
-from .home_interface import HomeInterface, resource_path
+from .home_interface import HomeInterface
 from .serial_terminal_interface import SerialTerminalInterface
 from .part_library_interface import PartLibraryInterface
 from .data_interface import DataInterface
@@ -17,9 +17,6 @@ from .code_configuration_interface import CodeConfigurationInterface
 from .finance_interface import FinanceInterface
 from .mech_design_interface import MechDesignInterface
 from .about_interface import AboutInterface
-from .ai_interface import AIInterface
-from .tools.update_check_thread import UpdateCheckThread
-from . import __version__
 import base64
 
 
@@ -30,7 +27,8 @@ class MainWindow(FluentWindow):
         self.initInterface()
         self.initNavigation()
 
-        QTimer.singleShot(2500, self.check_updates_in_background)
+        # 后台检查更新（不弹窗，只显示通知）
+        # self.check_updates_in_background()
 
     def initWindow(self):
         self.setMicaEffectEnabled(False)
@@ -38,7 +36,7 @@ class MainWindow(FluentWindow):
         setTheme(Theme.AUTO, lazy=True)
 
         self.resize(960, 640)
-        self.setWindowIcon(QIcon(resource_path('assets/logo/M2.ico')))
+        self.setWindowIcon(QIcon('./assets/logo/M2.ico'))
         self.setWindowTitle("MRobot Toolbox")
 
 
@@ -58,21 +56,18 @@ class MainWindow(FluentWindow):
         self.codeConfigurationInterface = CodeConfigurationInterface(self)
         self.financeInterface = FinanceInterface(self)
         self.mechDesignInterface = MechDesignInterface(self)
-        self.aiInterface = AIInterface(self)
-        self.aboutInterface = AboutInterface(self)
 
 
     def initNavigation(self):
         self.addSubInterface(self.homeInterface, FIF.HOME, self.tr('主页'))
         # self.addSubInterface(self.dataInterface, FIF.CODE, self.tr('代码生成'))
         self.addSubInterface(self.codeConfigurationInterface, FIF.CODE, self.tr('代码生成'))
-        self.addSubInterface(self.aiInterface, FIF.ROBOT, self.tr('AI 工作台'))
         self.addSubInterface(self.serialTerminalInterface, FIF.COMMAND_PROMPT,self.tr('串口助手'))
         self.addSubInterface(self.partLibraryInterface, FIF.DOWNLOAD, self.tr('零件库'))
         self.addSubInterface(self.mechDesignInterface, FIF.SETTING, self.tr('机械设计'))
         # self.addSubInterface(self.financeInterface, FIF.DOCUMENT, self.tr('财务做账'))
         self.addSubInterface(self.miniToolInterface, FIF.LIBRARY, self.tr('迷你工具箱'))
-        self.addSubInterface(self.aboutInterface, FIF.INFO, self.tr('关于'), position=NavigationItemPosition.BOTTOM)
+        self.addSubInterface(AboutInterface(self), FIF.INFO, self.tr('关于'), position=NavigationItemPosition.BOTTOM)
 
 
 
@@ -117,37 +112,11 @@ class MainWindow(FluentWindow):
     
     def check_updates_in_background(self):
         """后台检查更新"""
-        settings = QSettings("MRobot", "MRobot")
-        if not settings.value("updates/autoCheck", True, type=bool):
-            return
-        self.updateCheckThread = UpdateCheckThread(__version__)
-        self.updateCheckThread.update_found.connect(self._background_update_found)
-        self.updateCheckThread.error_occurred.connect(
-            lambda message: print(f"后台检查更新失败: {message}")
-        )
-        self.updateCheckThread.start()
-
-    def _background_update_found(self, update_info):
-        self.aboutInterface.accept_background_update(update_info)
-        version = update_info.get("version", "")
-        settings = QSettings("MRobot", "MRobot")
-        if settings.value("updates/autoInstall", False, type=bool):
-            InfoBar.success(
-                title="正在自动更新",
-                content=f"MRobot v{version} 将在下载和校验完成后自动安装并重启。",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=5000,
-            )
-            self.aboutInterface.start_update()
-        else:
-            InfoBar.info(
-                title="发现新版本",
-                content=f"MRobot v{version} 已发布，请在“关于”页面一键更新。",
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=6000,
-            )
+        try:
+            # 后台更新检查已移至关于页面手动触发
+            pass
+        except Exception as e:
+            print(f"初始化完成: {e}")
 
     # main_window.py 只需修改关闭事件
     def closeEvent(self, e):

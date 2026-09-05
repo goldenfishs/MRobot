@@ -8,12 +8,9 @@ import tempfile
 import time
 
 def update_code(parent=None, info_callback=None, error_callback=None):
-    # 优先使用当前有效的 GitHub 源，备用 Gitea
-    download_sources = [
-        ("GitHub CodeLoad", "https://codeload.github.com/goldenfishs/MRobot/zip/refs/heads/User_code", (5, 20)),
-        ("GitHub Archive", "https://github.com/goldenfishs/MRobot/archive/refs/heads/User_code.zip", (5, 20)),
-        ("Gitea", "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip", (5, 30)),
-    ]
+    # 优先使用 GitHub，备用 Gitea
+    github_url = "https://github.com/lvzucheng/MRobot/archive/refs/heads/User_code.zip"
+    gitea_url = "http://gitea.qutrobot.top/robofish/MRobot/archive/User_code.zip"
     
     # 导入 CodeGenerator 以使用统一的路径获取逻辑
     try:
@@ -58,36 +55,36 @@ def update_code(parent=None, info_callback=None, error_callback=None):
     local_dir = os.path.join(assets_dir, "User_code")
     print(f"更新代码：最终目标目录: {local_dir}")
     
-    # 依次尝试下载源
+    # 尝试从 GitHub 下载，失败则使用 Gitea
     download_successful = False
     resp = None
-    download_errors = []
-
-    headers = {
-        "User-Agent": "MRobot-Code-Updater/1.0",
-        "Accept": "application/zip,application/octet-stream,*/*",
-    }
-
-    for source_name, source_url, timeout in download_sources:
+    
+    # 首先尝试 GitHub
+    try:
+        print("尝试从 GitHub 下载代码...")
+        resp = requests.get(github_url, timeout=15)
+        resp.raise_for_status()
+        download_successful = True
+        print("成功从 GitHub 下载")
+    except Exception as github_error:
+        print(f"GitHub 下载失败: {github_error}")
+        print("切换到备用源 Gitea...")
+        
+        # 切换到 Gitea
         try:
-            print(f"尝试从 {source_name} 下载代码...")
-            resp = requests.get(source_url, timeout=timeout, headers=headers)
+            resp = requests.get(gitea_url, timeout=30)
             resp.raise_for_status()
             download_successful = True
-            print(f"成功从 {source_name} 下载")
-            break
-        except Exception as error:
-            print(f"{source_name} 下载失败: {error}")
-            download_errors.append(f"{source_name}: {error}")
-
+            print("成功从 Gitea 下载")
+        except Exception as gitea_error:
+            print(f"Gitea 下载也失败: {gitea_error}")
+            if error_callback:
+                error_callback(parent, f"所有下载源均失败\nGitHub: {github_error}\nGitea: {gitea_error}")
+            return False
+    
     if not download_successful or resp is None:
         if error_callback:
-            message = "所有下载源均失败"
-            if download_errors:
-                message += "\n" + "\n".join(download_errors)
-            if os.path.exists(local_dir):
-                message += "\n当前将继续使用本地已有的 User_code 模板。"
-            error_callback(parent, message)
+            error_callback(parent, "下载失败")
         return False
     
     try:

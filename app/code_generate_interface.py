@@ -5,8 +5,6 @@ from app.tools.analyzing_ioc import analyzing_ioc
 from app.code_page.bsp_interface import bsp
 from app.data_interface import DataInterface
 from app.tools.code_generator import CodeGenerator
-from mcode.errors import MCodeError
-from mcode.service import MCodeService
 
 import os
 import csv
@@ -18,13 +16,6 @@ class CodeGenerateInterface(QWidget):
         super().__init__(parent)
         self.setObjectName("CodeGenerateInterface")
         self.project_path = project_path
-        self.mcode = MCodeService()
-        self.project_model = None
-        try:
-            self.project_model = self.mcode.inspect(project_path)
-        except MCodeError:
-            # The UI reports the actionable diagnostic when generation starts.
-            pass
         
         # 初始化页面缓存
         self.page_cache = {}
@@ -273,7 +264,7 @@ class CodeGenerateInterface(QWidget):
 
 
     def generate_code(self):
-        """通过 MCode 的唯一生成流水线安装选中包并生成代码。"""
+        """生成所有代码，包括未加载页面"""
         try:
             # 先收集所有页面名（从CSV配置文件读取）
             from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用
@@ -305,44 +296,22 @@ class CodeGenerateInterface(QWidget):
                     elif hasattr(widget, '_generate_device_code_internal') and widget not in device_pages:
                         device_pages.append(widget)
 
-            algorithms = {"ahrs", "filter", "kalman_filter", "limiter", "mixer", "pid", "user_math"}
-            package_specs = ["mrobot.platform.stm32"]
-            bindings = {}
-            for page in bsp_pages:
-                if not getattr(page, "is_need_generate", lambda: False)():
-                    continue
-                name = getattr(page, "yaml_key", getattr(page, "peripheral_name", "")).lower()
-                if name:
-                    package_specs.append(f"mrobot.bsp.{name.replace('_', '-')}")
-                if hasattr(page, "_collect_configs"):
-                    for logical_name, instance in page._collect_configs():
-                        bindings[f"BSP_{name.upper()}_{logical_name.upper()}"] = instance
-            for page in component_pages:
-                if not getattr(page, "is_need_generate", lambda: False)():
-                    continue
-                name = getattr(page, "component_name", "").lower()
-                package_type = "algorithm" if name in algorithms else "component"
-                if name:
-                    package_specs.append(f"mrobot.{package_type}.{name.replace('_', '-')}")
-            for page in device_pages:
-                if not getattr(page, "is_need_generate", lambda: False)():
-                    continue
-                name = getattr(page, "device_name", "").lower()
-                if name:
-                    package_specs.append(f"mrobot.device.{name.replace('_', '-')}")
+            # 确保导入成功
+            from app.code_page.bsp_interface import bsp
+            from app.code_page.component_interface import component
+            from app.code_page.device_interface import device
 
-            self.mcode.configure(self.project_path, tuple(sorted(set(package_specs))), bindings)
-            diagnostics = self.mcode.validate(self.project_path)
-            errors = [item for item in diagnostics if item.severity.value == "error"]
-            if errors:
-                raise MCodeError("\n".join(item.message for item in errors))
-            mcode_plan = self.mcode.generate(self.project_path, adopt_legacy=True)
+            # 生成 BSP 代码
+            bsp_result = bsp.generate_bsp(self.project_path, bsp_pages)
 
-            combined_result = (
-                f"已解析 {len(mcode_plan.packages)} 个包，"
-                f"生成或更新 {mcode_plan.changed_count} 个文件。\n"
-                "所有输出均由 MCode 统一管理；用户 scaffold 不会被覆盖。"
-            )
+            # 生成 Component 代码  
+            component_result = component.generate_component(self.project_path, component_pages)
+
+            # 生成 Device 代码
+            device_result = device.generate_device(self.project_path, device_pages)
+
+            # 合并结果信息
+            combined_result = f"BSP代码生成:\n{bsp_result}\n\nComponent代码生成:\n{component_result}\n\nDevice代码生成:\n{device_result}"
 
             InfoBar.success(
                 title="代码生成结果",
@@ -369,11 +338,11 @@ class CodeGenerateInterface(QWidget):
 
     def _get_freertos_status(self):
         """获取FreeRTOS状态"""
-        try:
-            model = self.project_model or self.mcode.inspect(self.project_path)
-            return "开启" if model.freertos else "未开启"
-        except MCodeError as exc:
-            return f"解析失败: {exc}"
+        ioc_files = [f for f in os.listdir(self.project_path) if f.endswith('.ioc')]
+        if ioc_files:
+            ioc_path = os.path.join(self.project_path, ioc_files[0])
+            return "开启" if analyzing_ioc.is_freertos_enabled_from_ioc(ioc_path) else "未开启"
+        return "未找到.ioc文件"
 
     def _load_csv_and_build_tree(self):
         from app.tools.code_generator import CodeGenerator  # 在方法内重新导入确保可用

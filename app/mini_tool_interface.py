@@ -43,8 +43,8 @@ class MiniToolInterface(QWidget):
         self.aiCard = PushSettingCard(
             text="▶ 启动",
             icon=FluentIcon.ROBOT,
-            title="MRobot AI 工作台",
-            content="连接自定义 AI，并使用只读 MCode 工具理解当前机器人工程。",
+            title="MRobot AI助手",
+            content="与 MRobot 进行图一乐交流, 使用开源模型qwen3:0.6b。",
         )
         mainLayout.addWidget(self.aiCard)
         self.aiCard.clicked.connect(self.open_ai_tab)
@@ -105,11 +105,6 @@ class MiniToolInterface(QWidget):
         self.tabBar.setCurrentTab("fitPage")
 
     def open_ai_tab(self):
-        # 主窗口已经持有唯一 AI 工作台实例，避免多个页面同时写同一份会话历史。
-        window = self.window()
-        if hasattr(window, "aiInterface") and hasattr(window, "switchTo"):
-            window.switchTo(window.aiInterface)
-            return
         # 检查是否已存在标签页，避免重复添加
         for i in range(self.stackedWidget.count()):
             widget = self.stackedWidget.widget(i)

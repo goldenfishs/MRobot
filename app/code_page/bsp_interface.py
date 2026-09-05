@@ -77,28 +77,7 @@ class BspSimplePeripheral(QWidget):
                 return False
             output_path = os.path.join(self.project_path, f"User/bsp/{filename}")
             CodeGenerator.save_with_preserve(output_path, template_content)  # 使用保留用户区域的写入
-        
-        # 复制BSP文件夹下的其他额外文件（如 README.md, CHANGELOG.md）
-        periph_template_dir = os.path.join(template_base_dir, periph_folder)
-        if os.path.exists(periph_template_dir) and os.path.isdir(periph_template_dir):
-            import shutil
-            files_to_process = list(self.template_names.values())
-            for item in os.listdir(periph_template_dir):
-                # 跳过已处理的主要文件
-                if item in files_to_process:
-                    continue
-                
-                src_file = os.path.join(periph_template_dir, item)
-                dst_file = os.path.join(self.project_path, f"User/bsp/{item}")
-                
-                # 只复制文件，不复制子目录
-                if os.path.isfile(src_file):
-                    os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-                    shutil.copy2(src_file, dst_file)
-                    print(f"复制BSP额外文件: {item}")
-        
         self._save_config()
-        return True
         return True
 
 
@@ -426,19 +405,6 @@ class bsp_can(BspPeripheralBase):
             get_available_can
         )
 
-    def _generate_bsp_code_internal(self):
-        """重写生成方法，直接复制can文件夹中的文件"""
-        # 检查是否需要生成
-        if not self.is_need_generate():
-            for filename in self.template_names.values():
-                output_path = os.path.join(self.project_path, f"User/bsp/{filename}")
-                if os.path.exists(output_path):
-                    return "skipped"
-            return "not_needed"
-        
-        # 调用父类方法生成配置化的代码（头文件和源文件）
-        return super()._generate_bsp_code_internal()
-
     def _generate_source_file(self, configs, template_dir):
         # 从子文件夹加载模板（与_generate_header_file保持一致）
         periph_folder = self.peripheral_name.lower()
@@ -691,37 +657,6 @@ class bsp_fdcan(BspPeripheralBase):
             get_available_fdcan
         )
 
-    def _generate_bsp_code_internal(self):
-        """重写生成方法，调用父类生成FDCAN代码后复制CAN兼容层"""
-        # 先调用父类方法生成FDCAN代码
-        result = super()._generate_bsp_code_internal()
-        if result and result not in ["skipped", "not_needed"]:
-            # 成功后复制CAN兼容层文件
-            self._copy_can_wrapper()
-        return result
-
-    def _copy_can_wrapper(self):
-        """复制CAN兼容层文件(can.h)到项目"""
-        try:
-            template_base_dir = CodeGenerator.get_assets_dir("User_code/bsp")
-            fdcan_folder = os.path.join(template_base_dir, "fdcan")
-            bsp_output_dir = os.path.join(self.project_path, "User/bsp")
-            
-            # 确保输出目录存在
-            os.makedirs(bsp_output_dir, exist_ok=True)
-            
-            # 复制can.h（CAN兼容层头文件）
-            can_h_src = os.path.join(fdcan_folder, "can.h")
-            can_h_dst = os.path.join(bsp_output_dir, "can.h")
-            if os.path.exists(can_h_src):
-                with open(can_h_src, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                CodeGenerator.save_with_preserve(can_h_dst, content)
-                print(f"✓ 已复制CAN兼容层: can.h")
-                
-        except Exception as e:
-            print(f"复制CAN兼容层文件时出错: {e}")
-
     def _generate_header_file(self, configs, template_dir):
         """重写头文件生成，添加 FDCAN 使能和 FIFO 分配定义"""
         # 从子文件夹加载模板
@@ -917,48 +852,10 @@ class bsp_spi(BspPeripheralBase):
 
 
 def patch_uart_interrupts(project_path, uart_instances):
-    """自动修改中断文件，插入 UART BSP 相关代码（支持 F1/F4/H7 等系列）"""
-    # 检测MCU型号，确定正确的中断文件
-    ioc_files = [f for f in os.listdir(project_path) if f.endswith('.ioc')]
-    if not ioc_files:
-        return
-    
-    ioc_path = os.path.join(project_path, ioc_files[0])
-    mcu_name = analyzing_ioc.get_mcu_name_from_ioc(ioc_path)
-    
-    if not mcu_name:
-        return
-    
-    # 根据MCU型号确定中断文件名
-    mcu_upper = mcu_name.upper()
-    if 'STM32F1' in mcu_upper:
-        it_file = "stm32f1xx_it.c"
-    elif 'STM32F4' in mcu_upper:
-        it_file = "stm32f4xx_it.c"
-    elif 'STM32H7' in mcu_upper:
-        it_file = "stm32h7xx_it.c"
-    elif 'STM32F7' in mcu_upper:
-        it_file = "stm32f7xx_it.c"
-    elif 'STM32G4' in mcu_upper:
-        it_file = "stm32g4xx_it.c"
-    elif 'STM32L4' in mcu_upper:
-        it_file = "stm32l4xx_it.c"
-    else:
-        # 通用处理：尝试从MCU名称提取系列信息
-        # 格式通常为 STM32X0XXX，提取 X0 部分
-        import re as regex
-        match = regex.match(r'STM32([A-Z]\d)', mcu_upper)
-        if match:
-            series = match.group(1).lower()
-            it_file = f"stm32{series}xx_it.c"
-        else:
-            # 默认尝试 F4
-            it_file = "stm32f4xx_it.c"
-    
-    it_path = os.path.join(project_path, f"Core/Src/{it_file}")
+    """自动修改 stm32f4xx_it.c，插入 UART BSP 相关代码"""
+    it_path = os.path.join(project_path, "Core/Src/stm32f4xx_it.c")
     if not os.path.exists(it_path):
         return
-    
     with open(it_path, "r", encoding="utf-8") as f:
         code = f.read()
 
@@ -1216,25 +1113,18 @@ class bsp_gpio(QWidget):
         )
         
         # 生成EXTI使能代码 - 使用用户自定义的BSP枚举名称
-        # 根据引脚编号获取正确的IRQn（适配不同MCU）
         enable_lines = []
         disable_lines = []
         for config in configs:
             if config['has_exti']:
                 ioc_label = config['ioc_label']
                 custom_name = config['custom_name']
-                # 尝试从IOC label中提取引脚编号，优先使用IOC定义的IRQn
                 enable_lines.append(f"    case BSP_GPIO_{custom_name}:")
-                enable_lines.append(f"#if defined({ioc_label}_EXTI_IRQn)")
                 enable_lines.append(f"      HAL_NVIC_EnableIRQ({ioc_label}_EXTI_IRQn);")
-                enable_lines.append(f"#endif")
-                enable_lines.append(f"      return BSP_OK;")
-                
+                enable_lines.append(f"      break;")
                 disable_lines.append(f"    case BSP_GPIO_{custom_name}:")
-                disable_lines.append(f"#if defined({ioc_label}_EXTI_IRQn)")
                 disable_lines.append(f"      HAL_NVIC_DisableIRQ({ioc_label}_EXTI_IRQn);")
-                disable_lines.append(f"#endif")
-                disable_lines.append(f"      return BSP_OK;")
+                disable_lines.append(f"      break;")
                 
         content = CodeGenerator.replace_auto_generated(
             content, "AUTO GENERATED BSP_GPIO_ENABLE_IRQ", "\n".join(enable_lines)
